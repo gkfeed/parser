@@ -1,0 +1,26 @@
+version: '3'
+services:
+  gkfeed-parser:
+    build:
+      context: .
+    tty: True
+    volumes:
+      - ~/.local/share/gkfeed/data:/data
+    env_file:
+      - .env
+    container_name: gkfeed-parser
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    tty: True
+    env_file:
+      - .env
+    container_name: gkfeed-worker
+  redis:
+    image: redis:alpine
+    # ports:
+    #   - "6379:6379"
+    container_name: gkfeed-parser-redis
+volumes:
+  gkfeed_data:
