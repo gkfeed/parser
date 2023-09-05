@@ -8,6 +8,10 @@ services:
       - ~/.local/share/gkfeed/data:/data
     env_file:
       - .env
+    networks:
+      - gkfeed-bridge
+    depends_on:
+      - redis
     container_name: gkfeed-parser
   worker:
     build:
@@ -16,11 +20,21 @@ services:
     tty: True
     env_file:
       - .env
+    networks:
+      - gkfeed-bridge
+    depends_on:
+      - redis
     container_name: gkfeed-worker
   redis:
     image: redis:alpine
-    # ports:
-    #   - "6379:6379"
+    networks:
+      gkfeed-bridge:
+        ipv4_address: 10.5.0.4
     container_name: gkfeed-parser-redis
-volumes:
-  gkfeed_data:
+networks:
+  gkfeed-bridge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
