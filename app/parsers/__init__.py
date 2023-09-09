@@ -11,6 +11,7 @@ from .shiki import ShikiFeed
 from .reddit import RedditFeed
 from .vk import VkFeed
 from .youtube import YoutubeFeed
+from .ranobeme import RanobeMeFeed
 
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
@@ -23,6 +24,7 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     'reddit': RedditFeed,
     'vk': VkFeed,
     'yt': YoutubeFeed,
+    'ranobe.me': RanobeMeFeed,
 }
 
 
