@@ -18,7 +18,8 @@ class TikTokFeed(BaseFeed):
                     title=v['description'],
                     text=v['description'],
                     date=await self._get_video_publish_date(v),
-                    link=v['webpage_url'],
+                    link=self.feed.url + '/video/' +
+                    v['webpage_url'].split('/')[-1],
                 )
                 for v in videos
             ]
