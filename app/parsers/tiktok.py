@@ -23,7 +23,7 @@ class TikTokFeed(BaseFeed):
                 )
                 for v in videos
             ]
-        except (UnavailableFeed, ValueError):
+        except (UnavailableFeed, ValueError, TypeError):
             return []
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
