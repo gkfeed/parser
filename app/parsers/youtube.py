@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 from app.utils.datetime import convert_datetime
@@ -9,9 +9,6 @@ from ._base import BaseFeed
 
 
 class YoutubeFeed(BaseFeed):
-    _channel_info_storage_time = timedelta(hours=1)
-    _video_info_storage_time = timedelta(weeks=1)
-
     @property
     async def items(self) -> list[Item]:
         try:
