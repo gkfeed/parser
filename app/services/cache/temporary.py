@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from . import CacheService
 from .storage import TStorage
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 
 class ExpiredCache(Exception):
@@ -21,9 +21,7 @@ class TemporaryCacheService(CacheService[_T]):
         self.__timestamps_when_expired: dict[str, float] = {}
 
     def set(self, id: str, data: _T, storage_time: timedelta) -> None:
-        self.__timestamps_when_expired[id] = (
-            datetime.now() + storage_time
-        ).timestamp()
+        self.__timestamps_when_expired[id] = (datetime.now() + storage_time).timestamp()
 
         super().set(id, data)
 

@@ -3,7 +3,7 @@ from datetime import timedelta
 from .storage.memory import MemoryStorage
 from .temporary import TemporaryCacheService, UndefinedCache, ExpiredCache
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 
 class _UseTemporaryCacheServiceMixin(Generic[_T]):
@@ -11,9 +11,7 @@ class _UseTemporaryCacheServiceMixin(Generic[_T]):
 
 
 class UseTemporaryCacheServiceExtension(Generic[_T]):
-    cache: TemporaryCacheService[_T] = TemporaryCacheService(
-        storage=MemoryStorage()
-    )
+    cache: TemporaryCacheService[_T] = TemporaryCacheService(storage=MemoryStorage())
 
 
 def async_store_in_cache_for(storage_time: timedelta):
@@ -26,5 +24,7 @@ def async_store_in_cache_for(storage_time: timedelta):
                 result = await func(*args, **kwargs)
                 cache.set(args[1], result, storage_time)
             return result
+
         return wrapper
+
     return decorator

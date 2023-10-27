@@ -3,8 +3,7 @@ from dateutil.parser import parse
 
 
 constant_datetime = datetime.combine(
-    date(year=2023, month=1, day=21), time(
-        hour=8), timezone(offset=timedelta(hours=0))
+    date(year=2023, month=1, day=21), time(hour=8), timezone(offset=timedelta(hours=0))
 )
 
 

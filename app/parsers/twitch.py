@@ -1,8 +1,11 @@
 from datetime import timedelta
 
 from app.serializers.feed import Item
-from app.services.cache.temporary import \
-    TemporaryCacheService, ExpiredCache, UndefinedCache
+from app.services.cache.temporary import (
+    TemporaryCacheService,
+    ExpiredCache,
+    UndefinedCache,
+)
 from app.services.cache.storage.memory import MemoryStorage
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
@@ -10,8 +13,7 @@ from ._base import BaseFeed as _BaseFeed
 
 
 class TwitchFeed(_BaseFeed):
-    __cache: TemporaryCacheService[list[Item]] =\
-        TemporaryCacheService(MemoryStorage())
+    __cache: TemporaryCacheService[list[Item]] = TemporaryCacheService(MemoryStorage())
 
     @property
     async def items(self) -> list[Item]:
@@ -27,12 +29,12 @@ class TwitchFeed(_BaseFeed):
 
     def _get_stream_item(self, stream: Stream) -> Item:
         return Item(
-            title=stream.channel_name + ': ' + stream.title,
+            title=stream.channel_name + ": " + stream.title,
             text=stream.title,
             date=stream.started_at,
-            link=self.feed.url
+            link=self.feed.url,
         )
 
     @property
     def _streamer_name(self) -> str:
-        return self.feed.url.split('/')[-1]
+        return self.feed.url.split("/")[-1]

@@ -15,16 +15,16 @@ from .ranobeme import RanobeMeFeed
 
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
-    'web': WebFeed,
-    'tiktok': TikTokFeed,
-    'kinogo': KinogoFeed,
-    'twitch': TwitchFeed,
-    'yummyanime': YummyAnimeFeed,
-    'shiki': ShikiFeed,
-    'reddit': RedditFeed,
-    'vk': VkFeed,
-    'yt': YoutubeFeed,
-    'ranobe.me': RanobeMeFeed,
+    "web": WebFeed,
+    "tiktok": TikTokFeed,
+    "kinogo": KinogoFeed,
+    "twitch": TwitchFeed,
+    "yummyanime": YummyAnimeFeed,
+    "shiki": ShikiFeed,
+    "reddit": RedditFeed,
+    "vk": VkFeed,
+    "yt": YoutubeFeed,
+    "ranobe.me": RanobeMeFeed,
 }
 
 
@@ -34,7 +34,7 @@ class FeedParser:
     def __init__(self, feed: Feed):
         self.feed = feed
         if self.feed.type not in _PARSERS:
-            raise ValueError(f'Unknown feed type: {self.feed.type}')
+            raise ValueError(f"Unknown feed type: {self.feed.type}")
 
     async def parse(self) -> list[Item]:
         parser = self._parsers[self.feed.type]

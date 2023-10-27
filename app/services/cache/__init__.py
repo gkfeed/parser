@@ -3,7 +3,7 @@ from typing import Generic, TypeVar
 from .storage import TStorage
 
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 
 class _CacheServiceMixin(Generic[_T]):

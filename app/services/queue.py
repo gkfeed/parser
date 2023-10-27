@@ -11,8 +11,7 @@ class QueueService:
     __rq = Queue(connection=Redis(host=REDIS_HOST))
 
     @classmethod
-    async def put_and_wait_for_result(cls,
-                                      func: Callable, args=list[Any]) -> Any:
+    async def put_and_wait_for_result(cls, func: Callable, args=list[Any]) -> Any:
         job = cls.__rq.enqueue(func, *args)
         while not job.is_finished:
             if job.is_failed:

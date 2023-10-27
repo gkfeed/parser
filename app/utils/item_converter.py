@@ -9,5 +9,5 @@ def convert_item(item: FeedItem) -> Item:
         title=item.title,
         text=item.description,
         date=convert_datetime(item.publish_date),
-        link=item.link
+        link=item.link,
     )

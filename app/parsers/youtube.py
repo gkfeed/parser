@@ -12,16 +12,16 @@ class YoutubeFeed(BaseFeed):
     @property
     async def items(self) -> list[Item]:
         try:
-            videos_url = self.feed.url + '/videos'
+            videos_url = self.feed.url + "/videos"
             info = await YoutubeInfoExtractor.get_page_info(videos_url)
-            channel_name = info['uploader']
-            videos = info['entries']
+            channel_name = info["uploader"]
+            videos = info["entries"]
             return [
                 Item(
-                    title='YT: ' + channel_name,
-                    text=v['title'],
+                    title="YT: " + channel_name,
+                    text=v["title"],
                     date=await self._get_video_publish_date(v),
-                    link=v['url'],
+                    link=v["url"],
                 )
                 for v in videos
             ]
@@ -30,9 +30,8 @@ class YoutubeFeed(BaseFeed):
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
         today_timestamp = datetime.today().timestamp()
-        if video['timestamp'] and video['timestamp'] >= today_timestamp:
-            date_str = datetime.fromtimestamp(
-                video['timestamp']).strftime('%Y%m%d')
+        if video["timestamp"] and video["timestamp"] >= today_timestamp:
+            date_str = datetime.fromtimestamp(video["timestamp"]).strftime("%Y%m%d")
             return convert_datetime(date_str)
-        info = await YoutubeInfoExtractor.get_video_info(video['url'])
-        return convert_datetime(info['upload_date'])
+        info = await YoutubeInfoExtractor.get_video_info(video["url"])
+        return convert_datetime(info["upload_date"])

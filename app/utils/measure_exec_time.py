@@ -10,4 +10,5 @@ def measure_execution_time_async(func):
         print(args[0].feed.url)
         print(f"Execution time: {execution_time} seconds")
         return result
+
     return wrapper

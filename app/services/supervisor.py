@@ -15,24 +15,23 @@ class FeedsSupervisor:
     async def dispatcher(cls):
         try:
             while True:
-                print('START FETCHING FEEDS')
+                print("START FETCHING FEEDS")
                 await cls.__fetch_all_feeds()
-                await asyncio.sleep(1)
+                await asyncio.sleep(60)
         except Exception as e:
-            print('DISPATCHER FAILED WITH ', e)
+            print("DISPATCHER FAILED WITH ", e)
             import traceback
+
             traceback.print_exc()
-            await cls.dispatcher()
+            # await cls.dispatcher()
 
     @classmethod
     async def __fetch_all_feeds(cls):
         feeds = await FeedRepository.get_all()
 
-        yt_feeds = [f for f in feeds if f.type == 'yt']
-
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if feed.type not in ('twitch',):
+                if feed.type not in ("twitch",):
                     tg.create_task(cls.__fetch_feed(feed))
 
     @classmethod
@@ -40,4 +39,4 @@ class FeedsSupervisor:
         items = await FeedParser(feed).parse()
         await ItemsRepository(feed).add_items_to_feed(items)
         if len(items) == 0:
-            print('Feed failed: ', feed.url, len(items))
+            print("Feed failed: ", feed.url, len(items))

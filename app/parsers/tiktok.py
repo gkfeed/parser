@@ -12,14 +12,13 @@ class TikTokFeed(BaseFeed):
     async def items(self) -> list[Item]:
         try:
             info = await TikTokInfoExtractor.get_page_info(self.feed.url)
-            videos = info['entries']
+            videos = info["entries"]
             return [
                 Item(
-                    title=v['description'],
-                    text=v['description'],
+                    title=v["description"],
+                    text=v["description"],
                     date=await self._get_video_publish_date(v),
-                    link=self.feed.url + '/video/' +
-                    v['webpage_url'].split('/')[-1],
+                    link=self.feed.url + "/video/" + v["webpage_url"].split("/")[-1],
                 )
                 for v in videos
             ]
@@ -27,6 +26,7 @@ class TikTokFeed(BaseFeed):
             return []
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
-        date_str = datetime.fromtimestamp(
-            video['timestamp']).strftime('%Y%m%d %H:%M:%S')
+        date_str = datetime.fromtimestamp(video["timestamp"]).strftime(
+            "%Y%m%d %H:%M:%S"
+        )
         return convert_datetime(date_str)

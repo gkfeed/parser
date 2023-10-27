@@ -16,14 +16,14 @@ class FeedRepository:
     @classmethod
     async def get_by_id(cls, id: int) -> Feed:
         if not (item := await _Feed.filter(id=id).first()):
-            raise ValueError(f'No feed found by id: {id}')
+            raise ValueError(f"No feed found by id: {id}")
 
         return await cls._unserialize(item)
 
     @classmethod
     async def delete_by_id(cls, id: int) -> None:
         if not (item := await _Feed.filter(id=id).first()):
-            raise ValueError(f'No feed found by id: {id}')
+            raise ValueError(f"No feed found by id: {id}")
 
         await _Feed.delete(item)
 

@@ -11,7 +11,7 @@ class MemoryStorage(_BaseStorage):
         try:
             return self.__storage[id]
         except KeyError:
-            raise ValueError('No such index: ' + id)
+            raise ValueError("No such index: " + id)
 
     def set(self, id: str, data: Any) -> None:
         self.__storage[id] = data
