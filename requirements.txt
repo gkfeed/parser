@@ -26,7 +26,7 @@ pypika-tortoise==0.1.6 ; python_version >= '3.7' and python_version < '4.0'
 pytest==7.4.1 ; python_version >= '3.7'
 python-dateutil==2.8.2
 python-dotenv==1.0.0
-pytz==2023.3
+pytz==2023.3.post1
 redis[hiredis]==5.0.0
 requests==2.31.0 ; python_version >= '3.7'
 rq==1.15.1
