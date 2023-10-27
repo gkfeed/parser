@@ -1,5 +1,5 @@
-from rss_parser import Parser
-from rss_parser.models import FeedItem
+from rss_parser import Parser  # type: ignore
+from rss_parser.models import FeedItem  # type: ignore
 
 from app.utils.item_converter import convert_item
 from app.serializers.feed import Item
@@ -17,10 +17,7 @@ class WebFeed(WebParser):
             return []
 
     async def _get_items_from_web(self, url: str) -> list[Item]:
-        return [
-            convert_item(item)
-            for item in await self.__get_feed_from_url(url)
-        ]
+        return [convert_item(item) for item in await self.__get_feed_from_url(url)]
 
     async def __get_feed_from_url(self, url: str) -> list[FeedItem]:
         try:

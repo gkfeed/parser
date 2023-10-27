@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-import yt_dlp
+import yt_dlp  # type: ignore
 
 from app.services.queue import QueueService
 from app.services.cache.use_temporary import (

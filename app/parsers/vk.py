@@ -74,7 +74,7 @@ class VkFeed(WebParser):
 
     def _get_post_link(self, post: Tag) -> str:
         try:
-            link = 'https://vk.com/wall' + post['id'][4:]
+            link = 'https://vk.com/wall' + str(post['id'])[4:]
             return link
         except IndexError:
             raise ValueError

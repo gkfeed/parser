@@ -5,7 +5,7 @@ from ._base import BaseStorage as _BaseStorage
 
 class MemoryStorage(_BaseStorage):
     def __init__(self) -> None:
-        self.__storage = {}
+        self.__storage: dict[str, Any] = {}
 
     def get(self, id: str) -> Any:
         try:

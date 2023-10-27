@@ -1,4 +1,4 @@
-from rss_parser.models import FeedItem
+from rss_parser.models import FeedItem  # type: ignore
 
 from app.serializers.feed import Item
 from .datetime import convert_datetime

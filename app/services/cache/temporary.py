@@ -18,7 +18,7 @@ class UndefinedCache(Exception):
 class TemporaryCacheService(CacheService[_T]):
     def __init__(self, storage: TStorage) -> None:
         super().__init__(storage)
-        self.__timestamps_when_expired = {}
+        self.__timestamps_when_expired: dict[str, float] = {}
 
     def set(self, id: str, data: _T, storage_time: timedelta) -> None:
         self.__timestamps_when_expired[id] = (

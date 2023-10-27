@@ -1,5 +1,5 @@
 import asyncio
-from typing import Coroutine, Any
+from typing import Callable, Any
 
 from redis import Redis
 from rq import Queue
@@ -12,7 +12,7 @@ class QueueService:
 
     @classmethod
     async def put_and_wait_for_result(cls,
-                                      func: Coroutine, args=list[Any]) -> Any:
+                                      func: Callable, args=list[Any]) -> Any:
         job = cls.__rq.enqueue(func, *args)
         while not job.is_finished:
             if job.is_failed:
