@@ -23,11 +23,19 @@ class FeedsSupervisor:
             import traceback
 
             traceback.print_exc()
-            await cls.dispatcher()
+            # await cls.dispatcher()
 
     @classmethod
     async def __fetch_all_feeds(cls):
         feeds = await FeedRepository.get_all()
+        feeds = [
+            Feed(
+                id=1,
+                title="a",
+                url="https://www.tiktok.com/sendependa_dio",
+                type="tiktok",
+            ),
+        ]
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
