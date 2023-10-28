@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 tortoise-orm = "*"
-yt-dlp = "*"
+yt-dlp = "==2023.10.13"
 aiohttp = "*"
 redis = {extras = ["hiredis"], version = "*"}
 rq = "*"
@@ -13,6 +13,7 @@ python-dateutil = "*"
 python-dotenv = "*"
 pydantic = "==1.10.11"
 rss-parser = "==0.2.4"
+selenium = "*"
 
 [dev-packages]
 flake8 = "*"

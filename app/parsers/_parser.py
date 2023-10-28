@@ -1,6 +1,7 @@
 from abc import ABC
 from bs4 import BeautifulSoup
 from datetime import timedelta
+from selenium import webdriver
 
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
@@ -24,3 +25,18 @@ class WebParser(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
 
     async def get_soup(self, url: str) -> BeautifulSoup:
         return BeautifulSoup(await self.get_html(url), "html.parser")
+
+
+class WebParserWithSelenium(WebParser, ABC):
+    _cache_storage_time = timedelta(minutes=5)
+
+    @async_store_in_cache_for(_cache_storage_time)
+    async def get_html(self, url: str) -> bytes:
+        driver = webdriver.Remote(
+            "http://10.5.0.5:4444",
+            options=webdriver.ChromeOptions(),
+        )
+        driver.get(url)
+        html = driver.page_source
+        driver.close()
+        return html
