@@ -44,8 +44,11 @@ class TikTokSeleniumFeed(WebParserWithSelenium):
 
             video_links = []
             for link in links:
-                if (href := link["href"]).startswith(self.feed.url):
-                    video_links.append(href)
+                try:
+                    if (href := link["href"]).startswith(self.feed.url):
+                        video_links.append(href)
+                except KeyError:
+                    continue
 
             items = []
             for link in video_links:
