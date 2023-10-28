@@ -17,7 +17,10 @@ class QueueService:
             if job.is_failed:
                 raise ValueError
             await asyncio.sleep(1)
-        return job.result
+        try:
+            return job.result
+        except:
+            raise ValueError
 
 
 def async_queue_wrap(func):
