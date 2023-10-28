@@ -10,6 +10,7 @@ try:
     TWITCH_CLIENT_ID = os.environ["TWITCH_CLIENT_ID"]
     TWITCH_CLIENT_SECRET = os.environ["TWITCH_CLIENT_SECRET"]
     REDIS_HOST = os.environ["REDIS_HOST"]
+    IS_WORKER = bool(int(os.environ["IS_WORKER"]))
 except ValueError:
     raise ValueError("Missing configuration")
 

@@ -4,7 +4,7 @@ from typing import Callable, Any
 from redis import Redis
 from rq import Queue
 
-from app.settings import REDIS_HOST
+from app.settings import REDIS_HOST, IS_WORKER
 
 
 class QueueService:
@@ -18,3 +18,13 @@ class QueueService:
                 raise ValueError
             await asyncio.sleep(1)
         return job.result
+
+
+def async_queue_wrap(func):
+    async def wrapper(*args, **kwargs):
+        print(type(IS_WORKER))
+        if IS_WORKER:
+            return func(*args[1:])
+        return await QueueService.put_and_wait_for_result(func, args)
+
+    return wrapper

@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import yt_dlp  # type: ignore
 
-from app.services.queue import QueueService
+from app.services.queue import async_queue_wrap
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
     async_store_in_cache_for,
@@ -41,18 +41,15 @@ class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
     @classmethod
     @async_store_in_cache_for(_video_info_storage_time)
     async def get_video_info(cls, url: str) -> dict:
-        return await QueueService.put_and_wait_for_result(
-            cls.extract_info, [url, cls._ydl_opts_video]
-        )
+        return await cls.extract_info(url, cls._ydl_opts_video)
 
     @classmethod
     @async_store_in_cache_for(_channel_info_storage_time)
     async def get_page_info(cls, url: str) -> dict:
-        return await QueueService.put_and_wait_for_result(
-            cls.extract_info, [url, cls._ydl_opts_tab]
-        )
+        return await cls.extract_info(url, cls._ydl_opts_tab)
 
     @classmethod
+    @async_queue_wrap
     def extract_info(cls, url: str, opts: dict = _ydl_opts_tab) -> dict:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)

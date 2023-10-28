@@ -11,6 +11,8 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.t
 
 FROM python:3.11-alpine
 
+ENV IS_WORKER 0
+
 COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache /wheels/*
 
