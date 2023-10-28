@@ -41,4 +41,5 @@ class WebParserWithSelenium(WebParser, ABC):
         driver.get(url)
         html = driver.page_source
         driver.close()
+        driver.quit()
         return html

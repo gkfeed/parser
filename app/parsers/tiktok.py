@@ -1,7 +1,5 @@
 from datetime import datetime
 
-import yt_dlp
-
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.tiktok import TikTokInfoExtractor
@@ -52,8 +50,7 @@ class TikTokSeleniumFeed(WebParserWithSelenium):
 
             items = []
             for link in video_links:
-                with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
-                    info = ydl.extract_info(link, download=False)
+                info = await TikTokInfoExtractor.get_page_info(link)
                 items.append(
                     Item(
                         title=info["description"],

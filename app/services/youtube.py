@@ -48,9 +48,8 @@ class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
     async def get_page_info(cls, url: str) -> dict:
         return await cls.extract_info(url, cls._ydl_opts_tab)
 
-    @classmethod
     @async_queue_wrap
-    def extract_info(cls, url: str, opts: dict = _ydl_opts_tab) -> dict:
+    def extract_info(url: str, opts: dict = _ydl_opts_tab) -> dict:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
         if not info:
