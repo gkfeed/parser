@@ -23,7 +23,7 @@ class FeedsSupervisor:
             import traceback
 
             traceback.print_exc()
-            # await cls.dispatcher()
+            await cls.dispatcher()
 
     @classmethod
     async def __fetch_all_feeds(cls):
