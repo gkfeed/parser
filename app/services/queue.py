@@ -23,7 +23,10 @@ class QueueService:
 def async_queue_wrap(func):
     async def wrapper(*args, **kwargs):
         if IS_WORKER:
-            return func(*args[1:])
+            try:
+                return func(*args[1:])
+            except TypeError:
+                return func(*args)
         return await QueueService.put_and_wait_for_result(func, args)
 
     return wrapper
