@@ -1,8 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
+from app.services.cache.temporary import (
+    TemporaryCacheService,
+    UndefinedCache,
+    ExpiredCache,
+)
+from app.services.cache.storage.memory import MemoryStorage
 from app.services.tiktok import TikTokInfoExtractor
 from ._exceptions import UnavailableFeed
 from ._base import BaseFeed
@@ -35,10 +41,16 @@ class TikTokFeed(BaseFeed):
 
 
 class TikTokSeleniumFeed(WebParserWithSelenium):
+    __cache = TemporaryCacheService(MemoryStorage())
+
     @property
     async def items(self) -> list[Item]:
         try:
-            soup = await self.get_soup(self.feed.url)
+            try:
+                soup = self.__cache.get(self.feed.url)
+            except (UndefinedCache, ExpiredCache):
+                soup = await self.get_soup(self.feed.url)
+
             links = soup.find_all("a")
 
             video_links = []
@@ -69,6 +81,9 @@ class TikTokSeleniumFeed(WebParserWithSelenium):
                         + info["webpage_url"].split("/")[-1],
                     )
                 )
+
+            if items:
+                self.__cache.set(self.feed.url, soup, timedelta(days=1))
 
             return items
         except (UnavailableFeed, ValueError, TypeError):
