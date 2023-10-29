@@ -29,7 +29,7 @@ class WebParser(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
 
 
 class WebParserWithSelenium(WebParser, ABC):
-    _cache_storage_time = timedelta(hours=1)
+    _cache_storage_time = timedelta(days=1)
 
     @async_store_in_cache_for(_cache_storage_time)
     @async_queue_wrap
