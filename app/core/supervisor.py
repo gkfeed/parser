@@ -17,7 +17,7 @@ class FeedsSupervisor:
             while True:
                 print("START FETCHING FEEDS")
                 await cls.__fetch_all_feeds()
-                await asyncio.sleep(60)
+                await asyncio.sleep(1)
         except Exception as e:
             print("DISPATCHER FAILED WITH ", e)
             import traceback
@@ -31,8 +31,12 @@ class FeedsSupervisor:
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if feed.type not in ("twitch",):
+                if feed.type not in ("twitch", "tiktok"):
                     tg.create_task(cls.__fetch_feed(feed))
+
+        for feed in feeds:
+            if feed.type == "tiktok":
+                await cls.__fetch_feed(feed)
 
     @classmethod
     async def __fetch_feed(cls, feed: Feed):
@@ -40,3 +44,5 @@ class FeedsSupervisor:
         await ItemsRepository(feed).add_items_to_feed(items)
         if len(items) == 0:
             print("Feed failed: ", feed.url, len(items))
+        else:
+            print("Feed success: ", feed.url, len(items))
