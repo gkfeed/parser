@@ -8,7 +8,7 @@ from app.services.cache.use_temporary import (
     async_store_in_cache_for,
 )
 from app.services.http import HttpService, HttpRequestError
-from app.services.queue import async_queue_wrap
+from app.utils.async_wrapper import async_wrap
 from ._exceptions import UnavailableFeed
 from ._base import BaseFeed as _BaseFeed
 
@@ -32,7 +32,7 @@ class WebParserWithSelenium(WebParser, ABC):
     _cache_storage_time = timedelta(minutes=5)
 
     @async_store_in_cache_for(_cache_storage_time)
-    @async_queue_wrap
+    @async_wrap
     def get_html(self, url: str) -> bytes:
         driver = webdriver.Remote(
             "http://10.5.0.5:4444",
