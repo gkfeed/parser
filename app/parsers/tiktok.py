@@ -1,4 +1,5 @@
 from datetime import datetime
+import asyncio
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
@@ -48,9 +49,16 @@ class TikTokSeleniumFeed(WebParserWithSelenium):
                 except KeyError:
                     continue
 
+            tasks = []
+            async with asyncio.TaskGroup() as tg:
+                for link in video_links:
+                    tasks.append(
+                        tg.create_task(TikTokInfoExtractor.get_video_info(link))
+                    )
+
             items = []
-            for link in video_links:
-                info = await TikTokInfoExtractor.get_page_info(link)
+            for task in tasks:
+                info = task.result()
                 items.append(
                     Item(
                         title=info["description"],
