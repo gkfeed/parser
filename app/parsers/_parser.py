@@ -8,7 +8,7 @@ from app.services.cache.use_temporary import (
     async_store_in_cache_for,
 )
 from app.services.http import HttpService, HttpRequestError
-from app.utils.async_wrapper import async_wrap
+from app.services.queue import async_queue_wrap
 from ._exceptions import UnavailableFeed
 from ._base import BaseFeed as _BaseFeed
 
@@ -29,10 +29,10 @@ class WebParser(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
 
 
 class WebParserWithSelenium(WebParser, ABC):
-    _cache_storage_time = timedelta(minutes=5)
+    _cache_storage_time = timedelta(hours=1)
 
     @async_store_in_cache_for(_cache_storage_time)
-    @async_wrap
+    @async_queue_wrap
     def get_html(self, url: str) -> bytes:
         driver = webdriver.Remote(
             "http://10.5.0.5:4444",
