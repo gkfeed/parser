@@ -38,8 +38,13 @@ class WebParserWithSelenium(WebParser, ABC):
             "http://10.5.0.5:4444",
             options=webdriver.ChromeOptions(),
         )
-        driver.get(url)
-        html = driver.page_source
-        driver.close()
-        driver.quit()
-        return html
+        try:
+            driver.get(url)
+            html = driver.page_source
+            driver.close()
+            driver.quit()
+            return html
+        except Exception as e:
+            driver.close()
+            driver.quit()
+            raise e
