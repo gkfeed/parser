@@ -86,7 +86,8 @@ class TikTokSeleniumFeed(SeleniumParserExtention):
                 self.__cache.set(self.feed.url, soup, timedelta(days=1))
 
             return items
-        except (UnavailableFeed, ValueError, TypeError):
+        # BUG: if cant fetch one of video links return nothing
+        except (UnavailableFeed, ValueError, TypeError, KeyError):
             return []
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
