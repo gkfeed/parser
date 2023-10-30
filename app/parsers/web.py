@@ -3,11 +3,11 @@ from rss_parser.models import FeedItem  # type: ignore
 
 from app.utils.item_converter import convert_item
 from app.serializers.feed import Item
-from ._parser import WebParser
-from ._exceptions import UnavailableFeed
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.http import HttpParserExtention
 
 
-class WebFeed(WebParser):
+class WebFeed(HttpParserExtention):
     @property
     async def items(self) -> list[Item]:
         try:

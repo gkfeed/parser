@@ -9,7 +9,7 @@ from app.services.cache.temporary import (
 from app.services.cache.storage.memory import MemoryStorage
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
-from ._base import BaseFeed as _BaseFeed
+from app.extentions.parsers.base import BaseFeed as _BaseFeed
 
 
 class TwitchFeed(_BaseFeed):

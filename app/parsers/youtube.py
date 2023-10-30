@@ -4,8 +4,8 @@ from datetime import datetime
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.youtube import YoutubeInfoExtractor
-from ._exceptions import UnavailableFeed
-from ._base import BaseFeed
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.base import BaseFeed
 
 
 class YoutubeFeed(BaseFeed):

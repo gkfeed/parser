@@ -4,11 +4,11 @@ from bs4 import Tag
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
-from ._exceptions import UnavailableFeed
-from ._parser import WebParser
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.http import HttpParserExtention
 
 
-class RedditFeed(WebParser):
+class RedditFeed(HttpParserExtention):
     __base_url = "https://libreddit.northboot.xyz/"
     _cache_storage_time = timedelta(hours=1)
 

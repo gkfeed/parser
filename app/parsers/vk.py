@@ -4,11 +4,11 @@ from bs4 import Tag
 
 from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
-from ._exceptions import UnavailableFeed
-from ._parser import WebParser
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.http import HttpParserExtention
 
 
-class VkFeed(WebParser):
+class VkFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property

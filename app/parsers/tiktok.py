@@ -10,9 +10,9 @@ from app.services.cache.temporary import (
 )
 from app.services.cache.storage.memory import MemoryStorage
 from app.services.tiktok import TikTokInfoExtractor
-from ._exceptions import UnavailableFeed
-from ._base import BaseFeed
-from ._parser import WebParserWithSelenium
+from app.extentions.parsers.base import BaseFeed
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.selenium import SeleniumParserExtention
 
 
 class TikTokFeed(BaseFeed):
@@ -40,7 +40,7 @@ class TikTokFeed(BaseFeed):
         return convert_datetime(date_str)
 
 
-class TikTokSeleniumFeed(WebParserWithSelenium):
+class TikTokSeleniumFeed(SeleniumParserExtention):
     __cache = TemporaryCacheService(MemoryStorage())
 
     @property

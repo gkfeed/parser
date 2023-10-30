@@ -1,7 +1,7 @@
 from typing import Type
 
 from app.serializers.feed import Feed, Item
-from ._base import BaseFeed
+from app.extentions.parsers.base import BaseFeed
 from .web import WebFeed
 from .tiktok import TikTokFeed, TikTokSeleniumFeed
 from .kinogo import KinogoFeed
