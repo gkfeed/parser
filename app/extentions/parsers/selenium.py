@@ -11,6 +11,7 @@ from .http import HttpParserExtention
 
 class SeleniumParserExtention(HttpParserExtention, ABC):
     _cache_storage_time = timedelta(hours=1)
+    _selenium_wait_time = 0
 
     @async_store_in_cache_for(_cache_storage_time)
     @async_run_sync_in_queue
@@ -21,7 +22,7 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
         )
         try:
             driver.get(url)
-            time.sleep(10)
+            time.sleep(self._selenium_wait_time)
             html = driver.page_source
             driver.close()
             driver.quit()
