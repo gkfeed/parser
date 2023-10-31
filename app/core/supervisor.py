@@ -31,12 +31,8 @@ class FeedsSupervisor:
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if feed.type not in ("twitch", "tiktok"):
+                if feed.type not in ("twitch",):
                     tg.create_task(cls.__fetch_feed(feed))
-
-        for feed in feeds:
-            if feed.type == "tiktok":
-                await cls.__fetch_feed(feed)
 
     @classmethod
     async def __fetch_feed(cls, feed: Feed):

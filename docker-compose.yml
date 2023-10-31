@@ -27,6 +27,19 @@ services:
       - redis
       - chrome
     container_name: gkfeed-worker
+  worker-sync:
+    build:
+      context: .
+      dockerfile: syncWorker.Dockerfile
+    tty: True
+    env_file:
+      - .env
+    networks:
+      - gkfeed-bridge
+    depends_on:
+      - redis
+      - chrome
+    container_name: gkfeed-worker-sync
   redis:
     image: redis:alpine
     networks:

@@ -20,4 +20,4 @@ COPY ./app ./app
 COPY ./scripts/docker_cmd.sh ./run.sh
 RUN chmod +x ./run.sh
 
-CMD rq worker-pool default -n ${NUM_OF_WORKERS} -u redis://${REDIS_HOST}
+CMD rq worker sync -u redis://${REDIS_HOST}
