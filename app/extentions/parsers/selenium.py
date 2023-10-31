@@ -1,5 +1,6 @@
 from datetime import timedelta
 from abc import ABC
+import time
 
 from selenium import webdriver
 
@@ -20,6 +21,7 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
         )
         try:
             driver.get(url)
+            time.sleep(10)
             html = driver.page_source
             driver.close()
             driver.quit()
