@@ -2,6 +2,7 @@ from datetime import timedelta, datetime, timezone
 
 from bs4 import Tag
 
+from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
@@ -12,19 +13,17 @@ class RanobeMeFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
+    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
-        try:
-            return [
-                Item(
-                    title=self._get_post_title(p),
-                    text=await self._get_post_text(p),
-                    date=await self._update_time,
-                    link=self._get_post_link(p),
-                )
-                for p in await self._posts
-            ]
-        except (UnavailableFeed, ValueError):
-            return []
+        return [
+            Item(
+                title=self._get_post_title(p),
+                text=await self._get_post_text(p),
+                date=await self._update_time,
+                link=self._get_post_link(p),
+            )
+            for p in await self._posts
+        ]
 
     @property
     async def _posts(self) -> list[Tag]:

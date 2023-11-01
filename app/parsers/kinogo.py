@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from app.utils.datetime import constant_datetime
+from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
@@ -10,20 +11,18 @@ class KinogoFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
+    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
-        try:
-            title = await self._show_title
-            status = await self._show_status
-            return [
-                Item(
-                    title=title + " " + status,
-                    text=status,
-                    date=constant_datetime,
-                    link=self.feed.url,
-                )
-            ]
-        except (UnavailableFeed, ValueError):
-            return []
+        title = await self._show_title
+        status = await self._show_status
+        return [
+            Item(
+                title=title + " " + status,
+                text=status,
+                date=constant_datetime,
+                link=self.feed.url,
+            )
+        ]
 
     @property
     async def _show_status(self) -> str:

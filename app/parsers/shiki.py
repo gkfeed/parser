@@ -3,6 +3,7 @@ from datetime import timedelta, datetime
 from bs4.element import Tag
 
 from app.utils.datetime import convert_datetime
+from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
@@ -12,25 +13,20 @@ class ShikiFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
+    @async_return_empty_when(UnavailableFeed, ValueError, IndexError)
     async def items(self) -> list[Item]:
-        try:
-            soup = await self.get_soup(self.feed.url)
-            title = await self._show_title
-            news = soup.find_all(class_="b-menu-links")[0].find_all(class_="entry")
-            return [
-                Item(
-                    title=title + " " + self._get_item_status(item),
-                    text=self._get_item_status(item),
-                    date=self._get_item_date(item),
-                    link=self.feed.url,
-                )
-                for item in news
-            ]
-        except (UnavailableFeed, ValueError, IndexError):
-            # print('FAILED: ', self.feed.url)
-            # import traceback
-            # traceback.print_exc()
-            return []
+        soup = await self.get_soup(self.feed.url)
+        title = await self._show_title
+        news = soup.find_all(class_="b-menu-links")[0].find_all(class_="entry")
+        return [
+            Item(
+                title=title + " " + self._get_item_status(item),
+                text=self._get_item_status(item),
+                date=self._get_item_date(item),
+                link=self.feed.url,
+            )
+            for item in news
+        ]
 
     @property
     async def _show_title(self) -> str:
