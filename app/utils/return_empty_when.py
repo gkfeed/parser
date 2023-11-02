@@ -5,7 +5,7 @@ def async_return_empty_when(*args: list[Exception]):
         async def wrapper(*args, **kwargs):
             try:
                 result = await func(*args, **kwargs)
-            except exceptions:
+            except* exceptions:
                 result = []
             return result
 
