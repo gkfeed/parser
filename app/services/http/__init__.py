@@ -1,5 +1,5 @@
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
+from aiohttp.client_exceptions import ClientError
 
 _headers = {
     "User-Agent": (
@@ -23,7 +23,7 @@ class HttpService:
             try:
                 async with session.get(url, headers=cls.headers) as response:
                     return await response.content.read()
-            except ClientConnectorError:
+            except ClientError:
                 raise HttpRequestError
 
     @classmethod
@@ -32,5 +32,5 @@ class HttpService:
             try:
                 async with session.post(url, params=body) as response:
                     return await response.json()
-            except ClientConnectorError:
+            except ClientError:
                 raise HttpRequestError
