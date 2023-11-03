@@ -34,6 +34,8 @@ class TikTokFeed(BaseFeed):
 
 
 class TikTokSeleniumFeed(SeleniumParserExtention):
+    _selenium_wait_time = 2
+
     @property
     @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
     async def items(self) -> list[Item]:
