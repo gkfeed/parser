@@ -14,6 +14,8 @@ try:
 except ValueError:
     raise ValueError("Missing configuration")
 
+SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
+
 
 MODELS = [
     "app.models.feed",

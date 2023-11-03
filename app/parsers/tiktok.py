@@ -35,6 +35,8 @@ class TikTokFeed(BaseFeed):
 
 class TikTokSeleniumFeed(SeleniumParserExtention):
     _selenium_wait_time = 2
+    _should_load_cookies = True
+    _should_save_cookies = True
 
     @property
     @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
