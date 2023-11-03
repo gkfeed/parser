@@ -1,6 +1,7 @@
 from datetime import timedelta
 from abc import ABC
 import time
+import pickle
 
 from selenium import webdriver
 
@@ -10,6 +11,7 @@ from .http import HttpParserExtention
 
 
 class SeleniumParserExtention(HttpParserExtention, ABC):
+    __cookies = None
     _cache_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
 
@@ -21,9 +23,13 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
             options=webdriver.ChromeOptions(),
         )
         try:
+            if self.__cookies:
+                for cookie in self.cookies:
+                    driver.add_cookie(cookie)
             driver.get(url)
             time.sleep(self._selenium_wait_time)
             html = driver.page_source
+            self.__cookies = driver.get_cookies()
             driver.close()
             driver.quit()
             return html
