@@ -3,7 +3,7 @@ from typing import Type
 from app.serializers.feed import Feed, Item
 from app.extentions.parsers.base import BaseFeed
 from .web import WebFeed
-from .tiktok import TikTokFeed, TikTokSeleniumFeed
+from .tiktok import TikTokFeed
 from .kinogo import KinogoFeed
 from .twitch import TwitchFeed
 from .yummyanime import YummyAnimeFeed
@@ -18,7 +18,7 @@ from .rezka import RezkaFeed
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
     "web": WebFeed,
-    "tiktok": TikTokSeleniumFeed,
+    "tiktok": TikTokFeed,
     "kinogo": KinogoFeed,
     "twitch": TwitchFeed,
     "yummyanime": YummyAnimeFeed,
