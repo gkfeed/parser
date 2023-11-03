@@ -1,4 +1,5 @@
 import asyncio
+import random
 
 from app.serializers.feed import Feed
 from app.services.repositories.feed import FeedRepository
@@ -28,6 +29,8 @@ class FeedsSupervisor:
     @classmethod
     async def __fetch_all_feeds(cls):
         feeds = await FeedRepository.get_all()
+
+        random.shuffle(feeds)
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
