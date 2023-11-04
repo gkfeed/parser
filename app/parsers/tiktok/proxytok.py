@@ -10,7 +10,14 @@ class TikTokFeed(BaseTikTokFeed, WebFeed):
     async def _video_links(self) -> list[str]:
         url = f"{self.__base_url}/@{self._user_name}/rss"
         items = await self._get_items_from_web(url)
-        return [self._normolize_item(i).link for i in items]
+
+        links = []
+        for item in items:
+            link = self._normolize_item(item).link
+            if link.startswith(self.feed.url):
+                links.append(link)
+
+        return links
 
     def _normolize_item(self, item: Item) -> Item:
         base_url = "https://www.tiktok.com"
