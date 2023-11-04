@@ -1,9 +1,3 @@
-import asyncio
-from datetime import datetime
-
-from app.utils.return_empty_when import async_return_empty_when
-from app.utils.datetime import convert_datetime
-from app.serializers.feed import Item
 from app.extentions.parsers.selenium import SeleniumParserExtention
 from ._base import BaseTikTokFeed
 
