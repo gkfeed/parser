@@ -1,4 +1,4 @@
-def async_return_empty_when(*args: list[Exception]):
+def async_return_empty_when(*args: type[BaseException]):
     exceptions = tuple(args)
 
     def decorator(func):
