@@ -14,6 +14,7 @@ from .youtube import YoutubeFeed
 from .ranobeme import RanobeMeFeed
 from .spoti import SpotifyFeed
 from .rezka import RezkaFeed
+from .instagram import InstagramFeed
 
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
@@ -29,6 +30,7 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     "ranobe.me": RanobeMeFeed,
     "spoti": SpotifyFeed,
     "rezka": RezkaFeed,
+    "inst": InstagramFeed,
 }
 
 
