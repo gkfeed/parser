@@ -28,7 +28,7 @@ class VkFeed(HttpParserExtention):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        return [p for p in soup.find_all(class_="post")]
+        return soup.find_all(class_="post")
 
     def _get_post_title(self, post: Tag) -> str:
         try:
