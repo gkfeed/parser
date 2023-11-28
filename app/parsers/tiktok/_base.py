@@ -17,21 +17,29 @@ class BaseTikTokFeed(_BaseFeed, ABC):
         tasks = []
         async with asyncio.TaskGroup() as tg:
             for link in await self._video_links:
-                tasks.append(tg.create_task(TikTokInfoExtractor.get_info(link)))
+                tasks.append(tg.create_task(self._create_video_item(link)))
+
+        return [task.result() for task in tasks if task.result()]
 
         items = []
         for task in tasks:
             info = task.result()
-            items.append(
-                Item(
-                    title=info["description"],
-                    text=info["description"],
-                    date=await self._get_video_publish_date(info),
-                    link=self.feed.url + "/video/" + info["webpage_url"].split("/")[-1],
-                )
-            )
+            if info:
+                items.append(self._create_video_item(info))
 
         return items
+
+    async def _create_video_item(self, link: str) -> Item | None:
+        try:
+            info = await TikTokInfoExtractor.get_info(link)
+            return Item(
+                title=info["description"],
+                text=info["description"],
+                date=await self._get_video_publish_date(info),
+                link=self.feed.url + "/video/" + info["webpage_url"].split("/")[-1],
+            )
+        except (TypeError, ValueError):
+            return None
 
     @property
     @abstractmethod
