@@ -2,7 +2,7 @@ from asyncio import TaskGroup
 from datetime import datetime
 from typing import AsyncGenerator
 
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import convert_datetime, constant_datetime
 from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.services.youtube import (
@@ -74,7 +74,9 @@ class YoutubeFeed(BaseFeed):
             return convert_datetime(date_str)
         link = self._extract_video_link_from_info(video)
         info = await YoutubeInfoExtractor.get_info(link, VideoExtractionMode())
-        return convert_datetime(info["upload_date"])
+        if "upload_date" in info:
+            return convert_datetime(info["upload_date"])
+        return constant_datetime
 
     def _extract_video_link_from_info(self, video_info: dict) -> str:
         if "url" in video_info:
