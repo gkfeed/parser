@@ -17,7 +17,7 @@ class BaseTikTokFeed(_BaseFeed, ABC):
         tasks = []
         async with asyncio.TaskGroup() as tg:
             for link in await self._video_links:
-                tasks.append(tg.create_task(TikTokInfoExtractor.get_video_info(link)))
+                tasks.append(tg.create_task(TikTokInfoExtractor.get_info(link)))
 
         items = []
         for task in tasks:
