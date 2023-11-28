@@ -29,11 +29,12 @@ class YoutubeFeed(BaseFeed):
 
     async def _create_video_item(self, video_info: dict) -> Item | None:
         try:
+            link = self._extract_video_link_from_info(video_info)
             return Item(
                 title="YT: " + await self._channel_name,
                 text=video_info["title"],
                 date=await self._get_video_publish_date(video_info),
-                link=video_info["webpage_url"],
+                link=link,
             )
         except (TypeError, ValueError):
             return None
@@ -71,7 +72,13 @@ class YoutubeFeed(BaseFeed):
         if "timestamp" in video and video["timestamp"] >= today_timestamp:
             date_str = datetime.fromtimestamp(video["timestamp"]).strftime("%Y%m%d")
             return convert_datetime(date_str)
-        info = await YoutubeInfoExtractor.get_info(
-            video["webpage_url"], VideoExtractionMode()
-        )
+        link = self._extract_video_link_from_info(video)
+        info = await YoutubeInfoExtractor.get_info(link, VideoExtractionMode())
         return convert_datetime(info["upload_date"])
+
+    def _extract_video_link_from_info(self, video_info: dict) -> str:
+        if "url" in video_info:
+            return video_info["url"]
+        if "webpage_url" in video_info:
+            return video_info["webpage_url"]
+        raise ValueError
