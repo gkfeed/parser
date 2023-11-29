@@ -58,7 +58,7 @@ class YoutubeFeed(BaseFeed):
 
     def _get_target_url(self) -> str:
         target_url = self.feed.url
-        if target_url.split("/")[-1] == "channel":
+        if target_url.split("/")[-2] == "channel" or len(target_url.split("@")) == 2:
             target_url += "/videos"
         return target_url
 
