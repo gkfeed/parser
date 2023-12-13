@@ -30,6 +30,8 @@ class InstagramStoriesFeed(HttpParserExtention):
         soup = await self.get_soup(url)
         for video in soup.find_all("video"):
             yield video["src"]
+        for img in soup.find_all("img")[1:]:
+            yield img["src"]
 
     @property
     def _user_name(self) -> str:
