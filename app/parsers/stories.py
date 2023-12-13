@@ -29,7 +29,7 @@ class InstagramStoriesFeed(HttpParserExtention):
         url = f"{self.__base_url}/{self._user_name}/stories"
         soup = await self.get_soup(url)
         for video in soup.find_all("video"):
-            yield self._extract_sublink(video["src"])
+            yield video["src"]
 
     @property
     def _user_name(self) -> str:
