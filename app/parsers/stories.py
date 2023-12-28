@@ -1,17 +1,23 @@
 from typing import AsyncGenerator
 from urllib.parse import unquote
+from datetime import timedelta
 
 from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
+from app.extentions.parsers.cache import (
+    CacheFeedExtention,
+    async_store_in_cache_if_not_empty_for,
+)
 from app.utils.datetime import constant_datetime
 
 
-class InstagramStoriesFeed(HttpParserExtention):
+class InstagramStoriesFeed(HttpParserExtention, CacheFeedExtention):
     __base_url = "https://ig.opnxng.com"
 
     @property
+    @async_store_in_cache_if_not_empty_for(timedelta(days=1))
     @async_return_empty_when(UnavailableFeed, ValueError, KeyError)
     async def items(self) -> list[Item]:
         return [
