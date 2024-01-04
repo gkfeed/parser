@@ -12,7 +12,7 @@ class TikTokFeed(BaseFeed):
     @property
     @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
     async def items(self) -> list[Item]:
-        info = await TikTokInfoExtractor.get_page_info(self.feed.url)
+        info = await TikTokInfoExtractor.get_info(self.feed.url)
         videos = info["entries"]
         return [
             Item(
