@@ -1,1 +1,1 @@
-from .proxytok import TikTokFeed
+from .yt_dlp import TikTokFeed
