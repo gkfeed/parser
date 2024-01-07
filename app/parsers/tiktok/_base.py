@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 
 from app.utils.return_empty_when import async_return_empty_when
@@ -7,11 +7,16 @@ from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.base import BaseFeed as _BaseFeed
+from app.extentions.parsers.cache import (
+    CacheFeedExtention,
+    async_store_in_cache_if_not_empty_for,
+)
 from app.services.tiktok import TikTokInfoExtractor
 
 
-class BaseTikTokFeed(_BaseFeed, ABC):
+class BaseTikTokFeed(CacheFeedExtention, _BaseFeed, ABC):
     @property
+    @async_store_in_cache_if_not_empty_for(timedelta(days=1))
     @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
         tasks = []
@@ -20,14 +25,6 @@ class BaseTikTokFeed(_BaseFeed, ABC):
                 tasks.append(tg.create_task(self._create_video_item(link)))
 
         return [task.result() for task in tasks if task.result()]
-
-        items = []
-        for task in tasks:
-            info = task.result()
-            if info:
-                items.append(self._create_video_item(info))
-
-        return items
 
     async def _create_video_item(self, link: str) -> Item | None:
         try:
@@ -43,7 +40,7 @@ class BaseTikTokFeed(_BaseFeed, ABC):
 
     @property
     @abstractmethod
-    def _video_links(self) -> list[str]:
+    async def _video_links(self) -> list[str]:
         pass
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
