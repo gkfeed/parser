@@ -1,27 +1,17 @@
 from datetime import datetime
 
 from app.utils.datetime import convert_datetime
-from app.utils.return_empty_when import async_return_empty_when
-from app.serializers.feed import Item
-from app.extentions.parsers.base import BaseFeed
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.services.tiktok import TikTokInfoExtractor
+from ._base import BaseTikTokFeed
 
 
-class TikTokFeed(BaseFeed):
+class TikTokFeed(BaseTikTokFeed):
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
-    async def items(self) -> list[Item]:
+    async def _video_links(self) -> list[str]:
         info = await TikTokInfoExtractor.get_info(self.feed.url)
         videos = info["entries"]
         return [
-            Item(
-                title=v["description"],
-                text=v["description"],
-                date=await self._get_video_publish_date(v),
-                link=self.feed.url + "/video/" + v["webpage_url"].split("/")[-1],
-            )
-            for v in videos
+            self.feed.url + "/video/" + v["webpage_url"].split("/")[-1] for v in videos
         ]
 
     async def _get_video_publish_date(self, video: dict) -> datetime:
