@@ -16,6 +16,7 @@ from .spoti import SpotifyFeed
 from .rezka import RezkaFeed
 from .instagram import InstagramFeed
 from .stories import InstagramStoriesFeed
+from .insolarance import InsolaranceFeed
 
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
@@ -33,6 +34,7 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     "rezka": RezkaFeed,
     "inst": InstagramFeed,
     "stories": InstagramStoriesFeed,
+    "insolarance": InsolaranceFeed,
 }
 
 
