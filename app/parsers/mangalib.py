@@ -1,0 +1,49 @@
+from datetime import timedelta
+
+from bs4 import Tag
+
+from app.serializers.feed import Item
+from app.utils.datetime import constant_datetime
+from app.utils.return_empty_when import async_return_empty_when
+from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extentions.parsers.selenium import SeleniumParserExtention
+
+
+class MangaLibFeed(SeleniumParserExtention):
+    _cache_storage_time = timedelta(hours=1)
+    _base_url = "https://mangalib.org"
+    _max_posts = 5
+
+    @property
+    @async_return_empty_when(UnavailableFeed, ValueError)
+    async def items(self) -> list[Item]:
+        return [
+            Item(
+                title=self._get_post_title(p),
+                text=self._get_post_text(p),
+                date=constant_datetime,
+                link=self._get_post_link(p),
+            )
+            for p in await self._posts
+        ]
+
+    @property
+    async def _posts(self) -> list[Tag]:
+        soup = await self.get_soup(self.feed.url + "?section=chapters")
+        posts = [p for p in soup.find_all(class_="media-chapter")][: self._max_posts]
+        return posts
+
+    def _get_post_title(self, post: Tag) -> str:
+        try:
+            return post.find_all("a")[0].text.strip()
+        except IndexError:
+            raise ValueError
+
+    def _get_post_text(self, post: Tag) -> str:
+        return self._get_post_title(post)
+
+    def _get_post_link(self, post: Tag) -> str:
+        try:
+            return self._base_url + post.find_all("a")[0]["href"]
+        except IndexError:
+            raise ValueError
