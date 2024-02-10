@@ -18,6 +18,7 @@ from .instagram import InstagramFeed
 from .stories import InstagramStoriesFeed
 from .insolarance import InsolaranceFeed
 from .mangalib import MangaLibFeed
+from .x import XFeed
 
 
 _PARSERS: dict[str, Type[BaseFeed]] = {
@@ -37,6 +38,7 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     "stories": InstagramStoriesFeed,
     "insolarance": InsolaranceFeed,
     "mangalib": MangaLibFeed,
+    "x": XFeed,
 }
 
 
