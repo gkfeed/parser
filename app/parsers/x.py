@@ -49,6 +49,7 @@ class XFeed(HttpParserExtention):
             raise ValueError
 
     def _get_post_datetime(self, post: Tag) -> datetime:
+        return constant_datetime
         try:
             date_str = post.find_all(class_="tweet-date")[0].a.text
             return convert_datetime(date_str)
