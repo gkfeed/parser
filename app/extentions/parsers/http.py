@@ -11,13 +11,15 @@ from .exceptions import UnavailableFeed
 from .base import BaseFeed as _BaseFeed
 
 
+# NOTE: do not inherit of BaseFeed
 class HttpParserExtention(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
     _cache_storage_time = timedelta(minutes=5)
+    _headers = HttpService.headers
 
     @async_store_in_cache_for(_cache_storage_time)
     async def get_html(self, url: str) -> bytes:
         try:
-            return await HttpService.get(url)
+            return await HttpService.get(url, headers=self._headers)
         except HttpRequestError:
             raise UnavailableFeed(self.feed.url)
 

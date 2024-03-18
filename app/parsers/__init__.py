@@ -12,7 +12,7 @@ from .reddit import RedditFeed
 from .vk import VkFeed
 from .youtube import YoutubeFeed
 from .ranobeme import RanobeMeFeed
-from .spoti import SpotifyFeed
+from .spoti import SpotifyFeed, SpotifyPlaylistFeed
 from .rezka import RezkaFeed
 from .instagram import InstagramFeed
 from .stories import InstagramStoriesFeed
@@ -39,6 +39,7 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     "insolarance": InsolaranceFeed,
     "mangalib": MangaLibFeed,
     "x": XFeed,
+    "spoti:playlist": SpotifyPlaylistFeed,
 }
 
 

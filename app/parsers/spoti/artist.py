@@ -43,6 +43,7 @@ class SpotifyFeed(SeleniumParserExtention):
     async def _artist_name(self) -> str:
         soup = await self.get_soup(self.feed.url + "/discography/album")
         links = soup.find_all("a")
+        print(links)
         for link in links:
             if link["href"].startswith("/artist"):
                 return link.text
