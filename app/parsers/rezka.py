@@ -22,4 +22,7 @@ class RezkaFeed(SeleniumParserExtention):
     @property
     async def _show_status(self) -> str:
         soup = await self.get_soup(self.feed.url)
+        titles = soup.find_all("h2")
+        if not titles:
+            raise UnavailableFeed(self.feed.url)
         return soup.find_all("h2")[-1].text
