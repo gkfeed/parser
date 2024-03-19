@@ -1,6 +1,5 @@
 from typing import Type
 
-from app.serializers.feed import Feed, Item
 from app.extentions.parsers.base import BaseFeed
 from .web import WebFeed
 from .tiktok import TikTokFeed
@@ -21,7 +20,7 @@ from .mangalib import MangaLibFeed
 from .x import XFeed
 
 
-_PARSERS: dict[str, Type[BaseFeed]] = {
+PARSERS: dict[str, Type[BaseFeed]] = {
     "web": WebFeed,
     "tiktok": TikTokFeed,
     "kinogo": KinogoFeed,
@@ -41,17 +40,3 @@ _PARSERS: dict[str, Type[BaseFeed]] = {
     "x": XFeed,
     "spoti:playlist": SpotifyPlaylistFeed,
 }
-
-
-class FeedParser:
-    _parsers = _PARSERS
-
-    def __init__(self, feed: Feed, data: dict):
-        self.feed = feed
-        self.data = data
-        if self.feed.type not in _PARSERS:
-            raise ValueError(f"Unknown feed type: {self.feed.type}")
-
-    async def parse(self) -> list[Item]:
-        parser = self._parsers[self.feed.type]
-        return await parser(self.feed, self.data).items

@@ -7,11 +7,13 @@ from app.services.repositories.item import ItemsRepository
 from app.middlewares import wrap_middlewares
 
 
+# BUG: deprecated
 class FeedsSupervisor:
     @classmethod
     def on_startup(cls):
         asyncio.run(cls.dispatcher())
 
+    # NOTE: Start polling
     @classmethod
     async def dispatcher(cls):
         try:
