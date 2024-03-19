@@ -17,8 +17,7 @@ class Dispatcher(MiddlewaresWrapper, ParsersRegistrator, ItemsStorage):
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if feed.type in ("kinogo",):
-                    tg.create_task(cls._fetch_feed(feed))
+                tg.create_task(cls._fetch_feed(feed))
 
         await cls.start_polling()
 
