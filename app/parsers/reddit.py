@@ -14,7 +14,6 @@ class RedditFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
         return [
             Item(

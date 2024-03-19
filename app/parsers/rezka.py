@@ -7,7 +7,6 @@ from app.extentions.parsers.selenium import SeleniumParserExtention
 
 class RezkaFeed(SeleniumParserExtention):
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
     async def items(self) -> list[Item]:
         show_url = self.feed.url
         return [

@@ -18,7 +18,6 @@ from app.extentions.parsers.base import BaseFeed
 
 class YoutubeFeed(BaseFeed):
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
         tasks = []
         async with TaskGroup() as tg:

@@ -10,7 +10,6 @@ from app.extentions.parsers.http import HttpParserExtention
 
 class WebFeed(HttpParserExtention):
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
         return await self._get_items_from_web(self.feed.url)
 

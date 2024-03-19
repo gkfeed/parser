@@ -11,7 +11,6 @@ class InstagramFeed(HttpParserExtention):
     __base_url = "https://ig.opnxng.com"
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, KeyError)
     async def items(self) -> list[Item]:
         return [
             Item(

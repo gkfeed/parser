@@ -13,7 +13,7 @@ class ShikiFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, IndexError)
+    # @async_return_empty_when(UnavailableFeed, ValueError, IndexError)
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         title = await self._show_title

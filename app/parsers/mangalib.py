@@ -15,7 +15,6 @@ class MangaLibFeed(SeleniumParserExtention):
     _max_posts = 5
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError)
     async def items(self) -> list[Item]:
         return [
             Item(

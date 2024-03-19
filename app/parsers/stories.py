@@ -18,7 +18,6 @@ class InstagramStoriesFeed(HttpParserExtention, CacheFeedExtention):
 
     @property
     @async_store_in_cache_if_not_empty_for(timedelta(days=1))
-    @async_return_empty_when(UnavailableFeed, ValueError, KeyError)
     async def items(self) -> list[Item]:
         return [
             Item(
