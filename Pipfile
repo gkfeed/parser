@@ -39,4 +39,4 @@ drun = "sh -c 'pipenv -q run dbuild && docker compose up -d'"
 drestart = "sh -c 'pipenv -q run dstop && pipenv -q run drun'"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"
