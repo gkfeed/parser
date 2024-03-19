@@ -4,7 +4,7 @@ import random
 from app.serializers.feed import Feed
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.item import ItemsRepository
-from app.parsers import FeedParser
+from app.middlewares import wrap_middlewares
 
 
 class FeedsSupervisor:
@@ -34,14 +34,9 @@ class FeedsSupervisor:
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if feed.type not in ("twitch",):
-                    tg.create_task(cls.__fetch_feed(feed))
+                tg.create_task(cls.__fetch_feed(feed))
 
     @classmethod
     async def __fetch_feed(cls, feed: Feed):
-        items = await FeedParser(feed).parse()
+        items = await wrap_middlewares(feed)
         await ItemsRepository(feed).add_items_to_feed(items)
-        if len(items) == 0:
-            print("Feed failed: ", feed.url, len(items))
-        else:
-            print("Feed success: ", feed.url, len(items))
