@@ -18,10 +18,10 @@ class HttpService:
     headers = _headers
 
     @classmethod
-    async def get(cls, url: str) -> bytes:
+    async def get(cls, url: str, headers: dict = headers) -> bytes:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
-                async with session.get(url, headers=cls.headers) as response:
+                async with session.get(url, headers=headers) as response:
                     return await response.content.read()
             except ClientError:
                 raise HttpRequestError
