@@ -1,13 +1,9 @@
-from datetime import timedelta
-
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
 
 
 class YummyAnimeFeed(HttpParserExtention):
-    _cache_storage_time = timedelta(hours=1)
-
     @property
     async def items(self) -> list[Item]:
         title = await self._show_title

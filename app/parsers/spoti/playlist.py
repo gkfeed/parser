@@ -1,7 +1,5 @@
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.utils.return_empty_when import async_return_empty_when
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
 
 
@@ -9,7 +7,6 @@ class SpotifyPlaylistFeed(HttpParserExtention):
     _headers = {}
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         first_track = soup.find_all("img")[2].parent.parent.parent

@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import datetime
 
 from bs4 import Tag
 
@@ -10,7 +10,6 @@ from app.extentions.parsers.http import HttpParserExtention
 class XFeed(HttpParserExtention):
     _base_url = "https://nitter.fdn.fr/"
     _x_url = "https://x.com"
-    _cache_storage_time = timedelta(hours=1)
 
     @property
     async def items(self) -> list[Item]:

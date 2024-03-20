@@ -4,9 +4,10 @@ from bs4 import Tag
 
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
+from app.extentions.parsers.cache import CacheFeedExtention
 
 
-class RanobeMeFeed(HttpParserExtention):
+class RanobeMeFeed(HttpParserExtention, CacheFeedExtention):
     _base_url = "https://ranobe.me"
     _cache_storage_time = timedelta(hours=1)
 

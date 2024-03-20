@@ -13,12 +13,12 @@ from .http import HttpParserExtention
 
 
 class SeleniumParserExtention(HttpParserExtention, ABC):
-    _cache_storage_time = timedelta(hours=1)
+    _http_repsponse_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
     _should_load_cookies = False
     _should_save_cookies = False
 
-    @async_store_in_cache_for(_cache_storage_time)
+    @async_store_in_cache_for(_http_repsponse_storage_time)
     @async_run_sync_in_queue
     def get_html(self, url: str) -> bytes:
         driver = webdriver.Remote(

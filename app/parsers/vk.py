@@ -5,9 +5,10 @@ from bs4 import Tag
 from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
+from app.extentions.parsers.cache import CacheFeedExtention
 
 
-class VkFeed(HttpParserExtention):
+class VkFeed(HttpParserExtention, CacheFeedExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property

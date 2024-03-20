@@ -5,9 +5,10 @@ from bs4 import Tag
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 from app.extentions.parsers.selenium import SeleniumParserExtention
+from app.extentions.parsers.cache import CacheFeedExtention
 
 
-class MangaLibFeed(SeleniumParserExtention):
+class MangaLibFeed(SeleniumParserExtention, CacheFeedExtention):
     _cache_storage_time = timedelta(hours=1)
     _base_url = "https://mangalib.org"
     _max_posts = 5

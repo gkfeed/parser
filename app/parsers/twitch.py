@@ -1,30 +1,20 @@
 from datetime import timedelta
 
 from app.serializers.feed import Item
-from app.services.cache.temporary import (
-    TemporaryCacheService,
-    ExpiredCache,
-    UndefinedCache,
-)
-from app.services.cache.storage.memory import MemoryStorage
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
 from app.extentions.parsers.base import BaseFeed as _BaseFeed
+from app.extentions.parsers.cache import CacheFeedExtention
 
 
-class TwitchFeed(_BaseFeed):
-    __cache: TemporaryCacheService[list[Item]] = TemporaryCacheService(MemoryStorage())
+class TwitchFeed(CacheFeedExtention, _BaseFeed):
+    _cache_storage_time_if_success = timedelta(hours=1)
 
     @property
     async def items(self) -> list[Item]:
-        try:
-            items = self.__cache.get(self.feed.url)
-        except (ExpiredCache, UndefinedCache):
-            if stream := await Twitch.get_stream(self._streamer_name):
-                items = [self._get_stream_item(stream)]
-                self.__cache.set(self.feed.url, items, timedelta(hours=1))
-            else:
-                items = []
+        items = []
+        if stream := await Twitch.get_stream(self._streamer_name):
+            items = [self._get_stream_item(stream)]
         return items
 
     def _get_stream_item(self, stream: Stream) -> Item:

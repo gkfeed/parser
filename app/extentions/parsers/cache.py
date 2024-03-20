@@ -1,29 +1,16 @@
+from typing import override
 from datetime import timedelta
 
-from app.services.cache.use_temporary import (
-    UseTemporaryCacheServiceExtension,
-    UndefinedCache,
-    ExpiredCache,
-)
+from app.serializers.feed import Feed
 from .base import BaseFeed as _BaseFeed
 
 
-def async_store_in_cache_if_not_empty_for(storage_time: timedelta):
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            cache = args[0].cache
-            try:
-                result = cache.get(args[0].feed.id)
-            except (UndefinedCache, ExpiredCache):
-                result = await func(*args, **kwargs)
-                if result:
-                    cache.set(args[0].feed.id, result, storage_time)
-            return result
+class CacheFeedExtention(_BaseFeed):
+    _cache_storage_time = timedelta(minutes=5)
+    _cache_storage_time_if_success = timedelta(hours=1)
 
-        return wrapper
-
-    return decorator
-
-
-class CacheFeedExtention(_BaseFeed, UseTemporaryCacheServiceExtension):
-    pass
+    @override
+    def __init__(self, feed: Feed, data: dict) -> None:
+        data["cache_storage_time"] = self._cache_storage_time
+        data["cache_storage_time_if_success"] = self._cache_storage_time_if_success
+        super().__init__(feed, data)

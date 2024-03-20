@@ -1,12 +1,15 @@
+from datetime import timedelta
 from typing import AsyncGenerator
 
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
 from app.utils.datetime import constant_datetime
+from app.extentions.parsers.http import HttpParserExtention
+from app.extentions.parsers.cache import CacheFeedExtention
 
 
-class InstagramFeed(HttpParserExtention):
+class InstagramFeed(HttpParserExtention, CacheFeedExtention):
     __base_url = "https://ig.opnxng.com"
+    _cache_storage_time_if_success = timedelta(days=1)
 
     @property
     async def items(self) -> list[Item]:

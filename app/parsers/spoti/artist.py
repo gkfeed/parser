@@ -2,8 +2,6 @@ from bs4.element import Tag
 
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.utils.return_empty_when import async_return_empty_when
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.selenium import SeleniumParserExtention
 
 
@@ -11,7 +9,6 @@ class SpotifyFeed(SeleniumParserExtention):
     _selenium_wait_time = 10
 
     @property
-    @async_return_empty_when(UnavailableFeed, ValueError, TypeError)
     async def items(self) -> list[Item]:
         artist_name = await self._artist_name
         return [
