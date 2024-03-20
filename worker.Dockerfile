@@ -1,4 +1,4 @@
-FROM python:3.11-alpine as builder
+FROM python:3.12-alpine as builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
 
-FROM python:3.11-alpine
+FROM python:3.12-alpine
 
 ENV IS_WORKER 1
 
