@@ -1,8 +1,6 @@
 from typing import AsyncGenerator
 
-from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
 from app.utils.datetime import constant_datetime
 

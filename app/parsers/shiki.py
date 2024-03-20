@@ -3,9 +3,7 @@ from datetime import timedelta, datetime
 from bs4.element import Tag
 
 from app.utils.datetime import convert_datetime
-from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
 
 
@@ -13,7 +11,6 @@ class ShikiFeed(HttpParserExtention):
     _cache_storage_time = timedelta(hours=1)
 
     @property
-    # @async_return_empty_when(UnavailableFeed, ValueError, IndexError)
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         title = await self._show_title

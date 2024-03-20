@@ -2,9 +2,7 @@ from rss_parser import Parser  # type: ignore
 from rss_parser.models import FeedItem  # type: ignore
 
 from app.utils.item_converter import convert_item
-from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
 
 

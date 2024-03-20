@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import AsyncGenerator
 
 from app.utils.datetime import convert_datetime, constant_datetime
-from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
 from app.services.youtube import (
     BaseExtractionMode,
@@ -12,7 +11,6 @@ from app.services.youtube import (
     PlaylistExtractionMode,
     VideoExtractionMode,
 )
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.base import BaseFeed
 
 

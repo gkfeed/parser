@@ -2,9 +2,7 @@ from datetime import timedelta, datetime, timezone
 
 from bs4 import Tag
 
-from app.utils.return_empty_when import async_return_empty_when
 from app.serializers.feed import Item
-from app.extentions.parsers.exceptions import UnavailableFeed
 from app.extentions.parsers.http import HttpParserExtention
 
 
