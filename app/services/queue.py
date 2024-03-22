@@ -33,6 +33,7 @@ class QueueService:
         return job.result
 
 
+# NOTE: deprecated make workers instead
 def async_queue_wrap(func) -> Callable[..., Awaitable]:
     async def wrapper(*args, **kwargs):
         if IS_WORKER:
@@ -42,6 +43,7 @@ def async_queue_wrap(func) -> Callable[..., Awaitable]:
     return wrapper
 
 
+# NOTE: deprecated make sync workers instead
 def async_run_sync_in_queue(func) -> Callable[..., Awaitable]:
     async def wrapper(*args, **kwargs):
         if IS_WORKER:

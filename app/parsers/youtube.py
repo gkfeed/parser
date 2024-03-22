@@ -1,17 +1,18 @@
 from asyncio import TaskGroup
-from datetime import datetime
 from typing import AsyncGenerator
 
-from app.utils.datetime import convert_datetime, constant_datetime
+from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.youtube import (
     BaseExtractionMode,
     ChannelExtractionMode,
-    YoutubeInfoExtractor,
     PlaylistExtractionMode,
-    VideoExtractionMode,
 )
 from app.extentions.parsers.base import BaseFeed
+from app.workers.youtube import (
+    extract_video_urls,
+    extract_video_info,
+)
 
 
 class YoutubeFeed(BaseFeed):
@@ -19,39 +20,31 @@ class YoutubeFeed(BaseFeed):
     async def items(self) -> list[Item]:
         tasks = []
         async with TaskGroup() as tg:
-            async for v in self._videos_infos:
+            async for v in self._video_urls:
                 tasks.append(tg.create_task(self._create_video_item(v)))
 
         return [task.result() for task in tasks if task.result()]
 
-    async def _create_video_item(self, video_info: dict) -> Item | None:
+    async def _create_video_item(self, video_url: str) -> Item | None:
         try:
-            link = self._extract_video_link_from_info(video_info)
-            return Item(
-                title="YT: " + await self._channel_name,
-                text=video_info["title"],
-                date=await self._get_video_publish_date(video_info),
-                link=link,
+            title, date_str, channel_name = await extract_video_info(video_url)
+            item = Item(
+                title="YT: " + channel_name,
+                text=title,
+                date=convert_datetime(date_str),
+                link=video_url,
             )
+            return item
         except (TypeError, ValueError):
             return None
 
     @property
-    async def _channel_name(self) -> str:
-        target_url = self._get_target_url()
-        info = await YoutubeInfoExtractor.get_info(target_url)
-        return info["uploader"]
-
-    @property
-    async def _videos_infos(self) -> AsyncGenerator[dict, dict]:
+    async def _video_urls(self) -> AsyncGenerator[str, str]:
         videos_url = self._get_target_url()
         extraction_mode = self._choose_extraction_mode(videos_url)
         max_videos = 5  # FIXME: feed options
-
-        info = await YoutubeInfoExtractor.get_info(videos_url, extraction_mode)
-
-        for video in info["entries"][-max_videos:]:
-            yield video
+        for url in await extract_video_urls(videos_url, extraction_mode, max_videos):
+            yield url
 
     def _get_target_url(self) -> str:
         target_url = self.feed.url
@@ -63,21 +56,3 @@ class YoutubeFeed(BaseFeed):
         if "playlist" in url:
             return PlaylistExtractionMode()
         return ChannelExtractionMode()
-
-    async def _get_video_publish_date(self, video: dict) -> datetime:
-        today_timestamp = datetime.today().timestamp()
-        if "timestamp" in video and video["timestamp"] >= today_timestamp:
-            date_str = datetime.fromtimestamp(video["timestamp"]).strftime("%Y%m%d")
-            return convert_datetime(date_str)
-        link = self._extract_video_link_from_info(video)
-        info = await YoutubeInfoExtractor.get_info(link, VideoExtractionMode())
-        if "upload_date" in info:
-            return convert_datetime(info["upload_date"])
-        return constant_datetime
-
-    def _extract_video_link_from_info(self, video_info: dict) -> str:
-        if "url" in video_info:
-            return video_info["url"]
-        if "webpage_url" in video_info:
-            return video_info["webpage_url"]
-        raise ValueError
