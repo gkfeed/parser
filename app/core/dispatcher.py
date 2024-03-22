@@ -19,10 +19,13 @@ class Dispatcher(MiddlewaresWrapper, ParsersRegistrator, ItemsStorage):
             for feed in feeds:
                 tg.create_task(cls._fetch_feed(feed))
 
+        await asyncio.sleep(60)
         await cls.start_polling()
 
     @classmethod
     async def _fetch_feed(cls, feed: Feed):
-        parse_feed = cls._wrap_middlewares(cls._parsers[feed.type])
-        items = await parse_feed(feed, {})
+        parser = cls._parsers[feed.type]
+        parse_feed = cls._wrap_middlewares(parser)
+        data = parser(feed, {}).data
+        items = await parse_feed(feed, data)
         await cls._save_items(feed, items)
