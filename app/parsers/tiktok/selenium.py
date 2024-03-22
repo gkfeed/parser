@@ -3,7 +3,7 @@ from ._base import BaseTikTokFeed
 
 
 class TikTokSeleniumFeed(BaseTikTokFeed, SeleniumParserExtention):
-    _selenium_wait_time = 2
+    _selenium_wait_time = 20
     _should_load_cookies = True
     _should_save_cookies = True
 
