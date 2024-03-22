@@ -5,7 +5,7 @@ name = "pypi"
 
 [packages]
 tortoise-orm = "*"
-yt-dlp = "==2023.7.6"
+yt-dlp = "==2024.03.10"
 aiohttp = "*"
 redis = {extras = ["hiredis"], version = "*"}
 rq = "*"
