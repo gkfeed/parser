@@ -2,17 +2,16 @@ import asyncio
 import random
 
 from app.serializers.feed import Feed
-from app.services.repositories.feed import FeedRepository
-from .storage import ItemsStorage
+from .storage import ItemsStorage, FeedStorage
 from .middlewares import MiddlewaresWrapper
 from .parsers import ParsersRegistrator
 
 
-class Dispatcher(MiddlewaresWrapper, ParsersRegistrator, ItemsStorage):
+class Dispatcher(MiddlewaresWrapper, ParsersRegistrator, FeedStorage, ItemsStorage):
     @classmethod
     async def start_polling(cls):
         print("Start polling")
-        feeds = await FeedRepository.get_all()
+        feeds = await cls._get_all_feeds()
         random.shuffle(feeds)
 
         async with asyncio.TaskGroup() as tg:
