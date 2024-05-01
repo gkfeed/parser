@@ -12,10 +12,12 @@ from app.core.dispatcher import Dispatcher
 time.sleep(10)
 asyncio.run(models.setup(DB_URL, MODELS))
 
+dp = Dispatcher()
+
 for parser_type in PARSERS:
-    Dispatcher.register_parser(parser_type, PARSERS[parser_type])
+    dp.register_parser(parser_type, PARSERS[parser_type])
 
 for middleware in MIDDLEWARES:
-    Dispatcher.register_middleware(middleware)
+    dp.register_middleware(middleware)
 
-asyncio.run(Dispatcher.start_polling())
+asyncio.run(dp.start_polling())
