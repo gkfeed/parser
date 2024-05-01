@@ -4,27 +4,28 @@ import random
 from app.serializers.feed import Feed
 from .storage import ItemsStorage, FeedStorage
 from .middlewares import MiddlewaresWrapper
-from .parsers import ParsersRegistrator
+from .parsers import FeedParsingContext
 
 
-class Dispatcher(MiddlewaresWrapper, ParsersRegistrator, FeedStorage, ItemsStorage):
-    @classmethod
-    async def start_polling(cls):
+class Dispatcher(MiddlewaresWrapper, FeedParsingContext, FeedStorage, ItemsStorage):
+    def __init__(self):
+        super().__init__()
+        super(MiddlewaresWrapper, self).__init__()
+
+    async def start_polling(self):
         print("Start polling")
-        feeds = await cls._get_all_feeds()
+        feeds = await self._get_all_feeds()
         random.shuffle(feeds)
 
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                tg.create_task(cls._fetch_feed(feed))
+                tg.create_task(self._fetch_feed(feed))
 
         await asyncio.sleep(60)
-        await cls.start_polling()
+        await self.start_polling()
 
-    @classmethod
-    async def _fetch_feed(cls, feed: Feed):
-        parser = cls._parsers[feed.type]
-        parse_feed = cls._wrap_middlewares(parser)
-        data = parser(feed, {}).data
+    async def _fetch_feed(self, feed: Feed):
+        data = self.get_parser_initial_data(feed)
+        parse_feed = self._wrap_middlewares(self.execute_parser)
         items = await parse_feed(feed, data)
-        await cls._save_items(feed, items)
+        await self._save_items(feed, items)

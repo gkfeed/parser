@@ -1,27 +1,25 @@
 import functools
-from typing import Callable, Awaitable, Any, Type
+from typing import Callable, Awaitable, Any
 
 from app.serializers.feed import Feed, Item
-from app.extentions.parsers.base import BaseFeed
 from app.middlewares._base import BaseMiddleware
+
+_PARSER_TYPE = Callable[[Feed, dict[str, Any]], Awaitable[list[Item]]]
 
 
 class MiddlewaresWrapper:
-    _middlewares: list[BaseMiddleware] = []
+    def __init__(self):
+        self._middlewares: list[BaseMiddleware] = []
 
-    @classmethod
-    def register_middleware(cls, middleware: BaseMiddleware):
-        cls._middlewares.append(middleware)
+    def register_middleware(self, middleware: BaseMiddleware):
+        self._middlewares.append(middleware)
 
-    @classmethod
-    def _wrap_middlewares(
-        cls, parser: Type[BaseFeed]
-    ) -> Callable[[Feed, dict[str, Any]], Awaitable[list[Item]]]:
+    def _wrap_middlewares(self, parser: _PARSER_TYPE) -> _PARSER_TYPE:
         async def parser_wrapper(feed: Feed, data: dict) -> list[Item]:
-            return await parser(feed, data).items
+            return await parser(feed, data)
 
         middleware = parser_wrapper
-        for m in reversed(cls._middlewares):
+        for m in reversed(self._middlewares):
             middleware = functools.partial(m, middleware)
 
         return middleware
