@@ -5,7 +5,7 @@ async def _async_add(a: int, b: int) -> int:
     return a + b
 
 
-@pytest.mark.skip(reason='meaningless with mocks without works not in CI')
+@pytest.mark.skip(reason="meaningless with mocks without works not in CI")
 async def test_get_result():
     from app.services.queue import QueueService
 
