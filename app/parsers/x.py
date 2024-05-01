@@ -8,7 +8,7 @@ from app.extentions.parsers.http import HttpParserExtention
 
 
 class XFeed(HttpParserExtention):
-    _base_url = "https://nitter.fdn.fr/"
+    _base_url = "https://nitter.esmailelbob.xyz/"
     _x_url = "https://x.com"
 
     @property
@@ -54,4 +54,7 @@ class XFeed(HttpParserExtention):
 
     @property
     def feed_url(self) -> str:
-        return self._base_url + self.feed.url.split("/")[-1]
+        href = self.feed.url.split("/")[-1]
+        if self.feed.url.endswith("/"):
+            href = self.feed.url.split("/")[-2]
+        return self._base_url + href
