@@ -1,7 +1,8 @@
 from asyncio import TaskGroup
+
 from typing import AsyncGenerator
 
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import constant_datetime, convert_datetime
 from app.serializers.feed import Item
 from app.services.youtube import (
     BaseExtractionMode,
@@ -10,12 +11,20 @@ from app.services.youtube import (
 )
 from app.extentions.parsers.base import BaseFeed
 from app.workers.youtube import (
+    extract_channel_videos_info,
     extract_video_urls,
     extract_video_info,
 )
 
 
-class YoutubeFeed(BaseFeed):
+class _BaseYoutubeFeed(BaseFeed):
+    def _choose_extraction_mode(self, url: str) -> BaseExtractionMode:
+        if "playlist" in url:
+            return PlaylistExtractionMode()
+        return ChannelExtractionMode()
+
+
+class YoutubeFeed(_BaseYoutubeFeed):
     @property
     async def items(self) -> list[Item]:
         tasks = []
@@ -52,7 +61,36 @@ class YoutubeFeed(BaseFeed):
             target_url += "/videos"
         return target_url
 
-    def _choose_extraction_mode(self, url: str) -> BaseExtractionMode:
-        if "playlist" in url:
-            return PlaylistExtractionMode()
-        return ChannelExtractionMode()
+
+class AlternativeYoutubeFeed(_BaseYoutubeFeed):
+    @property
+    async def items(self) -> list[Item]:
+        return await self._create_items(self.feed.url)
+
+    async def _create_items(self, channel_url: str, max_items: int = 5):
+        extraction_mode = self._choose_extraction_mode(channel_url)
+
+        # FIXME: channel info pay not attention how many items
+        # FIXME: max items is hardcoded in extraction mode
+        channel_info = await extract_channel_videos_info(
+            channel_url, extraction_mode, max_items
+        )
+
+        channel_name = channel_info["entries"][0]["uploader"]
+        entries = channel_info["entries"][0]["entries"]
+
+        items = []
+        for video_info in entries:
+            title = video_info["title"]
+            video_url = video_info["url"]
+            items.append(
+                Item(
+                    title="YT: " + channel_name,
+                    text=title,
+                    # date=convert_datetime(date_str),
+                    date=constant_datetime,
+                    link=video_url,
+                )
+            )
+
+        return items

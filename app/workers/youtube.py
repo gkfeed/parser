@@ -26,3 +26,10 @@ async def extract_video_urls(
 async def extract_video_info(url: str) -> VideoInfo:
     info = await YoutubeInfoExtractor.get_info(url, VideoExtractionMode())
     return VideoInfo(info["title"], info["upload_date"], info["uploader"])
+
+
+@worker
+async def extract_channel_videos_info(
+    videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int
+) -> dict:
+    return await YoutubeInfoExtractor.get_info(videos_url, extraction_mode)
