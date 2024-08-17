@@ -23,6 +23,12 @@ class _BaseYoutubeFeed(BaseFeed):
             return PlaylistExtractionMode()
         return ChannelExtractionMode()
 
+    def _get_target_url(self) -> str:
+        target_url = self.feed.url
+        if target_url.split("/")[-2] == "channel" or len(target_url.split("@")) == 2:
+            target_url += "/videos"
+        return target_url
+
 
 class YoutubeFeed(_BaseYoutubeFeed):
     @property
@@ -55,29 +61,28 @@ class YoutubeFeed(_BaseYoutubeFeed):
         for url in await extract_video_urls(videos_url, extraction_mode, max_videos):
             yield url
 
-    def _get_target_url(self) -> str:
-        target_url = self.feed.url
-        if target_url.split("/")[-2] == "channel" or len(target_url.split("@")) == 2:
-            target_url += "/videos"
-        return target_url
-
 
 class AlternativeYoutubeFeed(_BaseYoutubeFeed):
     @property
     async def items(self) -> list[Item]:
-        return await self._create_items(self.feed.url)
-
-    async def _create_items(self, channel_url: str, max_items: int = 5):
-        extraction_mode = self._choose_extraction_mode(channel_url)
+        videos_url = self._get_target_url()
+        print(videos_url)
+        extraction_mode = self._choose_extraction_mode(self.feed.url)
+        max_items = 5
 
         # FIXME: channel info pay not attention how many items
         # FIXME: max items is hardcoded in extraction mode
         channel_info = await extract_channel_videos_info(
-            channel_url, extraction_mode, max_items
+            videos_url, extraction_mode, max_items
         )
 
-        channel_name = channel_info["entries"][0]["uploader"]
-        entries = channel_info["entries"][0]["entries"]
+        from pprint import pprint
+
+        pprint(channel_info)
+
+        channel_name = channel_info["channel"]
+        entries = channel_info["entries"]
+        # entries = channel_info["entries"][0]["entries"]
 
         items = []
         for video_info in entries:
@@ -87,7 +92,6 @@ class AlternativeYoutubeFeed(_BaseYoutubeFeed):
                 Item(
                     title="YT: " + channel_name,
                     text=title,
-                    # date=convert_datetime(date_str),
                     date=constant_datetime,
                     link=video_url,
                 )
