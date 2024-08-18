@@ -76,10 +76,6 @@ class AlternativeYoutubeFeed(_BaseYoutubeFeed):
             videos_url, extraction_mode, max_items
         )
 
-        from pprint import pprint
-
-        pprint(channel_info)
-
         channel_name = channel_info["channel"]
         entries = channel_info["entries"]
         # entries = channel_info["entries"][0]["entries"]
