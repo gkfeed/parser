@@ -4,6 +4,7 @@ services:
     build:
       context: .
     tty: True
+    restart: on-failure
     volumes:
       - ~/.local/share/gkfeed/data:/data
     env_file:
