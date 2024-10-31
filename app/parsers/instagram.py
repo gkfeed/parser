@@ -10,6 +10,7 @@ from app.extentions.parsers.cache import CacheFeedExtention
 class InstagramFeed(HttpParserExtention, CacheFeedExtention):
     __base_url = "https://www.piokok.com"
     _cache_storage_time_if_success = timedelta(days=1)
+    _http_run_in_queue = True
 
     @property
     async def items(self) -> list[Item]:
