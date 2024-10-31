@@ -18,7 +18,7 @@ class InstagramFeed(HttpParserExtention, CacheFeedExtention):
                 title="inst: " + self._user_name,
                 text=self._user_name,
                 date=constant_datetime,
-                link="https://www.instagram.com" + link,
+                link=self.__base_url + link,
             )
             async for link in self._posts_links
         ]
