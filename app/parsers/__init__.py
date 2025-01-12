@@ -19,6 +19,7 @@ from .insolarance import InsolaranceFeed
 from .mangalib import MangaLibFeed
 from .x import XFeed
 from .onefootball import OneFootballFeed
+from .rtl import RTLSerieFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -42,4 +43,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "x": XFeed,
     "spoti:playlist": SpotifyPlaylistFeed,
     "onefootball": OneFootballFeed,
+    "rtl": RTLSerieFeed,
 }

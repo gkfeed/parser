@@ -5,6 +5,7 @@ import pickle
 import os
 
 from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.settings import SELENIUM_COOKIES_PATH
 from app.services.cache.use_temporary import async_store_in_cache_for
@@ -34,6 +35,9 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
 
             driver.get(url)
             time.sleep(self._selenium_wait_time)
+
+            self.make_actions(driver)
+
             html = driver.page_source
 
             if self._should_save_cookies:
@@ -46,6 +50,9 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
             driver.close()
             driver.quit()
             raise e
+
+    def make_actions(self, driver: WebDriver):
+        pass
 
     def _load_cookies(self):
         if not os.path.isfile(SELENIUM_COOKIES_PATH):
