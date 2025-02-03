@@ -35,7 +35,7 @@ class RTLSerieFeed(SeleniumParserExtention):
         # Button Kostenlose Folden in top of the page
         button = driver.find_element(
             By.XPATH,
-            "/html/body/plus-root/ng-component/main/div/watch-watch/watch-format/section/watch-format-tab-navigation/mat-tab-group/mat-tab-header/div/div/div/div[2]/div",
+            "/html/body/plus-root/ng-component/main/div/watch-watch/watch-format/watch-format-tab-navigation/mat-tab-group/mat-tab-header/div/div/div/div[2]/div",
         )
         driver.execute_script("arguments[0].click();", button)
         time.sleep(self._selenium_wait_time)
