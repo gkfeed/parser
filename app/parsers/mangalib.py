@@ -10,6 +10,7 @@ from app.extentions.parsers.cache import CacheFeedExtention
 
 class MangaLibFeed(SeleniumParserExtention, CacheFeedExtention):
     _cache_storage_time = timedelta(hours=1)
+    _selenium_wait_time = 5
     _base_url = "https://mangalib.org"
     _max_posts = 5
 
@@ -28,7 +29,7 @@ class MangaLibFeed(SeleniumParserExtention, CacheFeedExtention):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url + "?section=chapters")
-        posts = [p for p in soup.find_all(class_="media-chapter")][: self._max_posts]
+        posts = [p for p in soup.find_all(class_="acu_az")][: self._max_posts]
         return posts
 
     def _get_post_title(self, post: Tag) -> str:
