@@ -1,4 +1,5 @@
 from app.serializers.feed import Feed
+
 from app.parsers.stories import InstagramStoriesFeed
 from . import FakeDispatcher
 
@@ -10,7 +11,7 @@ async def test_stories_feed():
         id=1,
         title="x",
         type="stories",
-        url="https://www.instagram.com/buzova86",
+        url="https://www.instagram.com/werrvin",
     )
 
     dp.register_parser("stories", InstagramStoriesFeed)
