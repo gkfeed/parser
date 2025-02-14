@@ -7,11 +7,12 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
 from app.utils.datetime import constant_datetime
+from app.extentions.parsers.cache import CacheFeedExtention
 from app.extentions.parsers.selenium import SeleniumParserExtention
 from app.serializers.feed import Item
 
 
-class InstagramStoriesFeed(SeleniumParserExtention):
+class InstagramStoriesFeed(SeleniumParserExtention, CacheFeedExtention):
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 5
     _service_url = "https://storiesig.website/"
