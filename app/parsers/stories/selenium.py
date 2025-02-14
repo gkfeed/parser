@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException
 
 from app.utils.datetime import constant_datetime
 from app.extentions.parsers.selenium import SeleniumParserExtention
@@ -33,11 +34,14 @@ class InstagramStoriesFeed(SeleniumParserExtention):
     @override
     def make_actions(self, driver: WebDriver):
         # Click consent button on startup
-        button = driver.find_element(
-            By.XPATH,
-            "/html/body/div[2]/div[2]/div[2]/div[2]/div[2]/button[1]",
-        )
-        driver.execute_script("arguments[0].click();", button)
+        try:
+            button = driver.find_element(
+                By.XPATH,
+                "/html/body/div[2]/div[2]/div[2]/div[2]/div[2]/button[1]",
+            )
+            driver.execute_script("arguments[0].click();", button)
+        except NoSuchElementException:
+            pass
 
         # Insert account name in form
         link = driver.find_element(By.ID, "link")  # Replace with actual element ID
