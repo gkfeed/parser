@@ -16,6 +16,7 @@ from .http import HttpParserExtention
 class SeleniumParserExtention(HttpParserExtention, ABC):
     _http_repsponse_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
+    _should_delete_cookies = False
     _should_load_cookies = False
     _should_save_cookies = False
 
@@ -27,6 +28,9 @@ class SeleniumParserExtention(HttpParserExtention, ABC):
             options=webdriver.ChromeOptions(),
         )
         try:
+            if self._should_delete_cookies:
+                driver.delete_all_cookies()
+
             if self._should_load_cookies:
                 driver.get(url)
                 driver.delete_all_cookies()
