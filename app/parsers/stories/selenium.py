@@ -14,7 +14,8 @@ from app.serializers.feed import Item
 
 class InstagramStoriesFeed(SeleniumParserExtention, CacheFeedExtention):
     _cache_storage_time_if_success = timedelta(days=1)
-    _selenium_wait_time = 5
+    _selenium_wait_time = 10
+    _should_delete_cookies = True
     _service_url = "https://storiesig.website/"
 
     @property
