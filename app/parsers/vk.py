@@ -17,7 +17,7 @@ class VkFeed(HttpParserExtention, CacheFeedExtention):
             Item(
                 title=self._get_post_title(p),
                 text=self._get_post_text(p),
-                date=self._get_post_datetime(p),
+                date=constant_datetime,
                 link=self._get_post_link(p),
             )
             for p in await self._posts
@@ -47,6 +47,7 @@ class VkFeed(HttpParserExtention, CacheFeedExtention):
             raise ValueError
 
     def _get_post_datetime(self, post: Tag) -> datetime:
+        # NOTE: broken
         try:
             datetime_str = post.find_all("time")[0].text
             return self._parse_datetime(datetime_str)
