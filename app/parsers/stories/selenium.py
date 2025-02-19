@@ -13,6 +13,7 @@ from app.serializers.feed import Item
 
 
 class InstagramStoriesFeed(SeleniumParserExtention, CacheFeedExtention):
+    _http_repsponse_storage_time = timedelta(seconds=0)
     _cache_storage_time = timedelta(seconds=0)
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
