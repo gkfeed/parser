@@ -1,19 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.instagram import InstagramFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+INSTAGRAM_FEED_DATA = {
+    "type": "inst",
+    "parser": InstagramFeed,
+    "url": "https://www.instagram.com/makaryshaa",
+}
 
 
-async def test_instagram_feed():
-    dp = FakeDispatcher()
-    feed = Feed(
-        id=1,
-        title="x",
-        type="inst",
-        url="https://www.instagram.com/makaryshaa",
-    )
-
-    dp.register_parser("inst", InstagramFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [INSTAGRAM_FEED_DATA], indirect=True)
+async def test_instagram_feed(fetch_items):
+    assert len(await fetch_items) != 0

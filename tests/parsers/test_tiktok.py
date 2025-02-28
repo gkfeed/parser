@@ -1,23 +1,15 @@
 import pytest
-
-from app.serializers.feed import Feed
 from app.parsers.tiktok import TikTokFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+TIKTOK_FEED_DATA = {
+    "type": "tiktok",
+    "parser": TikTokFeed,
+    "url": "https://www.tiktok.com/@sendependa_dio",
+}
 
 
 @pytest.mark.skip(reason="its not work")
-async def test_tiktok_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="tiktok",
-        url="https://www.tiktok.com/@sendependa_dio",
-    )
-
-    dp.register_parser("tiktok", TikTokFeed)
-
-    await dp.fetch_feed(feed)
-
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [TIKTOK_FEED_DATA], indirect=True)
+async def test_tiktok_feed(fetch_items):
+    assert len(await fetch_items) != 0

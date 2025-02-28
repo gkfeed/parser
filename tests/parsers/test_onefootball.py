@@ -1,23 +1,17 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.onefootball import OneFootballFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+ONEFOOTBALL_FEED_DATA = {
+    "type": "onefootball",
+    "parser": OneFootballFeed,
+    "url": "https://onefootball.com/en/team/barcelona-5",
+}
 
 
-async def test_onefootball_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="onefootball",
-        url="https://onefootball.com/en/team/barcelona-5",
-    )
-
-    dp.register_parser("onefootball", OneFootballFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
-
+@pytest.mark.parametrize("fetch_items", [ONEFOOTBALL_FEED_DATA], indirect=True)
+async def test_onefootball_feed(fetch_items):
+    items = await fetch_items
+    assert len(items) != 0
     # test if parser works correctly it must return only 2 items
-    assert len(dp.items) == 2
+    assert len(items) == 2

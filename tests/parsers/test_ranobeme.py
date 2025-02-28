@@ -1,20 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.ranobeme import RanobeMeFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+RANOBEME_FEED_DATA = {
+    "type": "ranobeme",
+    "parser": RanobeMeFeed,
+    "url": "https://ranobe.me/ranobe166",
+}
 
 
-async def test_ranobeme_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="ranobeme",
-        url="https://ranobe.me/ranobe166",
-    )
-
-    dp.register_parser("ranobeme", RanobeMeFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [RANOBEME_FEED_DATA], indirect=True)
+async def test_ranobeme_feed(fetch_items):
+    assert len(await fetch_items) != 0

@@ -1,20 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.shiki import ShikiFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+SHIKI_FEED_DATA = {
+    "type": "shiki",
+    "parser": ShikiFeed,
+    "url": "https://shikimori.one/animes/51180",
+}
 
 
-async def test_shiki_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="shiki",
-        url="https://shikimori.one/animes/51180",
-    )
-
-    dp.register_parser("shiki", ShikiFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [SHIKI_FEED_DATA], indirect=True)
+async def test_shiki_feed(fetch_items):
+    assert len(await fetch_items) != 0

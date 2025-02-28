@@ -1,19 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.mangalib import MangaLibFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+MANGALIB_FEED_DATA = {
+    "type": "mangalib",
+    "parser": MangaLibFeed,
+    "url": "https://mangalib.org/ru/manga/4731--yuukoku-no-moriarty",
+}
 
 
-async def test_mangalib_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="mangalib",
-        url="https://mangalib.org/ru/manga/4731--yuukoku-no-moriarty",
-    )
-
-    dp.register_parser("mangalib", MangaLibFeed)
-    await dp.fetch_feed(feed)
-
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [MANGALIB_FEED_DATA], indirect=True)
+async def test_mangalib_feed(fetch_items):
+    assert len(await fetch_items) != 0

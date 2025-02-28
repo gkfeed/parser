@@ -1,19 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.reddit import RedditFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+REDDIT_FEED_DATA = {
+    "type": "reddit",
+    "parser": RedditFeed,
+    "url": "https://www.reddit.com/r/neovim",
+}
 
 
-async def test_reddit_feed():
-    dp = FakeDispatcher()
-    feed = Feed(
-        id=1,
-        title="x",
-        type="reddit",
-        url="https://www.reddit.com/r/neovim",
-    )
-
-    dp.register_parser("reddit", RedditFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [REDDIT_FEED_DATA], indirect=True)
+async def test_reddit_feed(fetch_items):
+    assert len(await fetch_items) != 0

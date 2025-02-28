@@ -1,20 +1,14 @@
-from app.serializers.feed import Feed
+import pytest
 from app.parsers.yummyanime import YummyAnimeFeed
-from . import FakeDispatcher
+from . import fetch_items  # noqa
+
+YUMMYANIME_FEED_DATA = {
+    "type": "yummyanime",
+    "parser": YummyAnimeFeed,
+    "url": "https://yummy-anime.org/4769-dobro-pozhalovat-v-klass-prevoshodstva-3.html",
+}
 
 
-async def test_yummyanime_feed():
-    dp = FakeDispatcher()
-
-    feed = Feed(
-        id=1,
-        title="x",
-        type="yummyanime",
-        url="https://yummy-anime.org/4769-dobro-pozhalovat-v-klass-prevoshodstva-3.html",
-    )
-
-    dp.register_parser("yummyanime", YummyAnimeFeed)
-    await dp.fetch_feed(feed)
-
-    # test if parser actually works
-    assert len(dp.items) != 0
+@pytest.mark.parametrize("fetch_items", [YUMMYANIME_FEED_DATA], indirect=True)
+async def test_yummyanime_feed(fetch_items):
+    assert len(await fetch_items) != 0
