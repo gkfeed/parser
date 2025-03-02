@@ -20,7 +20,7 @@ class HashMiddleware(BaseMiddleware):
         hash_function = data["hash_function"]
         items_to_remove = []
         for item in items:
-            hash = hash_function(item)
+            hash = await hash_function(item)
             if await ItemsHashRepository.contains(hash):
                 items_to_remove.append(item)
             else:

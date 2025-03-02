@@ -7,18 +7,26 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
 from app.utils.datetime import constant_datetime
+from app.serializers.feed import Item
+from app.services.hash import HashService
 from app.extentions.parsers.cache import CacheFeedExtention
 from app.extentions.parsers.selenium import SeleniumParserExtention
-from app.serializers.feed import Item
+from app.extentions.parsers.hash import ItemsHashExtension
 
 
-class InstagramStoriesFeed(SeleniumParserExtention, CacheFeedExtention):
+class InstagramStoriesFeed(
+    ItemsHashExtension, SeleniumParserExtention, CacheFeedExtention
+):
     _http_repsponse_storage_time = timedelta(seconds=0)
     _cache_storage_time = timedelta(seconds=0)
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
     _should_delete_cookies = True
     _service_url = "https://storiesig.website/"
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        return await HashService.hash_video_from_url(item.link)
 
     @property
     async def items(self) -> list[Item]:

@@ -10,7 +10,7 @@ from app.extentions.parsers.hash import ItemsHashExtension
 
 class WebFeed(ItemsHashExtension, HttpParserExtention):
     @override
-    def _generate_hash(self, item: Item) -> str:
+    async def _generate_hash(self, item: Item) -> str:
         return HashService.hash_str(item.title + item.text)
 
     @property
