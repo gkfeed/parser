@@ -1,3 +1,5 @@
+PYTHON = .venv/bin/python
+
 merge-to-master:
 	git checkout master
 	git merge dev
@@ -5,7 +7,9 @@ merge-to-master:
 	git checkout dev
 
 test:
-	IS_WORKER=1 pipenv run test
+	IS_WORKER=1 $(PYTHON) -m pytest
 
 dev:
-	IS_WORKER=1 pipenv run app
+	IS_WORKER=1 $(PYTHON) < app/main.py
+
+.PHONY: merge-to-master test dev
