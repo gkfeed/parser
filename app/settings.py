@@ -20,4 +20,5 @@ SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
 MODELS = [
     "app.models.feed",
     "app.models.item",
+    "app.models.item_hash",
 ]

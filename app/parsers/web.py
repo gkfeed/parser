@@ -1,22 +1,29 @@
-from rss_parser import Parser  # type: ignore
-from rss_parser.models import FeedItem  # type: ignore
+from typing import override
 
-from app.utils.item_converter import convert_item
+from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
+from app.services.hash import HashService
+from app.services.rss import RSSParser
 from app.extentions.parsers.http import HttpParserExtention
+from app.extentions.parsers.hash import ItemsHashExtension
 
 
-class WebFeed(HttpParserExtention):
+class WebFeed(ItemsHashExtension, HttpParserExtention):
+    @override
+    def _generate_hash(self, item: Item) -> str:
+        return HashService.hash_str(item.title + item.text)
+
     @property
     async def items(self) -> list[Item]:
         return await self._get_items_from_web(self.feed.url)
 
     async def _get_items_from_web(self, url: str) -> list[Item]:
-        return [convert_item(item) for item in await self.__get_feed_from_url(url)]
+        return [self._convert_item(item) for item in await RSSParser.parse_feed(url)]
 
-    async def __get_feed_from_url(self, url: str) -> list[FeedItem]:
-        try:
-            html = await self.get_html(url)
-            return Parser(html).parse().feed
-        except Exception as e:  # FIXME: Parser error
-            raise ValueError
+    def _convert_item(self, item_data: dict) -> Item:
+        return Item(
+            title=item_data.get("title", ""),
+            link=item_data.get("link", ""),
+            text=item_data.get("description", ""),
+            date=convert_datetime(item_data.get("pub_date", "")),
+        )
