@@ -6,6 +6,8 @@ from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
 
+# TODO: inherit from WebFeed and override __init__ to change url to rsshub
+
 
 class XFeed(HttpParserExtention):
     _base_url = "https://nitter.esmailelbob.xyz/"

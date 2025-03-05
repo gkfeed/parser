@@ -28,6 +28,7 @@ async def extract_video_info(url: str) -> VideoInfo:
     return VideoInfo(info["title"], info["upload_date"], info["uploader"])
 
 
+# FIXME: max_videos unused
 @worker
 async def extract_channel_videos_info(
     videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int

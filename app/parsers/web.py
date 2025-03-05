@@ -12,7 +12,6 @@ class WebFeed(ItemsHashExtension, HttpParserExtention):
     @override
     async def _generate_hash(self, item: Item) -> str:
         if item.guid:
-            print(item.guid)
             return HashService.hash_str(item.guid)
         return HashService.hash_str(item.title + item.text)
 
