@@ -1,3 +1,4 @@
+from typing import Optional
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -15,3 +16,4 @@ class Item(BaseModel):
     text: str
     date: datetime
     link: str
+    guid: Optional[str]

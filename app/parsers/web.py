@@ -11,6 +11,9 @@ from app.extentions.parsers.hash import ItemsHashExtension
 class WebFeed(ItemsHashExtension, HttpParserExtention):
     @override
     async def _generate_hash(self, item: Item) -> str:
+        if item.guid:
+            print(item.guid)
+            return HashService.hash_str(item.guid)
         return HashService.hash_str(item.title + item.text)
 
     @property
@@ -26,4 +29,5 @@ class WebFeed(ItemsHashExtension, HttpParserExtention):
             link=item_data.get("link", ""),
             text=item_data.get("description", ""),
             date=convert_datetime(item_data.get("pub_date", "")),
+            guid=item_data.get("guid", ""),
         )
