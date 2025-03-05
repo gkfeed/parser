@@ -11,9 +11,9 @@ redis = {extras = ["hiredis"], version = "*"}
 rq = "*"
 python-dateutil = "*"
 python-dotenv = "*"
-pydantic = "==1.10.11"
-rss-parser = "==0.2.4"
 selenium = "*"
+bs4 = "*"
+pydantic = "*"
 
 [dev-packages]
 flake8 = "*"
