@@ -1,16 +1,23 @@
 from datetime import timedelta, datetime
+from typing import override
 
 from bs4 import Tag
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
+from app.services.hash import HashService
 from app.extentions.parsers.http import HttpParserExtention
 from app.extentions.parsers.cache import CacheFeedExtention
+from app.extentions.parsers.hash import ItemsHashExtension
 
 
-class RedditFeed(HttpParserExtention, CacheFeedExtention):
+class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
     __base_url = "https://libreddit.northboot.xyz/"
     _cache_storage_time = timedelta(hours=1)
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        return HashService.hash_str(item.link)
 
     @property
     async def items(self) -> list[Item]:
