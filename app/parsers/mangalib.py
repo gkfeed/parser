@@ -18,19 +18,19 @@ class MangaLibFeed(SeleniumParserExtention, CacheFeedExtention):
     async def items(self) -> list[Item]:
         return [
             Item(
-                title=self._get_post_title(p),
-                text=self._get_post_text(p),
+                title=self._get_post_title(c),
+                text=self._get_post_text(c),
                 date=constant_datetime,
-                link=self._get_post_link(p),
+                link=self._get_post_link(c),
             )
-            for p in await self._posts
+            for c in await self._chapters
         ]
 
     @property
-    async def _posts(self) -> list[Tag]:
+    async def _chapters(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url + "?section=chapters")
-        posts = [p for p in soup.find_all(class_="acu_az")][: self._max_posts]
-        return posts
+        chapter_tags = soup.find_all(attrs={"data-chapter-id": True})
+        return chapter_tags[: self._max_posts]
 
     def _get_post_title(self, post: Tag) -> str:
         try:
