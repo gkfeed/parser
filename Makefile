@@ -12,4 +12,11 @@ test:
 dev:
 	IS_WORKER=1 $(PYTHON) < app/main.py
 
-.PHONY: merge-to-master test dev
+debug:
+ifdef FILE
+	IS_WORKER=1 $(PYTHON) -m pytest --pdb $(FILE)
+else
+	IS_WORKER=1 $(PYTHON) -m pytest --pdb
+endif
+
+.PHONY: merge-to-master test dev debug
