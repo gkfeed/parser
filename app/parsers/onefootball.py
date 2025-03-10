@@ -2,7 +2,7 @@ from datetime import timedelta, datetime
 
 from bs4 import Tag
 
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
 from app.extentions.parsers.cache import CacheFeedExtention
@@ -44,7 +44,8 @@ class OneFootballFeed(HttpParserExtention, CacheFeedExtention):
             datetime_str = match.find_all("time")[0]["datetime"]
             return convert_datetime(datetime_str)
         except (IndexError, KeyError):
-            raise ValueError
+            print("onefootball: return constant datetime")  # log
+            return constant_datetime
 
     def _get_match_link(self, match: Tag) -> str:
         try:
