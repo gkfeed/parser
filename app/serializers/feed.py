@@ -16,4 +16,4 @@ class Item(BaseModel):
     text: str
     date: datetime
     link: str
-    guid: Optional[str]
+    guid: Optional[str] = None
