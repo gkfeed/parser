@@ -12,7 +12,9 @@ class SpotifyPlaylistFeed(SeleniumParserExtention):
         soup = await self.get_soup(self.feed.url)
         first_track = soup.find_all("img")[1].parent.parent.parent
         first_track_name = first_track.find_all("a")[0].div.text
-        first_track_artist = first_track.find_all("a")[0].parent.span.div.a.text
+        first_track_artist = (
+            first_track.find_all("a")[0].parent.find_all("span")[-1].a.text
+        )
         first_track_id = first_track.find_all("a")[0]["href"].split("/")[-1]
 
         return [
