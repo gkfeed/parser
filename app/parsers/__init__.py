@@ -20,6 +20,7 @@ from .mangalib import MangaLibFeed
 from .x import XFeed
 from .onefootball import OneFootballFeed
 from .rtl import RTLSerieFeed
+from .rezka import RezkaCollecionFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -44,4 +45,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "spoti:playlist": SpotifyPlaylistFeed,
     "onefootball": OneFootballFeed,
     "rtl": RTLSerieFeed,
+    "rezka:collection": RezkaCollecionFeed,
 }
