@@ -20,7 +20,7 @@ class RezkaFeed(SeleniumParserExtention):
     @property
     async def _show_status(self) -> str:
         soup = await self.get_soup(self.feed.url)
-        titles = soup.find_all("h2")
-        if not titles:
-            raise UnavailableFeed(self.feed.url)
-        return soup.find_all("h2")[-1].text
+        title = soup.find("h1").text
+        seasons = soup.find_all(class_="b-simple_season__item")
+        episodes_tabs = soup.find_all(id="simple-episodes-tabs")
+        return f"{title} {seasons[-1].text} {episodes_tabs[-1].find_all('li')[-1].text}"
