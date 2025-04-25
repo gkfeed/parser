@@ -23,9 +23,8 @@ class SpotifyFeed(SeleniumParserExtention):
 
     @property
     async def _releases_links(self) -> list[Tag]:
-        albums_soup = await self.get_soup(self.feed.url + "/discography/album")
-        singles_soup = await self.get_soup(self.feed.url + "/discography/single")
-        links = albums_soup.find_all("a") + singles_soup.find_all("a")
+        soup = await self.get_soup(self.feed.url + "/discography")
+        links = soup.find_all("a")
 
         releases_links = []
         for link in links:
@@ -38,7 +37,7 @@ class SpotifyFeed(SeleniumParserExtention):
 
     @property
     async def _artist_name(self) -> str:
-        soup = await self.get_soup(self.feed.url + "/discography/album")
+        soup = await self.get_soup(self.feed.url + "/discography")
         links = soup.find_all("a")
         for link in links:
             if link["href"].startswith("/artist"):
