@@ -8,8 +8,7 @@ class RezkaCollecionFeed(SeleniumParserExtention):
 
     @property
     async def items(self) -> list[Item]:
-        collection_url = self.feed.url + "/?filter=last"
-        soup = await self.get_soup(collection_url)
+        soup = await self.get_soup(self.feed.url)
         titles = soup.find_all(class_="b-content__inline_item-link")[: self._max_items]
 
         return [
