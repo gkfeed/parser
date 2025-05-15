@@ -4,6 +4,7 @@ from app.extentions.parsers.selenium import SeleniumParserExtention
 
 
 class RezkaCollecionFeed(SeleniumParserExtention):
+    _base_url = "https://hdrezka.me"
     _max_items = 5
 
     @property
@@ -14,9 +15,14 @@ class RezkaCollecionFeed(SeleniumParserExtention):
         return [
             Item(
                 title=title.a.text,
-                link=title.a["href"],
+                link=self._normalize_href(title.a["href"]),
                 text=title.a.text,
                 date=constant_datetime,
             )
             for title in titles
         ]
+
+    def _normalize_href(self, href: str) -> str:
+        if href.startswith("/"):
+            return self._base_url + href
+        return href
