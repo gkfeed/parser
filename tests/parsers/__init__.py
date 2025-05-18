@@ -1,6 +1,8 @@
+import pytest
+
 from app.core.dispatcher import Dispatcher
 from app.serializers.feed import Feed, Item
-import pytest
+import app.configs  # noqa
 
 
 class MockedItemsStorage:
