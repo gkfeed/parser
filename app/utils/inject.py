@@ -1,4 +1,5 @@
 from typing import Any
+import inspect
 
 from app.settings import IS_WORKER
 from app.services.container import Container
@@ -9,31 +10,25 @@ if IS_WORKER:
 
 def inject(params: dict[str, Any], call: bool = False):
     def decorator(func):
-        def wrapper(*args, **kwargs):
+        is_async = inspect.iscoroutinefunction(func)
+
+        def _inject_kwargs(kwargs):
             for param in params:
                 injected_value = getattr(Container.get_data(), params[param])
                 if call:
                     injected_value = injected_value()
                 kwargs[param] = injected_value
 
+        def wrapper(*args, **kwargs):
+            _inject_kwargs(kwargs)
             return func(*args, **kwargs)
 
-        return wrapper
-
-    return decorator
-
-
-def inject_async(params: dict[str, Any], call: bool = False):
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            for param in params:
-                injected_value = getattr(Container.get_data(), params[param])
-                if call:
-                    injected_value = injected_value()
-                kwargs[param] = injected_value
-
+        async def async_wrapper(*args, **kwargs):
+            _inject_kwargs(kwargs)
             return await func(*args, **kwargs)
 
+        if is_async:
+            return async_wrapper
         return wrapper
 
     return decorator
