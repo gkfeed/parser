@@ -21,6 +21,7 @@ from .x import XFeed
 from .onefootball import OneFootballFeed
 from .rtl import RTLSerieFeed
 from .rezka import RezkaCollecionFeed
+from .matreshka import MatreshkaFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -46,4 +47,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "onefootball": OneFootballFeed,
     "rtl": RTLSerieFeed,
     "rezka:collection": RezkaCollecionFeed,
+    "matreshka": MatreshkaFeed,
 }
