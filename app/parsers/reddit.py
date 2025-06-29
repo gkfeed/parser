@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta, datetime
 from typing import override
 
@@ -5,6 +6,7 @@ from bs4 import Tag
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
+from app.services.http import HttpService
 from app.services.hash import HashService
 from app.extentions.parsers.http import HttpParserExtention
 from app.extentions.parsers.cache import CacheFeedExtention
@@ -12,8 +14,23 @@ from app.extentions.parsers.hash import ItemsHashExtension
 
 
 class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
-    __base_url = "https://libreddit.northboot.xyz/"
     _cache_storage_time = timedelta(hours=1)
+    __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
+    __base_urls_cache: list[str] | None = None
+
+    async def _get_base_urls(self) -> list[str]:
+        if self.__base_urls_cache:
+            return self.__base_urls_cache
+
+        response = await HttpService.get(self.__instances_url)
+        instances_data = json.loads(response)
+        urls = [
+            instance["url"]
+            for instance in instances_data["instances"]
+            if "url" in instance
+        ]
+        self.__base_urls_cache = urls
+        return urls
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -33,9 +50,20 @@ class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
 
     @property
     async def _posts(self) -> list[Tag]:
-        url = self.__base_url + "/".join(self.feed.url.split("/")[3:])
-        soup = await self.get_soup(url)
-        return [p for p in soup.find_all(class_="post")]
+        base_urls = await self._get_base_urls()
+        items: list[Tag] = []
+
+        for base_url in base_urls:
+            try:
+                url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
+                soup = await self.get_soup(url)
+                items = [p for p in soup.find_all(class_="post")]
+                if not items:
+                    continue
+            except Exception:
+                continue
+
+        return items
 
     def _get_post_title(self, post: Tag) -> str:
         try:
