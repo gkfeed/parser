@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.extentions.parsers.http import HttpParserExtention
 from app.extentions.parsers.cache import CacheFeedExtention
@@ -7,6 +8,7 @@ from app.extentions.parsers.cache import CacheFeedExtention
 
 class LiveballFeed(HttpParserExtention, CacheFeedExtention):
     _cache_storage_time = timedelta(hours=1)
+    _base_url = "https://liveball.my"
 
     @property
     async def items(self) -> list[Item]:
@@ -22,39 +24,10 @@ class LiveballFeed(HttpParserExtention, CacheFeedExtention):
             if not match or not hasattr(match, "select_one"):
                 continue
 
-            league_elem = match.select_one(".tm_league_name")
-            if not league_elem:
-                continue
-            league_name = league_elem.get_text(strip=True)
-
-            team1_elem = match.select_one(".t_left .league_title")
-            team2_elem = match.select_one(".t_right .league_title")
-            if not team1_elem or not team2_elem:
-                continue
-            team1 = team1_elem.get_text(strip=True)
-            team2 = team2_elem.get_text(strip=True)
-
-            timer_elem = match.select_one(".tm_timer")
-            if not timer_elem:
-                continue
-            try:
-                timestamp_str = timer_elem.get("value")
-                timestamp = int(str(timestamp_str))
-            except ValueError:
-                continue
-
-            match_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-
-            link_elem = match.select_one("a.la")
-            if not link_elem:
-                continue
-            match_url = link_elem.get("href")
-            if not match_url:
-                continue
-
-            match_url = str(match_url)
-            if not match_url.startswith("http"):
-                match_url = self.feed.url.rstrip("/") + match_url
+            league_name = self._extract_league_name(match)
+            team1, team2 = self._extract_teams(match)
+            match_time = self._extract_match_datetime(match)
+            match_url = self._exctract_match_url(match)
 
             items.append(
                 Item(
@@ -66,3 +39,42 @@ class LiveballFeed(HttpParserExtention, CacheFeedExtention):
             )
 
         return items
+
+    def _extract_league_name(self, match) -> str:
+        league_elem = match.select_one(".tm_league_name")
+        if league_elem:
+            return league_elem.get_text(strip=True)
+        raise ValueError
+
+    def _extract_teams(self, match) -> tuple[str | None, str | None]:
+        team1_elem = match.select_one(".t_left .league_title")
+        team2_elem = match.select_one(".t_right .league_title")
+        team1 = team1_elem.get_text(strip=True) if team1_elem else None
+        team2 = team2_elem.get_text(strip=True) if team2_elem else None
+        return team1, team2
+
+    def _extract_match_datetime(self, match) -> datetime:
+        timer_elem = match.select_one(".tm_timer")
+        if not timer_elem:
+            return constant_datetime
+
+        timestamp_str = timer_elem.get("value")
+        if not timestamp_str:
+            return constant_datetime
+
+        timestamp = int(str(timestamp_str))
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+    def _exctract_match_url(self, match) -> str:
+        link_elem = match.select_one("a.la")
+        if not link_elem:
+            raise ValueError
+
+        match_url = link_elem.get("href")
+        if not match_url:
+            raise ValueError
+
+        match_url = str(match_url)
+        if not match_url.startswith("http"):
+            match_url = self._base_url + match_url
+        return match_url
