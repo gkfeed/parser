@@ -10,3 +10,4 @@ cache_directory/
 **/.pytest_cache
 **/**/.ruff_cache/
 .aider*
+data/*
