@@ -11,12 +11,14 @@ from app.services.hash import HashService
 from app.extentions.parsers.http import HttpParserExtention
 from app.extentions.parsers.cache import CacheFeedExtention
 from app.extentions.parsers.hash import ItemsHashExtension
+from app.services.url_ranker import URLRanker
 
 
 class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
     _cache_storage_time = timedelta(hours=1)
     __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
     __base_urls_cache: list[str] | None = None
+    url_ranker = URLRanker(data_file="data/reddit_url_ranks.json")
 
     async def _get_base_urls(self) -> list[str]:
         if self.__base_urls_cache:
@@ -24,13 +26,13 @@ class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
 
         response = await HttpService.get(self.__instances_url)
         instances_data = json.loads(response)
-        urls = [
+        all_urls = [
             instance["url"]
             for instance in instances_data["instances"]
             if "url" in instance
         ]
-        self.__base_urls_cache = urls
-        return urls
+        self.__base_urls_cache = self.url_ranker.get_ranked_urls(all_urls)
+        return self.__base_urls_cache
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -59,8 +61,11 @@ class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
                 soup = await self.get_soup(url)
                 items = [p for p in soup.find_all(class_="post")]
                 if not items:
+                    self.url_ranker.demote_url(base_url)
                     continue
+                self.url_ranker.promote_url(base_url)
             except Exception:
+                self.url_ranker.demote_url(base_url)
                 continue
 
         return items
