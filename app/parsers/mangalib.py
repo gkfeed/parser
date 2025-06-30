@@ -29,20 +29,26 @@ class MangaLibFeed(SeleniumParserExtension, CacheFeedExtension):
     @property
     async def _chapters(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url + "?section=chapters")
-        chapter_tags = soup.find_all(attrs={"data-chapter-id": True})
+        chapter_tags = [
+            tag
+            for tag in soup.find_all(attrs={"data-chapter-id": True})
+            if isinstance(tag, Tag)
+        ]
         return chapter_tags[: self._max_posts]
 
     def _get_post_title(self, post: Tag) -> str:
-        try:
-            return post.find_all("a")[0].text.strip()
-        except IndexError:
-            raise ValueError
+        a_tag = post.find("a")
+        if a_tag and isinstance(a_tag, Tag):
+            return a_tag.text.strip()
+        raise ValueError("Could not extract post title")
 
     def _get_post_text(self, post: Tag) -> str:
         return self._get_post_title(post)
 
     def _get_post_link(self, post: Tag) -> str:
-        try:
-            return self._base_url + post.find_all("a")[0]["href"]
-        except IndexError:
-            raise ValueError
+        a_tag = post.find("a")
+        if a_tag and isinstance(a_tag, Tag) and "href" in a_tag.attrs:
+            href = a_tag["href"]
+            if isinstance(href, str):
+                return self._base_url + href
+        raise ValueError("Could not extract post link")
