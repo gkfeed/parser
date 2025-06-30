@@ -1,6 +1,6 @@
 from asyncio import TaskGroup
 
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 from app.utils.datetime import constant_datetime, convert_datetime
 from app.serializers.feed import Item
@@ -38,7 +38,7 @@ class YoutubeFeed(_BaseYoutubeFeed):
             async for v in self._video_urls:
                 tasks.append(tg.create_task(self._create_video_item(v)))
 
-        return [task.result() for task in tasks if task.result()]
+        return [cast(Item, task.result()) for task in tasks if task.result()]
 
     async def _create_video_item(self, video_url: str) -> Item | None:
         try:
