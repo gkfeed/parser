@@ -106,4 +106,4 @@ def test_promote_url(url_ranker):
 
     url_ranker.ranks = {"url2": 0}
     url_ranker.promote_url("url2")
-    assert url_ranker.ranks["url2"] == 0 # Should not go below 0
+    assert url_ranker.ranks["url2"] == 0  # Should not go below 0
