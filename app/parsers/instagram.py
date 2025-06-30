@@ -1,6 +1,8 @@
 from datetime import timedelta
 from typing import AsyncGenerator
 
+from bs4 import Tag
+
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
@@ -28,14 +30,19 @@ class InstagramFeed(SeleniumParserExtension, CacheFeedExtension):
 
     async def get_post_photos_links(self, url: str) -> list[str]:
         soup = await self.get_soup(url)
-        return [pic.a["href"] for pic in soup.find_all(class_="pic")]
+        return [
+            str(pic.a["href"])
+            for pic in soup.find_all(class_="pic")
+            if isinstance(pic, Tag) and pic.a and "href" in pic.a.attrs
+        ]
 
     @property
     async def _posts_links(self) -> AsyncGenerator[str, str]:
         url = f"{self.__base_url}/profile/{self._user_name}"
         soup = await self.get_soup(url)
-        for link in soup.find_all("a", class_="cover_link"):
-            yield link["href"]
+        for link_tag in soup.find_all("a", class_="cover_link"):
+            if isinstance(link_tag, Tag) and "href" in link_tag.attrs:
+                yield str(link_tag["href"])
 
     @property
     def _user_name(self) -> str:
