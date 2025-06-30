@@ -1,4 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, datetime, timezone
+
+from bs4 import Tag
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
@@ -16,12 +18,12 @@ class LiveballFeed(HttpParserExtension, CacheFeedExtension):
         soup = await self.get_soup(self.feed.url)
 
         top_match_container = soup.find("section", class_="top_match_section")
-        if not top_match_container:
+        if not top_match_container or not isinstance(top_match_container, Tag):
             return []
 
         matches = top_match_container.select("div.top_match div.league_block")
         for match in matches:
-            if not match or not hasattr(match, "select_one"):
+            if not isinstance(match, Tag):
                 continue
 
             league_name = self._extract_league_name(match)
@@ -40,20 +42,20 @@ class LiveballFeed(HttpParserExtension, CacheFeedExtension):
 
         return items
 
-    def _extract_league_name(self, match) -> str:
+    def _extract_league_name(self, match: Tag) -> str:
         league_elem = match.select_one(".tm_league_name")
         if league_elem:
             return league_elem.get_text(strip=True)
-        raise ValueError
+        raise ValueError("League name not found")
 
-    def _extract_teams(self, match) -> tuple[str | None, str | None]:
+    def _extract_teams(self, match: Tag) -> tuple[str | None, str | None]:
         team1_elem = match.select_one(".t_left .league_title")
         team2_elem = match.select_one(".t_right .league_title")
         team1 = team1_elem.get_text(strip=True) if team1_elem else None
         team2 = team2_elem.get_text(strip=True) if team2_elem else None
         return team1, team2
 
-    def _extract_match_datetime(self, match) -> datetime:
+    def _extract_match_datetime(self, match: Tag) -> datetime:
         timer_elem = match.select_one(".tm_timer")
         if not timer_elem:
             return constant_datetime
@@ -65,14 +67,14 @@ class LiveballFeed(HttpParserExtension, CacheFeedExtension):
         timestamp = int(str(timestamp_str))
         return datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
-    def _extract_match_url(self, match) -> str:
+    def _extract_match_url(self, match: Tag) -> str:
         link_elem = match.select_one("a.la")
         if not link_elem:
-            raise ValueError
+            raise ValueError("Match URL element not found")
 
         match_url = link_elem.get("href")
         if not match_url:
-            raise ValueError
+            raise ValueError("Match URL not found")
 
         match_url = str(match_url)
         if not match_url.startswith("http"):
