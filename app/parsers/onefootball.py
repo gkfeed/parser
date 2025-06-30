@@ -27,28 +27,36 @@ class OneFootballFeed(HttpParserExtension, CacheFeedExtension):
     @property
     async def _matches(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        links = soup.find_all("a")
+        links = [link for link in soup.find_all("a") if isinstance(link, Tag)]
+        # Assuming links[16] and links[18] are always valid and Tag objects after filtering
         return [links[16], links[18]]
 
     def _get_match_title(self, match: Tag) -> str:
-        try:
-            first_team_name = match.find_all("span")[0].text
-            second_team_name = match.find_all("span")[2].text
+        first_team_span = match.find("span")
+        second_team_span = match.find_all("span")
 
-            return first_team_name + " vs " + second_team_name
-        except IndexError:
-            raise ValueError
+        if not (first_team_span and isinstance(first_team_span, Tag)):
+            raise ValueError("Could not find first team span")
+        if not (len(second_team_span) > 2 and isinstance(second_team_span[2], Tag)):
+            raise ValueError("Could not find second team span")
+
+        first_team_name = first_team_span.text
+        second_team_name = second_team_span[2].text
+
+        return first_team_name + " vs " + second_team_name
 
     def _get_match_datetime(self, match: Tag) -> datetime:
-        try:
-            datetime_str = match.find_all("time")[0]["datetime"]
-            return convert_datetime(datetime_str)
-        except (IndexError, KeyError):
-            print("onefootball: return constant datetime")  # log
-            return constant_datetime
+        time_tag = match.find("time")
+        if time_tag and isinstance(time_tag, Tag) and "datetime" in time_tag.attrs:
+            datetime_attr = time_tag["datetime"]
+            if isinstance(datetime_attr, str):
+                return convert_datetime(datetime_attr)
+        return constant_datetime
 
     def _get_match_link(self, match: Tag) -> str:
-        try:
-            return self.__base_url + match["href"]
-        except KeyError:
-            raise ValueError
+        if "href" not in match.attrs:
+            raise ValueError("Match tag has no 'href' attribute")
+        href = match["href"]
+        if not isinstance(href, str):
+            raise ValueError("Match 'href' attribute is not a string")
+        return self.__base_url + href
