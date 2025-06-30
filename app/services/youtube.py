@@ -89,6 +89,8 @@ class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
     def extract_info(cls, url: str, opts: dict, keys: list[str] | None = None) -> dict:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
+            if info is None:
+                raise ValueError("Could not extract info from URL")
             if keys:
                 _info = {}
                 for key in keys:
