@@ -7,7 +7,11 @@ merge-to-master:
 	git checkout dev
 
 test:
+ifdef FILE
+	IS_WORKER=1 $(PYTHON) -m pytest $(FILE)
+else
 	IS_WORKER=1 $(PYTHON) -m pytest
+endif
 
 dev:
 	IS_WORKER=1 $(PYTHON) < app/main.py
@@ -19,7 +23,7 @@ else
 	IS_WORKER=1 $(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test dev debug
+.PHONY: merge-to-master test dev debug format
 
 init-dev:
 	uv sync --all-extras
@@ -32,3 +36,10 @@ lock:
 
 lint:
 	uvx ruff check . && uvx typos && uv run mypy app/
+
+format:
+ifdef FILE
+	uvx ruff format $(FILE)
+else
+	uvx ruff format .
+endif
