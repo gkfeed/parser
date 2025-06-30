@@ -26,35 +26,47 @@ class RanobeMeFeed(HttpParserExtension, CacheFeedExtension):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        chapters = soup.find_all(class_="t-b-dotted")
+        chapters = [
+            ch for ch in soup.find_all(class_="t-b-dotted") if isinstance(ch, Tag)
+        ]
         return [ch for ch in chapters if len(ch.find_all("img")) == 1]
 
     def _get_post_title(self, post: Tag) -> str:
-        try:
-            return post.find_all("a")[0].text
-        except IndexError:
-            raise ValueError
+        a_tag = post.find("a")
+        if a_tag and isinstance(a_tag, Tag):
+            return a_tag.text
+        raise ValueError("Could not find post title.")
 
     async def _get_post_text(self, post: Tag) -> str:
-        try:
-            soup = await self.get_soup(self._get_post_link(post))
-            paragraphs = soup.find_all(class_="chapter")[0].find_all("p")
-            return "<br/><br/>".join(p.text for p in paragraphs)
-        except IndexError:
-            raise ValueError
+        soup = await self.get_soup(self._get_post_link(post))
+        chapter_div = soup.find(class_="chapter")
+        if chapter_div and isinstance(chapter_div, Tag):
+            paragraphs = [
+                p.text for p in chapter_div.find_all("p") if isinstance(p, Tag)
+            ]
+            return "<br/><br/>".join(paragraphs)
+        raise ValueError("Could not find post text.")
 
     @property
     async def _update_time(self) -> datetime:
-        try:
-            soup = await self.get_soup(self.feed.url)
-            timestamp = int(soup.find_all(class_="uptodate")[0]["data-time"])
-            tz = timezone(offset=timedelta(hours=0))
-            return datetime.fromtimestamp(timestamp, tz)
-        except IndexError:
-            raise ValueError
+        soup = await self.get_soup(self.feed.url)
+        uptodate_tag = soup.find(class_="uptodate")
+        if (
+            uptodate_tag
+            and isinstance(uptodate_tag, Tag)
+            and "data-time" in uptodate_tag.attrs
+        ):
+            timestamp_str = uptodate_tag["data-time"]
+            if isinstance(timestamp_str, str):
+                timestamp = int(timestamp_str)
+                tz = timezone(offset=timedelta(hours=0))
+                return datetime.fromtimestamp(timestamp, tz)
+        raise ValueError("Could not determine update time.")
 
     def _get_post_link(self, post: Tag) -> str:
-        try:
-            return self._base_url + str(post.a["href"])
-        except IndexError:
-            raise ValueError
+        a_tag = post.find("a")
+        if a_tag and isinstance(a_tag, Tag) and "href" in a_tag.attrs:
+            href = a_tag["href"]
+            if isinstance(href, str):
+                return self._base_url + href
+        raise ValueError("Could not find post link.")
