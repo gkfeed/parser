@@ -26,6 +26,10 @@ class InstagramFeed(SeleniumParserExtention, CacheFeedExtention):
             async for link in self._posts_links
         ]
 
+    async def get_post_photos_links(self, url: str) -> list[str]:
+        soup = await self.get_soup(url)
+        return [pic.a["href"] for pic in soup.find_all(class_="pic")]
+
     @property
     async def _posts_links(self) -> AsyncGenerator[str, str]:
         url = f"{self.__base_url}/profile/{self._user_name}"
