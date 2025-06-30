@@ -6,11 +6,11 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 
 from app.utils.datetime import constant_datetime
-from app.extentions.parsers.selenium import SeleniumParserExtention
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 
 
-class RTLSerieFeed(SeleniumParserExtention):
+class RTLSeriesFeed(SeleniumParserExtension):
     _selenium_wait_time = 20
     _base_url = "https://plus.rtl.de"
 
@@ -21,12 +21,12 @@ class RTLSerieFeed(SeleniumParserExtention):
         links = soup.find_all(class_="series-teaser__link")
         items = [
             Item(
-                title=l.h3.text,
-                text=l.h3.text,
+                title=link.h3.text,
+                text=link.h3.text,
                 date=constant_datetime,
-                link=self._base_url + l["href"],
+                link=self._base_url + link["href"],
             )
-            for l in links
+            for link in links
         ]
         return items
 

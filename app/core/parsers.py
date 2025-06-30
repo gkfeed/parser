@@ -1,7 +1,7 @@
 from typing import Type
 
 from app.serializers.feed import Feed, Item
-from app.extentions.parsers.base import BaseFeed
+from app.extensions.parsers.base import BaseFeed
 
 
 class FeedParsingContext:

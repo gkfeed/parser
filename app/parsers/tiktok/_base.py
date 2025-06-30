@@ -5,11 +5,11 @@ from abc import ABC, abstractmethod
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.workers.tiktok import extract_video_info
-from app.extentions.parsers.base import BaseFeed as _BaseFeed
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.base import BaseFeed as _BaseFeed
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class BaseTikTokFeed(CacheFeedExtention, _BaseFeed, ABC):
+class BaseTikTokFeed(CacheFeedExtension, _BaseFeed, ABC):
     _cache_storage_time_if_success = timedelta(days=1)
 
     @property

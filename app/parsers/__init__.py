@@ -1,6 +1,6 @@
 from typing import Type
 
-from app.extentions.parsers.base import BaseFeed
+from app.extensions.parsers.base import BaseFeed
 from .web import WebFeed
 from .tiktok import TikTokFeed
 from .kinogo import KinogoFeed
@@ -9,7 +9,7 @@ from .yummyanime import YummyAnimeFeed
 from .shiki import ShikiFeed
 from .reddit import RedditFeed
 from .vk import VkFeed
-from .youtube import YoutubeFeed, AlternativeYoutubeFeed
+from .youtube import AlternativeYoutubeFeed
 from .ranobeme import RanobeMeFeed
 from .spoti import SpotifyFeed, SpotifyPlaylistFeed
 from .rezka import RezkaFeed
@@ -19,8 +19,8 @@ from .insolarance import InsolaranceFeed
 from .mangalib import MangaLibFeed
 from .x import XFeed
 from .onefootball import OneFootballFeed
-from .rtl import RTLSerieFeed
-from .rezka import RezkaCollecionFeed
+from .rtl import RTLSeriesFeed
+from .rezka import RezkaCollectionFeed
 from .matreshka import MatreshkaFeed
 
 
@@ -45,7 +45,7 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "x": XFeed,
     "spoti:playlist": SpotifyPlaylistFeed,
     "onefootball": OneFootballFeed,
-    "rtl": RTLSerieFeed,
-    "rezka:collection": RezkaCollecionFeed,
+    "rtl": RTLSeriesFeed,
+    "rezka:collection": RezkaCollectionFeed,
     "matreshka": MatreshkaFeed,
 }

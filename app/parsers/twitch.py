@@ -3,11 +3,11 @@ from datetime import timedelta
 from app.serializers.feed import Item
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
-from app.extentions.parsers.base import BaseFeed as _BaseFeed
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.base import BaseFeed as _BaseFeed
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class TwitchFeed(CacheFeedExtention, _BaseFeed):
+class TwitchFeed(CacheFeedExtension, _BaseFeed):
     _cache_storage_time_if_success = timedelta(hours=1)
 
     @property

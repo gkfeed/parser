@@ -1,9 +1,9 @@
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
+from app.extensions.parsers.http import HttpParserExtension
 
 
-class YummyAnimeFeed(HttpParserExtention):
+class YummyAnimeFeed(HttpParserExtension):
     @property
     async def items(self) -> list[Item]:
         title = await self._show_title

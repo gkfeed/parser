@@ -8,13 +8,13 @@ from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.http import HttpService
 from app.services.hash import HashService
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
-from app.extentions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.services.url_ranker import URLRanker
 
 
-class RedditFeed(ItemsHashExtension, HttpParserExtention, CacheFeedExtention):
+class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
     __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
     __base_urls_cache: list[str] | None = None

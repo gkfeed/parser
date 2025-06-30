@@ -5,11 +5,11 @@ from bs4 import BeautifulSoup
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
-from app.extentions.parsers.selenium import SeleniumParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class MatreshkaFeed(SeleniumParserExtention, CacheFeedExtention):
+class MatreshkaFeed(SeleniumParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
 

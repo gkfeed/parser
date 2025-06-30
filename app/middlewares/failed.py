@@ -1,6 +1,6 @@
 from typing import Callable, Awaitable, Any, override
 
-from app.extentions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import UnavailableFeed
 from app.serializers.feed import Item, Feed
 from ._base import BaseMiddleware
 

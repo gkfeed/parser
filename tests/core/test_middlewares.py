@@ -2,7 +2,7 @@ from typing import Callable, Awaitable, Any
 
 from app.serializers.feed import Feed, Item
 from app.middlewares._base import BaseMiddleware
-from app.extentions.parsers.base import BaseFeed
+from app.extensions.parsers.base import BaseFeed
 from ..parsers import FakeDispatcher
 
 
@@ -35,7 +35,7 @@ def test_if_initial_data_in_storage():
     assert data["test"] == "1"
 
 
-async def test_if_initial_parser_data_is_usefull():
+async def test_if_initial_parser_data_is_useful():
     dp = FakeDispatcher()
     feed = Feed(id=1, type="type", title="title", url="url")
 

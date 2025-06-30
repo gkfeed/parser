@@ -1,5 +1,5 @@
 import pytest
-from app.parsers.rezka import RezkaFeed, RezkaCollecionFeed
+from app.parsers.rezka import RezkaFeed, RezkaCollectionFeed
 from . import fetch_items  # noqa
 
 REZKA_FEED_DATA = [
@@ -10,17 +10,17 @@ REZKA_FEED_DATA = [
     },
     {
         "type": "rezka:collection",
-        "parser": RezkaCollecionFeed,
+        "parser": RezkaCollectionFeed,
         "url": "https://hdrezka.me/collections/319-serialy-tnt/?filter=last",
     },
     {
         "type": "rezka:collection",
-        "parser": RezkaCollecionFeed,
+        "parser": RezkaCollectionFeed,
         "url": "https://hdrezka.me/?filter=watching",
     },
 ]
 
 
 @pytest.mark.parametrize("fetch_items", REZKA_FEED_DATA, indirect=True)
-async def test_rezka_feed(fetch_items):
+async def test_rezka_feed(fetch_items):  # noqa: F811
     assert len(await fetch_items) != 0

@@ -1,2 +1,8 @@
+from .collection import RezkaCollectionFeed
 from .rezka import RezkaFeed
-from .collection import RezkaCollecionFeed
+
+__all__ = [
+    "RezkaFeed",
+    "RezkaCollectionFeed",
+]
+

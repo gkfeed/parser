@@ -1,10 +1,10 @@
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.extentions.parsers.exceptions import UnavailableFeed
-from app.extentions.parsers.selenium import SeleniumParserExtention
+
+from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
-class RezkaFeed(SeleniumParserExtention):
+class RezkaFeed(SeleniumParserExtension):
     @property
     async def items(self) -> list[Item]:
         show_url = self.feed.url

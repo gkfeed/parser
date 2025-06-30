@@ -10,5 +10,5 @@ STORIES_FEED_DATA = {
 
 
 @pytest.mark.parametrize("fetch_items", [STORIES_FEED_DATA], indirect=True)
-async def test_stories_feed(fetch_items):
+async def test_stories_feed(fetch_items):  # noqa: F811
     assert len(await fetch_items) != 0

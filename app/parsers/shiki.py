@@ -1,14 +1,14 @@
 from datetime import timedelta, datetime
-from typing import override
+
 
 from bs4.element import Tag
 
 from app.utils.datetime import convert_datetime
-from app.serializers.feed import Item, Feed
-from app.extentions.parsers.http import HttpParserExtention
+from app.serializers.feed import Item
+from app.extensions.parsers.http import HttpParserExtension
 
 
-class ShikiFeed(HttpParserExtention):
+class ShikiFeed(HttpParserExtension):
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 

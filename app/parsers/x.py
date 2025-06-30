@@ -4,12 +4,12 @@ from bs4 import Tag
 
 from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
+from app.extensions.parsers.http import HttpParserExtension
 
 # TODO: inherit from WebFeed and override __init__ to change url to rsshub
 
 
-class XFeed(HttpParserExtention):
+class XFeed(HttpParserExtension):
     _base_url = "https://nitter.esmailelbob.xyz/"
     _x_url = "https://x.com"
 

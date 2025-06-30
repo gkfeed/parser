@@ -1,10 +1,10 @@
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
-from app.extentions.parsers.selenium import SeleniumParserExtention
+from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
-class SpotifyPlaylistFeed(SeleniumParserExtention):
+class SpotifyPlaylistFeed(SeleniumParserExtension):
     _selenium_wait_time = 10
 
     @property

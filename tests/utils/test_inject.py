@@ -20,7 +20,8 @@ def test_sync_injection(monkeypatch):
 
 def test_sync_injection_with_call(monkeypatch):
     class MockData:
-        foo = lambda _: 100
+        def foo(self):
+            return 100
 
     monkeypatch.setattr(Container, "get_data", lambda: MockData())
 
@@ -48,7 +49,8 @@ async def test_async_injection(monkeypatch):
 
 async def test_async_injection_with_call(monkeypatch):
     class MockData:
-        foo = lambda _: 100
+        def foo(self):
+            return 100
 
     monkeypatch.setattr(Container, "get_data", lambda: MockData())
 

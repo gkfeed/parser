@@ -2,11 +2,11 @@ from datetime import datetime, timedelta, timezone
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class LiveballFeed(HttpParserExtention, CacheFeedExtention):
+class LiveballFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
     _base_url = "https://liveball.my"
 
@@ -27,7 +27,7 @@ class LiveballFeed(HttpParserExtention, CacheFeedExtention):
             league_name = self._extract_league_name(match)
             team1, team2 = self._extract_teams(match)
             match_time = self._extract_match_datetime(match)
-            match_url = self._exctract_match_url(match)
+            match_url = self._extract_match_url(match)
 
             items.append(
                 Item(
@@ -65,7 +65,7 @@ class LiveballFeed(HttpParserExtention, CacheFeedExtention):
         timestamp = int(str(timestamp_str))
         return datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
-    def _exctract_match_url(self, match) -> str:
+    def _extract_match_url(self, match) -> str:
         link_elem = match.select_one("a.la")
         if not link_elem:
             raise ValueError

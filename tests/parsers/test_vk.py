@@ -6,5 +6,5 @@ VK_FEED_DATA = {"type": "vk", "parser": VkFeed, "url": "https://vk.com/rhymes"}
 
 
 @pytest.mark.parametrize("fetch_items", [VK_FEED_DATA], indirect=True)
-async def test_vk_feed(fetch_items):
+async def test_vk_feed(fetch_items):  # noqa: F811
     assert len(await fetch_items) != 0

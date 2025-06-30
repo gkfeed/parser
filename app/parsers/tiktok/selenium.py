@@ -1,8 +1,8 @@
-from app.extentions.parsers.selenium import SeleniumParserExtention
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from ._base import BaseTikTokFeed
 
 
-class TikTokSeleniumFeed(BaseTikTokFeed, SeleniumParserExtention):
+class TikTokSeleniumFeed(BaseTikTokFeed, SeleniumParserExtension):
     _selenium_wait_time = 20
     _should_load_cookies = True
     _should_save_cookies = True

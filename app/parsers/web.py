@@ -4,11 +4,11 @@ from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.rss import RSSParser
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 
 
-class WebFeed(ItemsHashExtension, HttpParserExtention):
+class WebFeed(ItemsHashExtension, HttpParserExtension):
     @override
     async def _generate_hash(self, item: Item) -> str:
         if item.guid:

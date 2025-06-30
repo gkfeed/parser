@@ -1,12 +1,12 @@
 from datetime import timedelta
 
 from app.serializers.feed import Item
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.cache import CacheFeedExtension
 from ..web import WebFeed
 from ._base import BaseTikTokFeed
 
 
-class TikTokFeed(BaseTikTokFeed, WebFeed, CacheFeedExtention):
+class TikTokFeed(BaseTikTokFeed, WebFeed, CacheFeedExtension):
     __base_url = "https://tok.adminforge.de"
     _cache_storage_time_if_success = timedelta(hours=2)
 
@@ -17,13 +17,13 @@ class TikTokFeed(BaseTikTokFeed, WebFeed, CacheFeedExtention):
 
         links = []
         for item in items:
-            link = self._normolize_item(item).link
+            link = self._normalize_item(item).link
             if link.startswith(self.feed.url):
                 links.append(link)
 
         return links
 
-    def _normolize_item(self, item: Item) -> Item:
+    def _normalize_item(self, item: Item) -> Item:
         base_url = "https://www.tiktok.com"
         relative_link = item.link
         if not self._is_link_relative(item.link):

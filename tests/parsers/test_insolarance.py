@@ -10,5 +10,5 @@ INSOLARANCE_FEED_DATA = {
 
 
 @pytest.mark.parametrize("fetch_items", [INSOLARANCE_FEED_DATA], indirect=True)
-async def test_insolarance_feed(fetch_items):
+async def test_insolarance_feed(fetch_items):  # noqa: F811
     assert len(await fetch_items) != 0

@@ -9,7 +9,7 @@ from app.services.youtube import (
     ChannelExtractionMode,
     PlaylistExtractionMode,
 )
-from app.extentions.parsers.base import BaseFeed
+from app.extensions.parsers.base import BaseFeed
 from app.workers.youtube import (
     extract_channel_videos_info,
     extract_video_urls,

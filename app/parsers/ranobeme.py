@@ -3,11 +3,11 @@ from datetime import timedelta, datetime, timezone
 from bs4 import Tag
 
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class RanobeMeFeed(HttpParserExtention, CacheFeedExtention):
+class RanobeMeFeed(HttpParserExtension, CacheFeedExtension):
     _base_url = "https://ranobe.me"
     _cache_storage_time = timedelta(hours=1)
 

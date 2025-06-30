@@ -3,12 +3,12 @@ from typing import AsyncGenerator
 
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.selenium import SeleniumParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
+
+from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class InstagramFeed(SeleniumParserExtention, CacheFeedExtention):
+class InstagramFeed(SeleniumParserExtension, CacheFeedExtension):
     __base_url = "https://www.piokok.com"
     _cache_storage_time_if_success = timedelta(days=1)
     _http_run_in_queue = True

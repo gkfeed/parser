@@ -2,11 +2,11 @@ from datetime import timedelta
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
-from app.extentions.parsers.http import HttpParserExtention
-from app.extentions.parsers.cache import CacheFeedExtention
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 
 
-class KinogoFeed(HttpParserExtention, CacheFeedExtention):
+class KinogoFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
 
     @property

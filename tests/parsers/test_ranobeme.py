@@ -24,5 +24,5 @@ def get_ranobeme_feed_data():
 
 
 @pytest.mark.parametrize("fetch_items", [get_ranobeme_feed_data()], indirect=True)
-async def test_ranobeme_feed(fetch_items):
+async def test_ranobeme_feed(fetch_items):  # noqa: F811
     assert len(await fetch_items) != 0

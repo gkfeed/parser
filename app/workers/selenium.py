@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import Callable, Any
+from typing import Callable
 import time
 import pickle
 import os
@@ -8,7 +8,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.settings import SELENIUM_COOKIES_PATH
 
-import app.configs
+import app.configs  # noqa: F401
 from app.utils.inject import inject
 from . import worker_sync
 

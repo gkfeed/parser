@@ -9,15 +9,15 @@ from selenium.common.exceptions import NoSuchElementException
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.extentions.parsers.cache import CacheFeedExtention
-from app.extentions.parsers.selenium import SeleniumParserExtention
-from app.extentions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 
 
 class InstagramStoriesFeed(
-    ItemsHashExtension, SeleniumParserExtention, CacheFeedExtention
+    ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
 ):
-    _http_repsponse_storage_time = timedelta(seconds=0)
+    _http_response_storage_time = timedelta(seconds=0)
     _cache_storage_time = timedelta(seconds=0)
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
