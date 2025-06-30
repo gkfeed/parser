@@ -26,19 +26,25 @@ class InsolaranceFeed(HttpParserExtension, CacheFeedExtension):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        return [p for p in soup.find_all("article")]
+        return [p for p in soup.find_all("article") if isinstance(p, Tag)]
 
     def _get_post_title(self, post: Tag) -> str:
-        try:
-            return post.find_all("a")[-2].text.strip()
-        except IndexError:
-            raise ValueError
+        a_tags = post.find_all("a")
+        if len(a_tags) >= 2 and isinstance(a_tags[-2], Tag):
+            return a_tags[-2].text.strip()
+        raise ValueError("Could not extract post title")
 
     def _get_post_text(self, post: Tag) -> str:
         return self._get_post_title(post)
 
     def _get_post_link(self, post: Tag) -> str:
-        try:
-            return post.find_all("a")[-2]["href"]
-        except IndexError:
-            raise ValueError
+        a_tags = post.find_all("a")
+        if (
+            len(a_tags) >= 2
+            and isinstance(a_tags[-2], Tag)
+            and "href" in a_tags[-2].attrs
+        ):
+            href = a_tags[-2]["href"]
+            if isinstance(href, str):
+                return href
+        raise ValueError("Could not extract post link")
