@@ -1,6 +1,6 @@
 import time
 from typing import override
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
@@ -21,14 +21,26 @@ class RTLSeriesFeed(SeleniumParserExtension):
         links = soup.find_all(class_="series-teaser__link")
         items = [
             Item(
-                title=link.h3.text,
-                text=link.h3.text,
+                title=self._extract_item_title(link),
+                text=self._extract_item_text(link),
                 date=constant_datetime,
-                link=self._base_url + link["href"],
+                link=self._get_item_link(link),
             )
             for link in links
+            if isinstance(link, Tag)
         ]
         return items
+
+    def _extract_item_title(self, link: Tag) -> str:
+        return link.h3.text if link.h3 and isinstance(link.h3, Tag) else ""
+
+    def _extract_item_text(self, link: Tag) -> str:
+        return link.h3.text if link.h3 and isinstance(link.h3, Tag) else ""
+
+    def _get_item_link(self, link_elem: Tag) -> str:
+        if "href" in link_elem.attrs and isinstance(link_elem["href"], str):
+            return self._base_url + str(link_elem["href"])
+        raise ValueError("Link element does not contain a valid href")
 
     @override
     def make_actions(self, driver: WebDriver):
