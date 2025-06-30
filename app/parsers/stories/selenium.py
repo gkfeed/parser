@@ -6,6 +6,8 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
 
+from bs4 import Tag
+
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.services.hash import HashService
@@ -33,15 +35,21 @@ class InstagramStoriesFeed(
         soup = await self.get_soup(self._service_url)
         videos = soup.find_all("video")
 
-        return [
-            Item(
-                title="inst: " + self._user_name,
-                text=self._user_name,
-                date=constant_datetime,
-                link=v.source["src"],
+        items = []
+        for v in videos:
+            if not isinstance(v, Tag):
+                continue
+            if not v.source or "src" not in v.source.attrs:
+                continue
+            items.append(
+                Item(
+                    title="inst: " + self._user_name,
+                    text=self._user_name,
+                    date=constant_datetime,
+                    link=str(v.source["src"]),
+                )
             )
-            for v in videos
-        ]
+        return items
 
     @override
     def make_actions(self, driver: WebDriver):

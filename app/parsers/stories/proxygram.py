@@ -2,6 +2,8 @@ from typing import AsyncGenerator
 from urllib.parse import unquote
 from datetime import timedelta
 
+from bs4 import Tag
+
 from app.serializers.feed import Item
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -29,9 +31,11 @@ class InstagramStoriesFeed(HttpParserExtension, CacheFeedExtension):
         url = f"{self.__base_url}/{self._user_name}/stories"
         soup = await self.get_soup(url)
         for video in soup.find_all("video"):
-            yield video["src"]
+            if isinstance(video, Tag) and "src" in video.attrs:
+                yield str(video["src"])
         for img in soup.find_all("img")[1:]:
-            yield img["src"]
+            if isinstance(img, Tag) and "src" in img.attrs:
+                yield str(img["src"])
 
     @property
     def _user_name(self) -> str:
