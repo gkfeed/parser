@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import timedelta
 
 import yt_dlp  # type: ignore
@@ -10,7 +11,7 @@ from app.services.cache.use_temporary import (
 
 
 class BaseExtractionMode:
-    opts = {
+    opts: dict[str, Any] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -21,7 +22,7 @@ class BaseExtractionMode:
 
 class ChannelExtractionMode(BaseExtractionMode):
     max_videos = 5
-    opts = {
+    opts: dict[str, Any] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -37,7 +38,7 @@ class ChannelExtractionMode(BaseExtractionMode):
 
 
 class VideoExtractionMode(BaseExtractionMode):
-    opts = {
+    opts: dict[str, Any] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -53,7 +54,7 @@ class VideoExtractionMode(BaseExtractionMode):
 
 
 class PlaylistExtractionMode(BaseExtractionMode):
-    opts = {
+    opts: dict[str, Any] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
