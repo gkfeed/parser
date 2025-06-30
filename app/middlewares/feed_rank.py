@@ -1,8 +1,7 @@
 from typing import Any, Callable, Awaitable
 
 from app.middlewares._base import BaseMiddleware
-from app.models.feed import Feed
-from app.models.item import Item
+from app.serializers.feed import Feed, Item
 from app.services.url_ranker import URLRanker
 
 
