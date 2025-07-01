@@ -48,18 +48,12 @@ class RezkaFeed(SeleniumParserExtension):
         return seasons[-1].text
 
     def _extract_last_episode_text(self, soup: Tag) -> str:
-        episodes_tabs = [
-            e for e in soup.find_all(id="simple-episodes-tabs") if isinstance(e, Tag)
+        a_tags = [
+            a
+            for a in soup.find_all(class_="b-simple_episode__item")
+            if isinstance(a, Tag)
         ]
-        if not (episodes_tabs and isinstance(episodes_tabs[-1], Tag)):
-            raise ValueError(
-                "Could not extract last episode text: episodes tabs not found or last episode tab not a Tag instance."
-            )
+        if not a_tags:
+            raise ValueError("Could not extract last episode text")
 
-        li_tags = [li for li in episodes_tabs[-1].find_all("li") if isinstance(li, Tag)]
-        if not (li_tags and isinstance(li_tags[-1], Tag)):
-            raise ValueError(
-                "Could not extract last episode text: li tags not found or last li tag not a Tag instance."
-            )
-
-        return li_tags[-1].text
+        return a_tags[-1].text

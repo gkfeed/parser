@@ -9,6 +9,11 @@ REZKA_FEED_DATA = [
         "url": "https://hdrezka.me/series/drama/63941-slovo-pacana-krov-na-asfalte-2023.html",
     },
     {
+        "type": "rezka",
+        "parser": RezkaFeed,
+        "url": "https://hdrezka.me/series/thriller/41647-igra-v-kalmara-2021-latest.html",
+    },
+    {
         "type": "rezka:collection",
         "parser": RezkaCollectionFeed,
         "url": "https://hdrezka.me/collections/319-serialy-tnt/?filter=last",
