@@ -2,7 +2,7 @@ from typing import TypeVar
 from datetime import datetime, timedelta
 
 from . import CacheService
-from .storage import TStorage
+from .storage._base import BaseStorage
 
 _T = TypeVar("_T")
 
@@ -16,11 +16,11 @@ class UndefinedCache(Exception):
 
 
 class TemporaryCacheService(CacheService[_T]):
-    def __init__(self, storage: TStorage) -> None:
+    def __init__(self, storage: BaseStorage) -> None:
         super().__init__(storage)
         self.__timestamps_when_expired: dict[str, float] = {}
 
-    def set(self, id: str, data: _T, storage_time: timedelta) -> None:
+    def set_with_expiry(self, id: str, data: _T, storage_time: timedelta) -> None:
         self.__timestamps_when_expired[id] = (datetime.now() + storage_time).timestamp()
 
         super().set(id, data)

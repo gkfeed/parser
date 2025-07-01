@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar
 
-from .storage import TStorage
+from .storage._base import BaseStorage
 
 
 _T = TypeVar("_T")
@@ -11,7 +11,7 @@ class _CacheServiceMixin(Generic[_T]):
 
 
 class CacheService(_CacheServiceMixin[_T]):
-    def __init__(self, storage: TStorage) -> None:
+    def __init__(self, storage: BaseStorage) -> None:
         self._storage = storage
 
     def get(self, id: str) -> _T:

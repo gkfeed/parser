@@ -26,7 +26,7 @@ def async_store_in_cache_for(storage_time: timedelta):
                 result = cache.get(args[1])
             except (UndefinedCache, ExpiredCache):
                 result = await func(*args, **kwargs)
-                cache.set(args[1], result, storage_time)
+                cache.set_with_expiry(args[1], result, storage_time)
             return result
 
         return wrapper

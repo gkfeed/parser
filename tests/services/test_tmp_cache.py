@@ -19,13 +19,13 @@ def test_create():
 def test_set_data():
     cache: TemporaryCacheService[int] = TemporaryCacheService(MemoryStorage())
     num = random.randint(0, 1000)
-    cache.set("0", num, timedelta(seconds=1))
+    cache.set_with_expiry("0", num, timedelta(seconds=1))
 
 
 def test_get_data():
     cache: TemporaryCacheService[int] = TemporaryCacheService(MemoryStorage())
     num = random.randint(0, 1000)
-    cache.set("0", num, timedelta(hours=1))
+    cache.set_with_expiry("0", num, timedelta(hours=1))
     assert cache.get("0") == num
 
 
@@ -38,7 +38,17 @@ def test_undefined_cache():
 def test_cache_temporary():
     cache: TemporaryCacheService[int] = TemporaryCacheService(MemoryStorage())
     num = random.randint(0, 1000)
-    cache.set("0", num, timedelta(microseconds=1))
+    cache.set_with_expiry("0", num, timedelta(microseconds=1))
+    time_.sleep(0.01)
+    with pytest.raises(ExpiredCache):
+        assert cache.get("0") == num
+
+
+def test_cache_temporary_many_items():
+    cache: TemporaryCacheService[int] = TemporaryCacheService(MemoryStorage())
+    for i in range(100):
+        num = random.randint(0, 1000)
+        cache.set_with_expiry(str(i), num, timedelta(microseconds=1))
     time_.sleep(0.01)
     with pytest.raises(ExpiredCache):
         assert cache.get("0") == num
