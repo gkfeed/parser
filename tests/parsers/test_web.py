@@ -5,7 +5,7 @@ from . import fetch_items  # noqa
 WEB_FEED_DATA = {
     "type": "web",
     "parser": WebFeed,
-    "url": "https://beardycast.com/feed/",
+    "url": "https://www.calnewport.com/feed/",
 }
 
 
