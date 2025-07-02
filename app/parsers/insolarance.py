@@ -39,12 +39,10 @@ class InsolaranceFeed(HttpParserExtension, CacheFeedExtension):
 
     def _get_post_link(self, post: Tag) -> str:
         a_tags = post.find_all("a")
-        if (
-            len(a_tags) >= 2
-            and isinstance(a_tags[-2], Tag)
-            and "href" in a_tags[-2].attrs
-        ):
-            href = a_tags[-2]["href"]
-            if isinstance(href, str):
-                return href
+        if len(a_tags) >= 2:
+            tag = a_tags[-2]
+            if isinstance(tag, Tag):
+                href = tag.get("href")
+                if isinstance(href, str):
+                    return href
         raise ValueError("Could not extract post link")
