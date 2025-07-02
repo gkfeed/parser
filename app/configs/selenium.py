@@ -23,3 +23,12 @@ def get_docker_driver() -> WebDriver:
         "http://10.5.0.5:4444",
         options=webdriver.ChromeOptions(),
     )
+
+
+def get_local_headless_chrome_driver() -> WebDriver:
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    return webdriver.Chrome(
+        service=Service(executable_path="/usr/bin/chromedriver"),
+        options=options,
+    )

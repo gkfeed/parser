@@ -60,10 +60,9 @@ class SpotifyFeed(SeleniumParserExtension):
         return f"{artist_name} - {text}"
 
     def _extract_link(self, link: Tag) -> str:
-        if "href" in link.attrs and isinstance(link["href"], str):
-            href = link["href"]
-            if href.startswith("/album"):
-                return f"https://open.spotify.com{href}"
+        href = link.get("href")
+        if isinstance(href, str) and href.startswith("/album"):
+            return f"https://open.spotify.com{href}"
         raise ValueError("Link href not found or not valid")
 
     @property

@@ -20,10 +20,14 @@ class ShikiFeed(HttpParserExtension):
         menu_links = soup.find_all(class_="b-menu-links")
 
         news = []
-        if menu_links and isinstance(menu_links[0], Tag):
-            news = [
-                n for n in menu_links[0].find_all(class_="entry") if isinstance(n, Tag)
-            ]
+        if menu_links:
+            menu_link = menu_links[0]
+            if isinstance(menu_link, Tag):
+                news = [
+                    n
+                    for n in menu_link.find_all(class_="entry")
+                    if isinstance(n, Tag)
+                ]
 
         return [
             Item(
@@ -40,22 +44,25 @@ class ShikiFeed(HttpParserExtension):
     async def _show_title(self) -> str:
         try:
             soup = await self.get_soup(self.feed.url)
-            return soup.find_all("h1")[0].text
+            h1 = soup.find("h1")
+            if isinstance(h1, Tag):
+                return h1.text
+            raise ValueError
         except IndexError:
             raise ValueError
 
     def _get_item_status(self, item: Tag) -> str:
-        span_tag = item.find_all("span")
-        if len(span_tag) > 1 and isinstance(span_tag[1], Tag):
-            return span_tag[1].text
+        span_tag = item.find("span")
+        if isinstance(span_tag, Tag):
+            return span_tag.text
         raise ValueError
 
     def _get_item_date(self, item: Tag) -> datetime:
-        span_tag = item.find_all("span")
-        if span_tag and isinstance(span_tag[0], Tag):
-            time_tag = span_tag[0].find("time")
-            if time_tag and isinstance(time_tag, Tag) and "datetime" in time_tag.attrs:
-                datetime_str = time_tag["datetime"]
+        span_tag = item.find("span")
+        if isinstance(span_tag, Tag):
+            time_tag = span_tag.find("time")
+            if isinstance(time_tag, Tag):
+                datetime_str = time_tag.get("datetime")
                 if isinstance(datetime_str, str):
                     return convert_datetime(datetime_str)
         return constant_datetime
