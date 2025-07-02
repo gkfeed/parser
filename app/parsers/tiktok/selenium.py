@@ -1,3 +1,5 @@
+from bs4 import Tag
+
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from ._base import BaseTikTokFeed
 
@@ -15,10 +17,9 @@ class TikTokSeleniumFeed(BaseTikTokFeed, SeleniumParserExtension):
 
         video_links = []
         for link in links:
-            try:
-                if (href := link["href"]).startswith(self.feed.url):
+            if isinstance(link, Tag) and link.name == "a" and link.has_attr("href"):
+                href = link["href"]
+                if isinstance(href, str) and href.startswith(self.feed.url):
                     video_links.append(href)
-            except KeyError:
-                continue
 
         return video_links

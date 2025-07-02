@@ -19,7 +19,12 @@ class BaseTikTokFeed(CacheFeedExtension, _BaseFeed, ABC):
             for link in await self._video_links:
                 tasks.append(tg.create_task(self._create_video_item(link)))
 
-        return [task.result() for task in tasks if task.result()]
+        items = []
+        for task in tasks:
+            result = task.result()
+            if result is not None and isinstance(result, Item):
+                items.append(result)
+        return items
 
     async def _create_video_item(self, link: str) -> Item | None:
         try:

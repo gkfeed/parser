@@ -10,8 +10,6 @@ class TikTokFeed(BaseTikTokFeed):
     async def _video_links(self) -> list[str]:
         return await extract_video_links(self.feed.url)
 
-    async def _get_video_publish_date(self, video: dict) -> datetime:
-        date_str = datetime.fromtimestamp(video["timestamp"]).strftime(
-            "%Y%m%d %H:%M:%S"
-        )
+    async def _get_video_publish_date(self, timestamp: float) -> datetime:
+        date_str = datetime.fromtimestamp(timestamp).strftime("%Y%m%d %H:%M:%S")
         return convert_datetime(date_str)
