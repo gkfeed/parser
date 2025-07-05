@@ -6,9 +6,10 @@ from app.utils.datetime import convert_datetime, constant_datetime
 from app.serializers.feed import Item
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 
 
-class VkFeed(HttpParserExtension, CacheFeedExtension):
+class VkFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
 
     @property
