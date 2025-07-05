@@ -9,7 +9,9 @@ from app.services.youtube import (
     ChannelExtractionMode,
     PlaylistExtractionMode,
 )
+from app.services.hash import HashService
 from app.extensions.parsers.base import BaseFeed
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.workers.youtube import (
     extract_channel_videos_info,
     extract_video_urls,
@@ -62,11 +64,10 @@ class YoutubeFeed(_BaseYoutubeFeed):
             yield url
 
 
-class AlternativeYoutubeFeed(_BaseYoutubeFeed):
+class AlternativeYoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
     @property
     async def items(self) -> list[Item]:
         videos_url = self._get_target_url()
-        print(videos_url)
         extraction_mode = self._choose_extraction_mode(self.feed.url)
         max_items = 5
 
@@ -78,7 +79,6 @@ class AlternativeYoutubeFeed(_BaseYoutubeFeed):
 
         channel_name = channel_info["channel"]
         entries = channel_info["entries"]
-        # entries = channel_info["entries"][0]["entries"]
 
         items = []
         for video_info in entries:
@@ -94,3 +94,6 @@ class AlternativeYoutubeFeed(_BaseYoutubeFeed):
             )
 
         return items
+
+    async def _generate_hash(self, item: Item) -> str:
+        return HashService.hash_str(item.link)
