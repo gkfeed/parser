@@ -24,9 +24,7 @@ class ShikiFeed(HttpParserExtension):
             menu_link = menu_links[0]
             if isinstance(menu_link, Tag):
                 news = [
-                    n
-                    for n in menu_link.find_all(class_="entry")
-                    if isinstance(n, Tag)
+                    n for n in menu_link.find_all(class_="entry") if isinstance(n, Tag)
                 ]
 
         return [
@@ -52,7 +50,7 @@ class ShikiFeed(HttpParserExtension):
             raise ValueError
 
     def _get_item_status(self, item: Tag) -> str:
-        span_tag = item.find("span")
+        span_tag = item.find_all("span")[-1]
         if isinstance(span_tag, Tag):
             return span_tag.text
         raise ValueError
