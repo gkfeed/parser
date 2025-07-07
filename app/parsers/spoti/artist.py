@@ -6,7 +6,7 @@ from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
 class SpotifyFeed(SeleniumParserExtension):
-    _selenium_wait_time = 10
+    _selenium_wait_time = 60
 
     @property
     async def items(self) -> list[Item]:
