@@ -71,9 +71,9 @@ class InstagramStoriesFeed(
         # Click dowbload button
         button = driver.find_element(
             By.ID,
-            "downloadButton",
+            "btn-download",
         )
-        button.click()
+        driver.execute_script("arguments[0].click();", button)
 
         time.sleep(self._selenium_wait_time)
 
