@@ -2,6 +2,7 @@ from asyncio import TaskGroup
 
 from typing import AsyncGenerator, cast
 
+from app.services.youtube.extractor import YoutubeInfoExtractor
 from app.utils.datetime import constant_datetime, convert_datetime
 from app.serializers.feed import Item
 from app.services.youtube import (
@@ -12,11 +13,6 @@ from app.services.youtube import (
 from app.services.hash import HashService
 from app.extensions.parsers.base import BaseFeed
 from app.extensions.parsers.hash import ItemsHashExtension
-from app.workers.youtube import (
-    extract_channel_videos_info,
-    extract_video_urls,
-    extract_video_info,
-)
 
 
 class _BaseYoutubeFeed(BaseFeed):
@@ -44,7 +40,11 @@ class YoutubeFeed(_BaseYoutubeFeed):
 
     async def _create_video_item(self, video_url: str) -> Item | None:
         try:
-            title, date_str, channel_name = await extract_video_info(video_url)
+            (
+                title,
+                date_str,
+                channel_name,
+            ) = await YoutubeInfoExtractor.extract_video_info(video_url)
             item = Item(
                 title="YT: " + channel_name,
                 text=title,
@@ -60,7 +60,9 @@ class YoutubeFeed(_BaseYoutubeFeed):
         videos_url = self._get_target_url()
         extraction_mode = self._choose_extraction_mode(videos_url)
         max_videos = 5  # FIXME: feed options
-        for url in await extract_video_urls(videos_url, extraction_mode, max_videos):
+        for url in await YoutubeInfoExtractor.extract_video_urls(
+            videos_url, extraction_mode, max_videos
+        ):
             yield url
 
 
@@ -71,9 +73,7 @@ class AlternativeYoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
         extraction_mode = self._choose_extraction_mode(self.feed.url)
         max_items = 5
 
-        # FIXME: channel info pay not attention how many items
-        # FIXME: max items is hardcoded in extraction mode
-        channel_info = await extract_channel_videos_info(
+        channel_info = await YoutubeInfoExtractor.extract_channel_videos_info(
             videos_url, extraction_mode, max_items
         )
 
