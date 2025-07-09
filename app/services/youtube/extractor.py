@@ -47,4 +47,4 @@ class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
         mode: BaseExtractionMode = BaseExtractionMode(),
         keys: list[str] | None = None,
     ) -> dict:
-        return extract_info(url, mode.opts, keys)
+        return await extract_info(url, mode.opts, keys)

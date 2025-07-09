@@ -4,7 +4,7 @@ from . import worker
 
 
 @worker
-def extract_info(url: str, opts: dict, keys: list[str] | None = None) -> dict:
+async def extract_info(url: str, opts: dict, keys: list[str] | None = None) -> dict:
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
         if info is None:
