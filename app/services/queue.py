@@ -1,10 +1,10 @@
 import asyncio
-from typing import Callable, Any, Awaitable, Sequence
+from typing import Callable, Any, Sequence
 
 from redis import Redis
 from rq import Queue
 
-from app.settings import REDIS_HOST, IS_WORKER
+from app.settings import REDIS_HOST
 
 
 class QueueService:
@@ -31,23 +31,3 @@ class QueueService:
                 raise ValueError
             await asyncio.sleep(1)
         return job.result
-
-
-# NOTE: deprecated make workers instead
-def async_queue_wrap(func) -> Callable[..., Awaitable]:
-    async def wrapper(*args, **kwargs):
-        if IS_WORKER:
-            return func(*args)
-        return await QueueService.put_and_wait_for_result(func, args)
-
-    return wrapper
-
-
-# NOTE: deprecated make sync workers instead
-def async_run_sync_in_queue(func) -> Callable[..., Awaitable]:
-    async def wrapper(*args, **kwargs):
-        if IS_WORKER:
-            return func(*args)
-        return await QueueService.put_and_wait_for_result_sync(func, args)
-
-    return wrapper
