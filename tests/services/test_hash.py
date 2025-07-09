@@ -1,75 +1,41 @@
-from datetime import datetime
-
 import pytest
 
-from app.serializers.feed import Item
 from app.services.hash import HashService
 
 
 def test_hash_consistency():
     """
-    Test that the same dataclass instance always produces the same hash.
+    Test that the same string always produces the same hash.
     """
-    instance = Item(
-        title="test_title",
-        link="test_link",
-        text="test_text",
-        date=datetime.fromisoformat("2024-01-01T00:00:00"),
-    )
-    hash1 = HashService.hash_item(instance)
-    hash2 = HashService.hash_item(instance)
-    assert hash1 == hash2, "Hash should be consistent for the same dataclass instance."
+    content = "test_content"
+    hash1 = HashService.hash_str(content)
+    hash2 = HashService.hash_str(content)
+    assert hash1 == hash2, "Hash should be consistent for the same string."
 
 
 def test_hash_uniqueness():
     """
-    Test that two dataclass instances with different values produce different hashes.
+    Test that two different strings produce different hashes.
     """
-    instance1 = Item(
-        title="test_title1",
-        link="test_link1",
-        text="test_text1",
-        date=datetime.fromisoformat("2024-01-01T00:00:00"),
-    )
-    instance2 = Item(
-        title="test_title2",
-        link="test_link2",
-        text="test_text2",
-        date=datetime.fromisoformat("2024-01-02T00:00:00"),
-    )
-    hash1 = HashService.hash_item(instance1)
-    hash2 = HashService.hash_item(instance2)
-    assert hash1 != hash2, "Different dataclass values should yield different hashes."
+    content1 = "test_content1"
+    content2 = "test_content2"
+    hash1 = HashService.hash_str(content1)
+    hash2 = HashService.hash_str(content2)
+    assert hash1 != hash2, "Different strings should yield different hashes."
 
 
 def test_invalid_input():
     """
-    Test that only Item instances can be hashed.
+    Test that non-string input raises an exception.
     """
-    with pytest.raises(Exception):
-        HashService.hash_item("not an Item instance")
+    with pytest.raises(AttributeError):
+        HashService.hash_str(123)  # type: ignore
 
 
-def test_order_independence():
+def test_empty_string():
     """
-    Test that the hash remains the same regardless of the order of fields,
-    given that JSON serialization sorts keys.
+    Test that hashing an empty string produces a valid hash.
     """
-
-    instance1 = Item(
-        title="test_title1",
-        link="test_link1",
-        text="test_text1",
-        date=datetime.fromisoformat("2024-01-01T00:00:00"),
-    )
-
-    instance2 = Item(
-        date=datetime.fromisoformat("2024-01-01T00:00:00"),
-        text="test_text1",
-        link="test_link1",
-        title="test_title1",
-    )
-
-    hash1 = HashService.hash_item(instance1)
-    hash2 = HashService.hash_item(instance2)
-    assert hash1 == hash2
+    hash_val = HashService.hash_str("")
+    assert isinstance(hash_val, str)
+    assert len(hash_val) > 0
