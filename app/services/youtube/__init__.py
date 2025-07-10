@@ -13,4 +13,3 @@ from .modes import (
     VideoExtractionMode,
     PlaylistExtractionMode,
 )
-

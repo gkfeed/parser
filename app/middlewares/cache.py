@@ -37,7 +37,9 @@ class CacheMiddleware(BaseMiddleware):
         except (UndefinedCache, ExpiredCache):
             items = await parser(feed, data)
             if len(items) > 0:
-                self.__cache.set_with_expiry(cache_id, items, cache_storage_time_if_success)
+                self.__cache.set_with_expiry(
+                    cache_id, items, cache_storage_time_if_success
+                )
             else:
                 self.__cache.set_with_expiry(cache_id, items, cache_storage_time)
 
