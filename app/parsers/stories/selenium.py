@@ -19,8 +19,6 @@ from app.extensions.parsers.hash import ItemsHashExtension
 class InstagramStoriesFeed(
     ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
 ):
-    _http_response_storage_time = timedelta(seconds=0)
-    _cache_storage_time = timedelta(seconds=0)
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
     _should_delete_cookies = True
