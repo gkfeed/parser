@@ -7,11 +7,7 @@ from .storage._base import BaseStorage
 _T = TypeVar("_T")
 
 
-class ExpiredCache(Exception):
-    """Cache has already expired"""
-
-
-class UndefinedCache(Exception):
+class InvalidCache(Exception):
     """Cache by this id isn't accesseble"""
 
 
@@ -26,15 +22,14 @@ class TemporaryCacheService(CacheService[_T]):
         super().set(id, data)
 
     def get(self, id: str) -> _T:
-        if self._is_cache_expired(id):
-            raise ExpiredCache
+        if not self.has_valid_cache(id):
+            raise InvalidCache
 
         return super().get(id)
 
-    def _is_cache_expired(self, id: str) -> bool:
-        try:
-            expired_timestamp = self.__timestamps_when_expired[id]
-        except KeyError:
-            raise UndefinedCache
+    def has_valid_cache(self, id: str) -> bool:
+        if id not in self.__timestamps_when_expired:
+            return False
 
+        expired_timestamp = self.__timestamps_when_expired[id]
         return datetime.now().timestamp() > expired_timestamp
