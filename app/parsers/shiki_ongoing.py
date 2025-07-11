@@ -2,13 +2,14 @@ from datetime import datetime, timedelta
 
 from bs4 import Tag
 
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class ShikiOngoingFeed(HttpParserExtension):
+class ShikiOngoingFeed(ItemsHashExtension, HttpParserExtension):
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 
