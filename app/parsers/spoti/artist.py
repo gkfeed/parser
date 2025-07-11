@@ -1,12 +1,15 @@
+from datetime import timedelta
 from bs4.element import Tag
 
+from app.extensions.parsers.cache import CacheFeedExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
-class SpotifyFeed(SeleniumParserExtension):
-    _selenium_wait_time = 60
+class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension):
+    _cache_storage_time = timedelta(days=1)
+    _selenium_wait_time = 20
 
     @property
     async def items(self) -> list[Item]:
