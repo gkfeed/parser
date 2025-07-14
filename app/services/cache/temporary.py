@@ -32,4 +32,4 @@ class TemporaryCacheService(CacheService[_T]):
             return False
 
         expired_timestamp = self.__timestamps_when_expired[id]
-        return datetime.now().timestamp() > expired_timestamp
+        return datetime.now().timestamp() < expired_timestamp

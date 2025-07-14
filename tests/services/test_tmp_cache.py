@@ -6,8 +6,7 @@ import pytest
 
 from app.services.cache.temporary import (
     TemporaryCacheService,
-    UndefinedCache,
-    ExpiredCache,
+    InvalidCache,
 )
 from app.services.cache.storage.memory import MemoryStorage
 
@@ -31,7 +30,7 @@ def test_get_data():
 
 def test_undefined_cache():
     cache: TemporaryCacheService[int] = TemporaryCacheService(MemoryStorage())
-    with pytest.raises(UndefinedCache):
+    with pytest.raises(InvalidCache):
         cache.get("0")
 
 
@@ -40,7 +39,7 @@ def test_cache_temporary():
     num = random.randint(0, 1000)
     cache.set_with_expiry("0", num, timedelta(microseconds=1))
     time_.sleep(0.01)
-    with pytest.raises(ExpiredCache):
+    with pytest.raises(InvalidCache):
         assert cache.get("0") == num
 
 
@@ -50,5 +49,5 @@ def test_cache_temporary_many_items():
         num = random.randint(0, 1000)
         cache.set_with_expiry(str(i), num, timedelta(microseconds=1))
     time_.sleep(0.01)
-    with pytest.raises(ExpiredCache):
+    with pytest.raises(InvalidCache):
         assert cache.get("0") == num
