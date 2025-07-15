@@ -3,7 +3,7 @@ from dateutil.parser import parse
 
 import aiohttp
 
-from app.settings import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
+from app.configs.env import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
 from .types import Stream
 from .auth import TwitchAuthenticator
 

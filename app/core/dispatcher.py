@@ -1,5 +1,6 @@
 import asyncio
 import random
+from typing import Coroutine
 
 from app.serializers.feed import Feed
 from .storage import ItemsStorage, FeedStorage
@@ -8,9 +9,18 @@ from .parsers import FeedParsingContext
 
 
 class Dispatcher(MiddlewaresWrapper, FeedParsingContext, FeedStorage, ItemsStorage):
+    _tasks_on_startup: list[Coroutine] = []
+
     def __init__(self):
         super().__init__()
         super(MiddlewaresWrapper, self).__init__()
+
+    async def on_startup(self):
+        for task in self._tasks_on_startup:
+            await task
+
+    def add_task_on_startup(self, task: Coroutine):
+        self._tasks_on_startup.append(task)
 
     async def start_polling(self):
         print("Start polling")

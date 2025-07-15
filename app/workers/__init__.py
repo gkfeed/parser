@@ -1,6 +1,6 @@
 from typing import Callable, Awaitable
 
-from app.settings import IS_WORKER
+from app.configs.env import IS_WORKER
 from app.services.queue import QueueService
 
 

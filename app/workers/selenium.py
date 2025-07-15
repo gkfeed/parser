@@ -6,7 +6,7 @@ import os
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from app.settings import SELENIUM_COOKIES_PATH
+from app.configs.selenium import SELENIUM_COOKIES_PATH
 
 import app.configs  # noqa: F401
 from app.utils.inject import inject

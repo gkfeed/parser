@@ -1,7 +1,7 @@
 from typing import Any
 import inspect
 
-from app.settings import IS_WORKER
+from app.configs.env import IS_WORKER
 from app.services.container import Container
 
 if IS_WORKER:

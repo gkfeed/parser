@@ -4,7 +4,7 @@ from typing import Callable, Any, Sequence
 from redis import Redis
 from rq import Queue
 
-from app.settings import REDIS_HOST
+from app.configs.env import REDIS_HOST
 
 
 class QueueService:
