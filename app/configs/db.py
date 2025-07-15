@@ -10,7 +10,6 @@ MODELS = [
     "app.models.feed",
     "app.models.item",
     "app.models.item_hash",
-    "app.models.log",
 ]
 
 
