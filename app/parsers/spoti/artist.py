@@ -26,7 +26,11 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension):
         ]
 
     async def _get_discography_soup(self):
-        return await self.get_soup(self.feed.url + "/discography")
+        _url = self.feed.url
+        if _url.endswith("/"):
+            _url = _url[:-1]
+
+        return await self.get_soup(_url + "/discography")
 
     async def _parse_releases_links(self, soup) -> list[Tag]:
         links = soup.find_all("a")
