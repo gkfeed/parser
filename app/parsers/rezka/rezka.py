@@ -3,6 +3,7 @@ from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.services.http import HttpService
 
 
 class RezkaFeed(SeleniumParserExtension):
@@ -20,7 +21,13 @@ class RezkaFeed(SeleniumParserExtension):
 
     @property
     async def _show_status(self) -> str:
-        soup = await self.get_soup(self.feed.url)
+        _url = self.feed.url
+
+        status = await HttpService.get_status(_url)
+        if status != 200 and not _url.endswith("-latest.html"):
+            _url = _url.replace(".html", "-latest.html")
+
+        soup = await self.get_soup(_url)
 
         if "/films/" in self.feed.url:
             h2_tag = soup.find_all("h2")[-1]
