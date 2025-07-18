@@ -30,20 +30,29 @@ class SpotifyPlaylistFeed(SeleniumParserExtension):
             )
         ]
 
-    def _get_first_track_element(self, soup: Tag) -> Tag | None:
+    def _get_first_track_element(self, soup: Tag) -> Tag:
         img_tags = soup.find_all("img")
-        if (
-            len(img_tags) > 1
-            and isinstance(img_tags[1], Tag)
-            and img_tags[1].parent
-            and isinstance(img_tags[1].parent, Tag)
-            and img_tags[1].parent.parent
-            and isinstance(img_tags[1].parent.parent, Tag)
-            and img_tags[1].parent.parent.parent
-            and isinstance(img_tags[1].parent.parent.parent, Tag)
-        ):
-            return img_tags[1].parent.parent.parent
-        return None
+        if len(img_tags) < 2:
+            raise ValueError("Could not find the image tags.")
+
+        track_tag = img_tags[1].parent
+        if not track_tag or not track_tag.get("class"):
+            if len(img_tags) < 3:
+                raise ValueError("Could not find the track tag.")
+            track_tag = img_tags[2].parent
+
+        if not isinstance(track_tag, Tag):
+            raise ValueError("Track tag is not a Tag.")
+
+        parent = track_tag.parent
+        if not isinstance(parent, Tag):
+            raise ValueError("Parent is not a Tag.")
+
+        grandparent = parent.parent
+        if not isinstance(grandparent, Tag):
+            raise ValueError("Grandparent is not a Tag.")
+
+        return grandparent
 
     def _get_track_anchor_tag(self, first_track: Tag) -> Tag:
         a_tags = first_track.find_all("a")
