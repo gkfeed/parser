@@ -5,7 +5,7 @@ from . import fetch_items  # noqa
 YUMMYANIME_FEED_DATA = {
     "type": "yummyanime",
     "parser": YummyAnimeFeed,
-    "url": "https://yummy-anime.org/4769-dobro-pozhalovat-v-klass-prevoshodstva-3.html",
+    "url": "https://yummyanime.org/4723-.html",
 }
 
 
