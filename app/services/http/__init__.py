@@ -1,5 +1,7 @@
+from typing import Optional
+
 import aiohttp
-from aiohttp.client_exceptions import ClientError
+from aiohttp.client_exceptions import ClientError, ClientConnectorError, InvalidURL
 
 _headers = {
     "User-Agent": (
@@ -33,4 +35,13 @@ class HttpService:
                 async with session.post(url, params=body) as response:
                     return await response.json()
             except ClientError:
+                raise HttpRequestError
+
+    @classmethod
+    async def get_status(cls, url: str, headers: Optional[dict] = headers) -> int:
+        async with aiohttp.ClientSession(conn_timeout=None) as session:
+            try:
+                async with session.get(url, headers=headers) as response:
+                    return response.status
+            except (ClientConnectorError, InvalidURL):
                 raise HttpRequestError
