@@ -21,6 +21,13 @@ class RezkaFeed(SeleniumParserExtension):
     @property
     async def _show_status(self) -> str:
         soup = await self.get_soup(self.feed.url)
+
+        if "/films/" in self.feed.url:
+            h2_tag = soup.find_all("h2")[-1]
+            if not (h2_tag and isinstance(h2_tag, Tag)):
+                raise ValueError("Could not extract h2 tag for film")
+            return h2_tag.text
+
         title = self._extract_title(soup)
         last_season_text = self._extract_last_season_text(soup)
         last_episode_text = self._extract_last_episode_text(soup)
