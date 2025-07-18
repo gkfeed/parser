@@ -19,6 +19,16 @@ REZKA_FEED_DATA = [
         "url": "https://hdrezka.me/films/action/64700-major-grom-game-the-2024.html",
     },
     {
+        "type": "rezka",
+        "parser": RezkaFeed,
+        "url": "https://hdrezka.me/series/comedy/78072-univer-molodye-2025.html",
+    },
+    {
+        "type": "rezka",
+        "parser": RezkaFeed,
+        "url": "https://hdrezka.me/series/comedy/78836-pozhit-kak-lyudi-2025.html",
+    },
+    {
         "type": "rezka:collection",
         "parser": RezkaCollectionFeed,
         "url": "https://hdrezka.me/collections/319-serialy-tnt/?filter=last",
