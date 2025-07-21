@@ -11,4 +11,4 @@ RTL_FEED_DATA = {
 
 @pytest.mark.parametrize("fetch_items", [RTL_FEED_DATA], indirect=True)
 async def test_rtl_feed(fetch_items):  # noqa: F811
-    assert len(await fetch_items) != 0
+    assert len(fetch_items) != 0

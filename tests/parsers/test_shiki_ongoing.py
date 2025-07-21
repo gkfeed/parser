@@ -11,4 +11,4 @@ SHIKI_ONGOING_FEED_DATA = {
 
 @pytest.mark.parametrize("fetch_items", [SHIKI_ONGOING_FEED_DATA], indirect=True)
 async def test_shiki_ongoing_feed(fetch_items):  # noqa: F811
-    assert len(await fetch_items) != 0
+    assert len(fetch_items) != 0

@@ -25,9 +25,9 @@ SPOTIFY_PLAYLIST_FEED_DATA = [
 
 @pytest.mark.parametrize("fetch_items", [SPOTIFY_FEED_DATA], indirect=True)
 async def test_spoti_feed(fetch_items):  # noqa: F811
-    assert len(await fetch_items) != 0
+    assert len(fetch_items) != 0
 
 
 @pytest.mark.parametrize("fetch_items", SPOTIFY_PLAYLIST_FEED_DATA, indirect=True)
 async def test_spoti_playlist_feed(fetch_items):  # noqa: F811
-    assert len(await fetch_items) != 0
+    assert len(fetch_items) != 0

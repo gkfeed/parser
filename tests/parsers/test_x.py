@@ -27,4 +27,4 @@ async def test_url_in_nitter():
 @pytest.mark.skip(reason="its not work")
 @pytest.mark.parametrize("fetch_items", [X_FEED_DATA], indirect=True)
 async def test_x_feed(fetch_items):  # noqa: F811
-    assert len(await fetch_items) != 0
+    assert len(fetch_items) != 0

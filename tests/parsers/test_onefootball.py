@@ -11,7 +11,7 @@ ONEFOOTBALL_FEED_DATA = {
 
 @pytest.mark.parametrize("fetch_items", [ONEFOOTBALL_FEED_DATA], indirect=True)
 async def test_onefootball_feed(fetch_items):  # noqa: F811
-    items = await fetch_items
+    items = fetch_items
     assert len(items) != 0
     # test if parser works correctly it must return only 2 items
     assert len(items) == 2
