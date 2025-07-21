@@ -28,8 +28,7 @@ jobs:
         with:
           command: |
             cd github/gkfeed/parser
-            pipenv run gitup
-            pipenv run drestart
+            make docker-update
           host: ${{ secrets.HOST }}
           user: ${{ secrets.USER_NAME }}
           key: ${{ secrets.PRIVATE_KEY }}
