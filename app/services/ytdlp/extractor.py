@@ -15,14 +15,14 @@ class VideoInfo(NamedTuple):
     channel_name: str
 
 
-class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
+class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
     _channel_info_storage_time = timedelta(hours=1)
     _video_info_storage_time = timedelta(weeks=1)
 
     @classmethod
     @async_store_in_cache_for(_video_info_storage_time)
     async def extract_video_info(cls, url: str) -> VideoInfo:
-        info = await cls._get_info(url, VideoExtractionMode())
+        info = await cls.get_info(url, VideoExtractionMode())
         return VideoInfo(info["title"], info["upload_date"], info["uploader"])
 
     @classmethod
@@ -30,18 +30,18 @@ class YoutubeInfoExtractor(UseTemporaryCacheServiceExtension):
     async def extract_channel_videos_info(
         cls, videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int
     ) -> dict:
-        return await cls._get_info(videos_url, extraction_mode)
+        return await cls.get_info(videos_url, extraction_mode)
 
     @classmethod
     @async_store_in_cache_for(_channel_info_storage_time)
     async def extract_video_urls(
         cls, videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int
     ) -> list[str]:
-        info = await cls._get_info(videos_url, extraction_mode)
+        info = await cls.get_info(videos_url, extraction_mode)
         return [v["url"] for v in info["entries"][-max_videos:]]
 
     @classmethod
-    async def _get_info(
+    async def get_info(
         cls,
         url: str,
         mode: BaseExtractionMode = BaseExtractionMode(),

@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
-from app.workers.tiktok import extract_video_info
+
+from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
 from app.extensions.parsers.cache import CacheFeedExtension
 
@@ -28,12 +29,12 @@ class BaseTikTokFeed(CacheFeedExtension, _BaseFeed, ABC):
 
     async def _create_video_item(self, link: str) -> Item | None:
         try:
-            description, url, timestamp = await extract_video_info(link)
+            info = await YtdlpInfoExtractor.get_info(link)
             return Item(
-                title=description,
-                text=description,
-                date=await self._get_video_publish_date(timestamp),
-                link=self.feed.url + "/video/" + url.split("/")[-1],
+                title=info["description"],
+                text=info["description"],
+                date=await self._get_video_publish_date(info["timestamp"]),
+                link=link,
             )
         except (TypeError, ValueError):
             return None

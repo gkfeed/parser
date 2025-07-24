@@ -2,10 +2,10 @@ from asyncio import TaskGroup
 
 from typing import AsyncGenerator, cast
 
-from app.services.youtube.extractor import YoutubeInfoExtractor
+from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.utils.datetime import constant_datetime, convert_datetime
 from app.serializers.feed import Item
-from app.services.youtube import (
+from app.services.ytdlp import (
     BaseExtractionMode,
     ChannelExtractionMode,
     PlaylistExtractionMode,
@@ -44,7 +44,7 @@ class YoutubeFeed(_BaseYoutubeFeed):
                 title,
                 date_str,
                 channel_name,
-            ) = await YoutubeInfoExtractor.extract_video_info(video_url)
+            ) = await YtdlpInfoExtractor.extract_video_info(video_url)
             item = Item(
                 title="YT: " + channel_name,
                 text=title,
@@ -60,7 +60,7 @@ class YoutubeFeed(_BaseYoutubeFeed):
         videos_url = self._get_target_url()
         extraction_mode = self._choose_extraction_mode(videos_url)
         max_videos = 5  # FIXME: feed options
-        for url in await YoutubeInfoExtractor.extract_video_urls(
+        for url in await YtdlpInfoExtractor.extract_video_urls(
             videos_url, extraction_mode, max_videos
         ):
             yield url
@@ -73,7 +73,7 @@ class AlternativeYoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
         extraction_mode = self._choose_extraction_mode(self.feed.url)
         max_items = 5
 
-        channel_info = await YoutubeInfoExtractor.extract_channel_videos_info(
+        channel_info = await YtdlpInfoExtractor.extract_channel_videos_info(
             videos_url, extraction_mode, max_items
         )
 

@@ -9,7 +9,6 @@ TIKTOK_FEED_DATA = {
 }
 
 
-@pytest.mark.skip(reason="its not work")
 @pytest.mark.parametrize("fetch_items", [TIKTOK_FEED_DATA], indirect=True)
 async def test_tiktok_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0

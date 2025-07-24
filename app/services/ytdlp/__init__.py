@@ -1,12 +1,12 @@
 __all__ = (
-    "YoutubeInfoExtractor",
+    "YtdlpInfoExtractor",
     "ChannelExtractionMode",
     "VideoExtractionMode",
     "PlaylistExtractionMode",
     "BaseExtractionMode",
 )
 
-from .extractor import YoutubeInfoExtractor
+from .extractor import YtdlpInfoExtractor
 from .modes import (
     BaseExtractionMode,
     ChannelExtractionMode,
