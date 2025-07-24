@@ -30,10 +30,10 @@ class CacheMiddleware(BaseMiddleware):
             cache_storage_time_if_success = data["cache_storage_time_if_success"]
 
         cache_id = str(feed.id)
-        if not self.__cache.has_valid_cache(cache_id):
-            return await parser(feed, data)
+        if self.__cache.has_valid_cache(cache_id):
+            return self.__cache.get(cache_id)
 
-        items = self.__cache.get(cache_id)
+        items = await parser(feed, data)
 
         storage_time = cache_storage_time
         if len(items) > 0:
