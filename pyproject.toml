@@ -17,7 +17,7 @@ dependencies = [
     "rq>=2.3.1",
     "selenium>=4.31.0",
     "tortoise-orm>=0.20.0",
-    "yt-dlp==2025.3.31",
+    "yt-dlp==2025.7.21",
 ]
 
 [dependency-groups]
