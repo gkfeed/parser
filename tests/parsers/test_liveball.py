@@ -5,7 +5,7 @@ from . import fetch_items  # noqa
 LIVEBALL_FEED_DATA = {
     "type": "liveball",
     "parser": LiveballFeed,
-    "url": "https://liveball.my/",
+    "url": "https://liveball.sx/",
 }
 
 
