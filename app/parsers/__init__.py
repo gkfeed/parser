@@ -23,6 +23,7 @@ from .rtl import RTLSeriesFeed
 from .rezka import RezkaCollectionFeed
 from .matreshka import MatreshkaFeed
 from .shiki_ongoing import ShikiOngoingFeed
+from .anilibria import AnilibriaFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -50,4 +51,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "rezka:collection": RezkaCollectionFeed,
     "matreshka": MatreshkaFeed,
     "shiki:ongoing": ShikiOngoingFeed,
+    "anilibria": AnilibriaFeed,
 }
