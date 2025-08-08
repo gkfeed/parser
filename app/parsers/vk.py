@@ -1,8 +1,10 @@
 from datetime import timedelta, datetime, date
+from typing import override
 
 from bs4 import Tag
 
 from app.utils.datetime import convert_datetime, constant_datetime
+from app.services.hash import HashService
 from app.serializers.feed import Item
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -23,6 +25,10 @@ class VkFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
             )
             for p in await self._posts
         ]
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        return HashService.hash_str(item.link)
 
     @property
     async def _posts(self) -> list[Tag]:
