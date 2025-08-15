@@ -1,11 +1,13 @@
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
 
 from app.utils.is_in_docker import IS_IN_DOCKER
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
-IS_HEADLESS = True
+IS_HEADLESS = False
 
 
 def get_driver() -> WebDriver:
@@ -35,5 +37,22 @@ def _get_local_headless_chrome_driver() -> WebDriver:
     options.add_argument("--headless")
     return webdriver.Chrome(
         service=Service(executable_path="/usr/bin/chromedriver"),
+        options=options,
+    )
+
+
+def _get_local_firefox_driver() -> WebDriver:
+    options = FirefoxOptions()
+    return webdriver.Firefox(
+        service=FirefoxService(executable_path="/usr/bin/geckodriver"),
+        options=options,
+    )
+
+
+def _get_local_headless_firefox_driver() -> WebDriver:
+    options = FirefoxOptions()
+    options.add_argument("--headless")
+    return webdriver.Firefox(
+        service=FirefoxService(executable_path="/usr/bin/geckodriver"),
         options=options,
     )
