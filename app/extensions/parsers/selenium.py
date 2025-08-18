@@ -15,7 +15,14 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
     _should_load_cookies = False
     _should_save_cookies = False
 
-    @async_store_in_cache_for(_http_response_storage_time)
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # @async_store_in_cache_for(_http_response_storage_time)
+        # async def get_html(self, url: str) -> bytes:
+        cls.get_html = async_store_in_cache_for(cls._http_response_storage_time)(
+            cls.get_html
+        )
+
     async def get_html(self, url: str) -> bytes:
         return await get_html(
             SeleniumGetHtmlArgs(
