@@ -23,7 +23,14 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
     _headers = HttpService.headers
     _http_run_in_queue = False
 
-    @async_store_in_cache_for(_http_response_storage_time)
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # @async_store_in_cache_for(_http_response_storage_time)
+        # async def get_html(self, url: str) -> bytes:
+        cls.get_html = async_store_in_cache_for(cls._http_response_storage_time)(
+            cls.get_html
+        )
+
     async def get_html(self, url: str) -> bytes:
         try:
             if self._http_run_in_queue:
