@@ -1,0 +1,1 @@
+from .anonig import InstagramFeed
