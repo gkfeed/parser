@@ -23,17 +23,23 @@ class PornHubFeed(HttpParserExtension):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        posts = [
-            p for p in soup.find_all("a", class_="linkVideoThumb") if isinstance(p, Tag)
+
+        container = soup.find("ul", id="claimedUploadedVideoSection")
+        if not isinstance(container, Tag):
+            raise ValueError("Videosection not found")
+
+        return [
+            p
+            for p in container.find_all("a", class_="linkVideoThumb")
+            if isinstance(p, Tag)
         ]
-        return posts
 
     def _get_video_title(self, post: Tag) -> str:
         if post.img and "title" in post.img.attrs:
-            return post.img["title"]
+            return str(post.img["title"])
         raise ValueError("No title found in post")
 
     def _get_video_link(self, post: Tag) -> str:
         if "href" in post.attrs:
-            return self._base_url + post["href"]
+            return self._base_url + str(post["href"])
         raise ValueError("No link found in post")
