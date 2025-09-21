@@ -1,8 +1,8 @@
 import time
-
 from typing import override
 from datetime import timedelta
 
+from bs4.element import Tag
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
@@ -10,6 +10,7 @@ from selenium.common.exceptions import NoSuchElementException
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.services.hash import HashService
+from app.services.catbox import CatboxUploader
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -35,15 +36,35 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
         items = []
         for i in media_list_items:
-            items.append(
-                Item(
-                    title="inst: " + self._user_name,
-                    text=self._user_name,
-                    date=constant_datetime,
-                    link=str(i.img["src"]),
-                )
-            )
+            if not isinstance(i, Tag):
+                continue
+
+            item = await self._create_item_from_media(i)
+            if item:
+                items.append(item)
+
         return items
+
+    async def _create_item_from_media(self, media: Tag) -> Item | None:
+        img = media.find("img")
+        if not isinstance(img, Tag):
+            return None
+
+        src = img.get("src")
+        if isinstance(src, list):
+            src = src[0]
+
+        if not src or not isinstance(src, str):
+            return None
+
+        link = await CatboxUploader.upload_with_url(src)
+
+        return Item(
+            title="inst: " + self._user_name,
+            text=self._user_name,
+            date=constant_datetime,
+            link=link,
+        )
 
     @override
     def make_actions(self, driver: WebDriver):
