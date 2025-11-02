@@ -2,10 +2,12 @@ from bs4 import Tag, BeautifulSoup
 from datetime import datetime
 
 from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.hash import ItemsHashExtension
+from app.extensions.cache import CacheFeedExtension
 from app.serializers.feed import Item
 
 
-class LiquidpediaFeed(HttpParserExtension):
+class LiquidpediaFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     @property
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)

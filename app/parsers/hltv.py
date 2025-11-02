@@ -6,10 +6,12 @@ from bs4 import Tag
 from bs4.element import NavigableString
 
 from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.hash import ItemsHashExtension
+from app.extensions.cache import CacheFeedExtension
 from app.serializers.feed import Item
 
 
-class HltvFeed(HttpParserExtension):
+class HltvFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     @property
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
