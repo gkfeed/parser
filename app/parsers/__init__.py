@@ -25,6 +25,7 @@ from .matreshka import MatreshkaFeed
 from .shiki_ongoing import ShikiOngoingFeed
 from .anilibria import AnilibriaFeed
 from .pornhub import PornHubFeed
+from .hltv import HltvFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -54,4 +55,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "shiki:ongoing": ShikiOngoingFeed,
     "anilibria": AnilibriaFeed,
     "pornhub": PornHubFeed,
+    "hltv": HltvFeed,
 }
