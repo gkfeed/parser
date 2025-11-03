@@ -2,8 +2,8 @@ from bs4 import Tag, BeautifulSoup
 from datetime import datetime
 
 from app.extensions.parsers.http import HttpParserExtension
-from app.extensions.hash import ItemsHashExtension
-from app.extensions.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.cache import CacheFeedExtension
 from app.serializers.feed import Item
 
 
