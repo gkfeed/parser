@@ -14,7 +14,6 @@ class RezkaFeed(SeleniumParserExtension):
         items = []
 
         if "/films/" in show_url:
-            breakpoint()
             h2_tag = soup.find_all("h2")[-1]
 
             if not (h2_tag and isinstance(h2_tag, Tag)):
@@ -44,7 +43,6 @@ class RezkaFeed(SeleniumParserExtension):
                 for ep in episodes
             ]
 
-        breakpoint()
         return items
 
     @property
