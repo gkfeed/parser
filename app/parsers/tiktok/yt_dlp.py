@@ -13,11 +13,18 @@ class TikTokFeed(BaseTikTokFeed):
     @property
     async def _video_links(self) -> list[str]:
         # NOTE: it s actually max videos fetched by ytdlp extractor
-        return (
-            await YtdlpInfoExtractor.extract_video_urls(
-                self.feed.url, BaseExtractionMode(), 0
-            )
-        )[: self._max_videos]
+        info = await YtdlpInfoExtractor.extract_channel_videos_info(
+            self.feed.url, BaseExtractionMode(), 0
+        )
+
+        videos = []
+        for v in info["entries"]:
+            if len(videos) >= self._max_videos:
+                break
+            if "url" not in v:
+                continue
+            videos.append(v["url"])
+        return videos
 
     async def _get_video_publish_date(self, timestamp: float) -> datetime:
         date_str = datetime.fromtimestamp(timestamp).strftime("%Y%m%d %H:%M:%S")
