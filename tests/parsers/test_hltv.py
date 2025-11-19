@@ -16,7 +16,6 @@ HLTV_FEED_DATA = {
 
 @pytest.mark.parametrize("fetch_items", [HLTV_FEED_DATA], indirect=True)
 async def test_hltv_feed(fetch_items):  # noqa: F811
-    breakpoint()
     assert len(fetch_items) != 0
 
 
