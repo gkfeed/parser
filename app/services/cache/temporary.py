@@ -2,7 +2,6 @@ from typing import TypeVar
 from datetime import datetime, timedelta
 
 from . import CacheService
-from .storage._base import BaseStorage
 
 _T = TypeVar("_T")
 
@@ -12,12 +11,9 @@ class InvalidCache(Exception):
 
 
 class TemporaryCacheService(CacheService[_T]):
-    def __init__(self, storage: BaseStorage) -> None:
-        super().__init__(storage)
-        self.__timestamps_when_expired: dict[str, float] = {}
-
     def set_with_expiry(self, id: str, data: _T, storage_time: timedelta) -> None:
-        self.__timestamps_when_expired[id] = (datetime.now() + storage_time).timestamp()
+        expire_at = (datetime.now() + storage_time).timestamp()
+        self._storage.set(f"{id}__timestamp", expire_at)
 
         super().set(id, data)
 
@@ -28,8 +24,9 @@ class TemporaryCacheService(CacheService[_T]):
         return super().get(id)
 
     def has_valid_cache(self, id: str) -> bool:
-        if id not in self.__timestamps_when_expired:
+        try:
+            expired_timestamp = self._storage.get(f"{id}__timestamp")
+        except ValueError:
             return False
 
-        expired_timestamp = self.__timestamps_when_expired[id]
         return datetime.now().timestamp() < expired_timestamp
