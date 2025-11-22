@@ -1,6 +1,6 @@
 from typing import TypeVar, Generic
 from datetime import timedelta
-from .storage.memory import MemoryStorage
+from .storage.redis import RedisStorage
 from .temporary import TemporaryCacheService
 
 _T = TypeVar("_T")
@@ -8,7 +8,7 @@ _T = TypeVar("_T")
 
 # NOTE: move to extensions
 class UseTemporaryCacheServiceExtension(Generic[_T]):
-    cache: TemporaryCacheService[_T] = TemporaryCacheService(storage=MemoryStorage())
+    cache: TemporaryCacheService[_T] = TemporaryCacheService(storage=RedisStorage())
 
 
 def async_store_in_cache_for(storage_time: timedelta):

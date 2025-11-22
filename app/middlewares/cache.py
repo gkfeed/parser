@@ -5,14 +5,14 @@ from app.serializers.feed import Item, Feed
 from app.services.cache.temporary import (
     TemporaryCacheService,
 )
-from app.services.cache.storage.memory import MemoryStorage
+from app.services.cache.storage.redis import RedisStorage
 from ._base import BaseMiddleware
 
 
 class CacheMiddleware(BaseMiddleware):
     def __init__(self) -> None:
         self.__cache: TemporaryCacheService[list[Item]] = TemporaryCacheService(
-            MemoryStorage()
+            RedisStorage()
         )
 
     @override
