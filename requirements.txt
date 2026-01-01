@@ -6,8 +6,8 @@ aiohttp==3.12.14
     # via parser
 aiosignal==1.4.0
     # via aiohttp
-aiosqlite==0.21.0
-    # via tortoise-orm
+alembic==1.17.2
+    # via parser
 annotated-types==0.7.0
     # via pydantic
 asyncpg==0.30.0
@@ -35,10 +35,13 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via
     #   click
     #   pytest
+fakeredis==2.32.1
 frozenlist==1.7.0
     # via
     #   aiohttp
     #   aiosignal
+greenlet==3.3.0
+    # via sqlalchemy
 h11==0.16.0
     # via wsproto
 hiredis==3.2.1
@@ -50,10 +53,14 @@ idna==3.10
     #   yarl
 iniconfig==2.1.0
     # via pytest
-iso8601==2.1.0 ; python_full_version < '4'
-    # via tortoise-orm
+lupa==2.6
+    # via fakeredis
 lxml==6.0.0
     # via parser
+mako==1.3.10
+    # via alembic
+markupsafe==3.0.3
+    # via mako
 multidict==6.6.3
     # via
     #   aiohttp
@@ -85,8 +92,6 @@ pydantic-core==2.33.2
     # via pydantic
 pygments==2.19.2
     # via pytest
-pypika-tortoise==0.6.1 ; python_full_version < '4'
-    # via tortoise-orm
 pyright==1.1.403
 pysocks==1.7.1
     # via urllib3
@@ -97,10 +102,9 @@ python-dateutil==2.9.0.post0
     # via parser
 python-dotenv==1.1.1
     # via parser
-pytz==2025.2
-    # via tortoise-orm
 redis==6.2.0
     # via
+    #   fakeredis
     #   parser
     #   rq
 requests==2.32.4
@@ -114,11 +118,15 @@ six==1.17.0
 sniffio==1.3.1
     # via trio
 sortedcontainers==2.4.0
-    # via trio
+    # via
+    #   fakeredis
+    #   trio
 soupsieve==2.7
     # via beautifulsoup4
-tortoise-orm==0.25.1
-    # via parser
+sqlalchemy==2.0.45
+    # via
+    #   alembic
+    #   parser
 trio==0.30.0
     # via
     #   selenium
@@ -130,13 +138,14 @@ types-requests==2.32.4.20250611
 typing-extensions==4.14.1
     # via
     #   aiosignal
-    #   aiosqlite
+    #   alembic
     #   beautifulsoup4
     #   mypy
     #   pydantic
     #   pydantic-core
     #   pyright
     #   selenium
+    #   sqlalchemy
     #   typing-inspection
 typing-inspection==0.4.1
     # via pydantic
