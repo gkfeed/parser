@@ -1,9 +1,11 @@
-from tortoise import fields
-from tortoise.models import Model
+from sqlalchemy.orm import Mapped, mapped_column
+from ._base import Base
 
 
-class Feed(Model):
-    id = fields.IntField(pk=True)
-    title = fields.TextField()
-    url = fields.TextField()
-    type = fields.TextField()
+class Feed(Base):
+    __tablename__ = "feed"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column()
+    url: Mapped[str] = mapped_column()
+    type: Mapped[str] = mapped_column()

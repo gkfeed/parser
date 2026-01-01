@@ -1,4 +1,5 @@
 PYTHON = .venv/bin/python
+ALEMBIC = .venv/bin/alembic
 
 merge-to-master:
 	git checkout master
@@ -23,7 +24,10 @@ else
 	IS_WORKER=1 $(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test dev debug format
+.PHONY: merge-to-master test dev debug format migrate
+
+migrate:
+	IS_WORKER=1 $(ALEMBIC) upgrade head
 
 init-dev:
 	uv sync --all-extras

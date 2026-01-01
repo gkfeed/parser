@@ -1,5 +1,3 @@
-from .db import setup as db_setup
+from typing import Coroutine
 
-ON_STARTUP = [
-    db_setup(),
-]
+ON_STARTUP: list[Coroutine] = []

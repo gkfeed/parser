@@ -1,6 +1,6 @@
 # Move from tortoise to sqlalchemy
 
-- STATUS: OPEN
+- STATUS: COMPLETED
 - PRIORITY: 1
 
 ## Objective
@@ -18,13 +18,13 @@ Utilize the existing `app/utils/inject.py` dependency injection mechanism to man
 
 ### 2. Configuration
 
-- [ ] Create `app/configs/database.py`:
+- [x] Create `app/configs/database.py`: (Note: used app/configs/db.py instead)
   - Define `AsyncEngine` and `async_sessionmaker` (expose as `session_factory` or similar).
   - Define `Base` using `DeclarativeBase` (SQLAlchemy 2.0).
-- [ ] Update `app/configs/__init__.py`:
+- [x] Update `app/configs/__init__.py`:
   - Update `Data` dataclass to include `db_session`.
   - Import `session_factory` and add it to `Container.setup` call.
-- [ ] Update `app/configs/on_startup.py`:
+- [x] Update `app/configs/on_startup.py`:
   - Remove `Tortoise.init` and `generate_schemas`.
   - Implement table creation (e.g., `await conn.run_sync(Base.metadata.create_all)`) for dev/testing ease, or rely on Alembic.
 
@@ -32,39 +32,44 @@ Utilize the existing `app/utils/inject.py` dependency injection mechanism to man
 
 Refactor `app/models/` to use SQLAlchemy `Mapped` columns and `DeclarativeBase`.
 
-- [ ] `app/models/feed.py`: `Feed` model.
-- [ ] `app/models/item.py`: `Item` model.
-- [ ] `app/models/item_hash.py`: `ItemHash` model.
+- [x] `app/models/feed.py`: `Feed` model.
+- [x] `app/models/item.py`: `Item` model (Updated to use `DateTime(timezone=True)`).
+- [x] `app/models/item_hash.py`: `ItemHash` model.
 
 ### 4. Repositories
 
 Refactor `app/services/repositories/` to use `@inject`.
 
-- [ ] `app/services/repositories/feed.py`:
-  - Apply `@inject({"session": "db_session"}, call=True)` to methods.
-  - Wrap logic in `async with session:` to ensure session closure.
-- [ ] `app/services/repositories/item.py`:
+- [x] `app/services/repositories/feed.py`:
+  - Apply `@inject({"session_factory": "db_session"})` to methods.
+  - Wrap logic in `async with session_factory() as session:` to ensure session closure.
+- [x] `app/services/repositories/item.py`:
   - Apply `@inject` to methods (e.g., `get_all`, `add_items_to_feed`).
   - Use `async with session:`.
-- [ ] `app/services/repositories/item_hash.py`:
+- [x] `app/services/repositories/item_hash.py`:
   - Apply `@inject` to `contains` and `save`.
   - Use `async with session:`.
 
 ### 5. Core Logic & Dispatcher
 
-- [ ] Update `app/core/dispatcher.py` and `app/core/storage.py`:
+- [x] Update `app/core/dispatcher.py` and `app/core/storage.py`:
   - Remove all code related to creating or passing `session` objects.
   - Rely on Repositories to handle their own sessions via injection.
 
 ### 6. Middlewares
 
-- [ ] Update `app/middlewares/hash.py`:
+- [x] Update `app/middlewares/hash.py`:
   - Just call `ItemsHashRepository` methods.
 
 ### 7. Migrations & Testing
 
-- [ ] Initialize Alembic (`alembic init -t async`).
-- [ ] Configure `alembic.ini` and `env.py` to use `DB_URL` from env.
-- [ ] Generate initial migration (`alembic revision --autogenerate`).
-- [ ] Run tests and verify that `make lint` and `make test` pass.
+- [x] Initialize Alembic (`alembic init -t async`).
+- [x] Configure `alembic.ini` and `env.py` to use `DB_URL` from env.
+- [x] Generate initial migration (`alembic revision --autogenerate`).
+- [x] Run tests and verify that `make lint` and `make test` pass.
 
+## Post-Migration Fixes
+
+- **PostgreSQL Sequence Sync:** Synchronized sequences (`setval`) for `feed`, `item`, and `item_hash` tables to prevent `UniqueViolationError` during inserts.
+- **Timezone Support:** Updated `Item.date` to `DateTime(timezone=True)` to ensure compatibility with `asyncpg` and existing data.
+- **Test Suite:** Added `tests/test_db.py` to verify full CRUD and duplicate handling for repositories.

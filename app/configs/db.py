@@ -1,18 +1,10 @@
-import os
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from dotenv import load_dotenv
-from tortoise import Tortoise
-
-load_dotenv()
-DB_URL = os.environ["DB_URL"]
-
-MODELS = [
-    "app.models.feed",
-    "app.models.item",
-    "app.models.item_hash",
-]
+import app.models  # noqa: F401
+from .env import DB_URL
 
 
-async def setup():
-    await Tortoise.init(db_url=DB_URL, modules={"models": MODELS})
-    await Tortoise.generate_schemas(safe=True)
+engine = create_async_engine(DB_URL)
+session_factory = async_sessionmaker(
+    engine, expire_on_commit=False, class_=AsyncSession
+)
