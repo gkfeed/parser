@@ -9,7 +9,7 @@ class ItemsHashRepository(BaseRepository):
         async with cls._session_factory() as session:
             stmt = select(ItemHash).where(ItemHash.hash == hash)
             result = await session.execute(stmt)
-            return result.scalar_one_or_none() is not None
+            return result.scalars().first() is not None
 
     @classmethod
     async def save(cls, hash: str):
