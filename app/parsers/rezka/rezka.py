@@ -1,7 +1,7 @@
 from bs4 import Tag
+
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.services.http import HttpService
 
@@ -29,12 +29,12 @@ class RezkaFeed(SeleniumParserExtension):
             )
         else:
             title = self._extract_title(soup)
-            last_season_text = self._extract_last_season_text(soup)
-            episodes = self._extract_episodes(soup)
+            season = self._extract_active_season(soup)
+            episodes = self._extract_episodes(soup, season)
             [
                 items.append(
                     Item(
-                        title=f"{title} {last_season_text} {ep.text}",
+                        title=f"{title} {season.text} {ep.text}",
                         link=show_url,
                         text=ep.text,
                         date=constant_datetime,
@@ -63,25 +63,25 @@ class RezkaFeed(SeleniumParserExtension):
             )
         return title_tag.text
 
-    def _extract_last_season_text(self, soup: Tag) -> str:
-        seasons = [
-            s
-            for s in soup.find_all(class_="b-simple_season__item")
-            if isinstance(s, Tag)
-        ]
-        if not (seasons and isinstance(seasons[-1], Tag)):
-            raise ValueError(
-                "Could not extract last season text: seasons not found or last season not a Tag instance."
-            )
-        return seasons[-1].text
+    def _extract_active_season(self, soup: Tag) -> Tag:
+        active_season = soup.find(class_="b-simple_season__item active")
 
-    def _extract_episodes(self, soup: Tag) -> list[Tag]:
-        a_tags = [
+        if not active_season or not isinstance(active_season, Tag):
+            raise ValueError("Could not extract active season")
+
+        return active_season
+
+    def _extract_episodes(self, soup: Tag, season: Tag) -> list[Tag]:
+        tab_id = season.get("data-tab_id")
+        if not tab_id:
+            raise ValueError("Could not extract tab_id from active season")
+
+        container = soup.find(id=f"simple-episodes-list-{tab_id}")
+        if not container or not isinstance(container, Tag):
+            raise ValueError("Could not extract episodes container")
+
+        return [
             a
-            for a in soup.find_all(class_="b-simple_episode__item")
+            for a in container.find_all(class_="b-simple_episode__item")
             if isinstance(a, Tag)
         ]
-        if not a_tags:
-            raise ValueError("Could not extract episodes")
-
-        return a_tags

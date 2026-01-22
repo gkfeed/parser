@@ -41,7 +41,24 @@ REZKA_FEED_DATA = [
 ]
 
 
-@pytest.mark.skip(reason="tmp unavailable")
+# @pytest.mark.skip(reason="tmp unavailable")
 @pytest.mark.parametrize("fetch_items", REZKA_FEED_DATA, indirect=True)
 async def test_rezka_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0
+
+
+@pytest.mark.parametrize(
+    "fetch_items",
+    [
+        {
+            "type": "rezka",
+            "parser": RezkaFeed,
+            "url": "https://hdrezka.me/series/comedy/7670-sashatanya-2013-latest.html",
+        }
+    ],
+    indirect=True,
+)
+async def test_rezka_many_items(fetch_items):  # noqa: F811
+    assert len(fetch_items) > 0
+    assert len(fetch_items) < 100
+
