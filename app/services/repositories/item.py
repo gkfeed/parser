@@ -1,46 +1,41 @@
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.item import Item as _Item
 from app.serializers.feed import Feed, Item
-from app.utils.inject import inject
+from ._base import BaseRepository
 
 
-class ItemsRepository:
-    def __init__(self, feed: Feed):
-        self.feed = feed
-
-    @inject({"session_factory": "db_session"})
-    async def get_all(
-        self, session_factory: async_sessionmaker[AsyncSession]
-    ) -> list[Item]:
-        async with session_factory() as session:
+class ItemsRepository(BaseRepository):
+    @classmethod
+    async def get_all(cls, feed: Feed) -> list[Item]:
+        async with cls._session_factory() as session:
             result = await session.execute(
-                select(_Item).where(_Item.feed_id == self.feed.id)
+                select(_Item).where(_Item.feed_id == feed.id)
             )
-            return [self._serialize_item(i) for i in result.scalars().all()]
+            return [cls._serialize_item(i) for i in result.scalars().all()]
 
-    @inject({"session_factory": "db_session"})
-    async def add_items_to_feed(
-        self, items: list[Item], session_factory: async_sessionmaker[AsyncSession]
-    ):
-        async with session_factory() as session:
+    @classmethod
+    async def add_items_to_feed(cls, feed: Feed, items: list[Item]):
+        async with cls._session_factory() as session:
             async with session.begin():
                 for item in items:
-                    if not await self._check_if_exists(session, item):
-                        await self._create_item(session, item)
+                    if not await cls._check_if_exists(session, feed, item):
+                        await cls._create_item(session, feed, item)
 
-    async def _check_if_exists(self, session: AsyncSession, item: Item) -> bool:
+    @classmethod
+    async def _check_if_exists(cls, session: AsyncSession, feed: Feed, item: Item) -> bool:
         stmt = select(_Item).where(
-            _Item.feed_id == self.feed.id,
+            _Item.feed_id == feed.id,
             _Item.title == item.title,
             _Item.link == item.link,
         )
         existing = (await session.execute(stmt)).scalar_one_or_none()
         return existing is not None
 
-    async def _create_item(self, session: AsyncSession, item: Item) -> None:
+    @classmethod
+    async def _create_item(cls, session: AsyncSession, feed: Feed, item: Item) -> None:
         new_item = _Item(
-            feed_id=self.feed.id,
+            feed_id=feed.id,
             title=item.title,
             text=item.text,
             date=item.date,
@@ -48,7 +43,8 @@ class ItemsRepository:
         )
         session.add(new_item)
 
-    def _serialize_item(self, model_item: _Item) -> Item:
+    @classmethod
+    def _serialize_item(cls, model_item: _Item) -> Item:
         return Item(
             title=model_item.title,
             text=model_item.text,
