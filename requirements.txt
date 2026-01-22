@@ -6,6 +6,8 @@ aiohttp==3.12.14
     # via parser
 aiosignal==1.4.0
     # via aiohttp
+aiosqlite==0.22.1
+    # via parser
 alembic==1.17.2
     # via parser
 annotated-types==0.7.0
