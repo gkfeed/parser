@@ -21,10 +21,10 @@ class HashMiddleware(BaseMiddleware):
         items_to_remove = []
         for item in items:
             hash = await hash_function(item)
-            if await ItemsHashRepository.contains(hash):
+            if await ItemsHashRepository.contains(hash, feed.id):
                 items_to_remove.append(item)
             else:
-                await ItemsHashRepository.save(hash)
+                await ItemsHashRepository.save(hash, feed.id)
 
         print(f"{feed.url}: -{len(items_to_remove)} hashed")
         return [item for item in items if item not in items_to_remove]

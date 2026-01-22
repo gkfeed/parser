@@ -1,3 +1,4 @@
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from ._base import Base
 
@@ -7,3 +8,4 @@ class ItemHash(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     hash: Mapped[str] = mapped_column()
+    feed_id: Mapped[int | None] = mapped_column(ForeignKey("feed.id"))
