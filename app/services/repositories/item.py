@@ -29,7 +29,7 @@ class ItemsRepository(BaseRepository):
             _Item.title == item.title,
             _Item.link == item.link,
         )
-        existing = (await session.execute(stmt)).scalar_one_or_none()
+        existing = (await session.execute(stmt)).scalars().first()
         return existing is not None
 
     @classmethod

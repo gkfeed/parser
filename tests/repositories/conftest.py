@@ -45,5 +45,5 @@ async def create_feed():
     for feed in feeds:
         try:
             await FeedRepository.delete_by_id(feed.id)
-        except:
+        except Exception:
             pass
