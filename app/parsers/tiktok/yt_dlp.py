@@ -17,7 +17,7 @@ class TikTokFeed(BaseTikTokFeed):
             self.feed.url, BaseExtractionMode(), 0
         )
 
-        videos = []
+        videos: list[str] = []
         for v in info["entries"]:
             if len(videos) >= self._max_videos:
                 break

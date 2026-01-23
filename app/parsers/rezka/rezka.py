@@ -31,7 +31,7 @@ class RezkaFeed(SeleniumParserExtension):
             title = self._extract_title(soup)
             season = self._extract_active_season(soup)
             episodes = self._extract_episodes(soup, season)
-            [
+            for ep in episodes:
                 items.append(
                     Item(
                         title=f"{title} {season.text} {ep.text}",
@@ -40,8 +40,6 @@ class RezkaFeed(SeleniumParserExtension):
                         date=constant_datetime,
                     )
                 )
-                for ep in episodes
-            ]
 
         return items
 
