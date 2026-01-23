@@ -61,4 +61,3 @@ async def test_rezka_feed(fetch_items):  # noqa: F811
 async def test_rezka_many_items(fetch_items):  # noqa: F811
     assert len(fetch_items) > 0
     assert len(fetch_items) < 100
-
