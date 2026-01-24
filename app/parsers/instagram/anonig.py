@@ -11,11 +11,11 @@ from selenium.common.exceptions import NoSuchElementException
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
-from app.services.http import HttpService
 from app.services.hash import HashService
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.workers.http import get_html
 
 
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
@@ -84,7 +84,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         else:
             # Handle remote URL
             try:
-                img_bytes = await HttpService.get(src)
+                img_bytes = await get_html(src)
                 encoded = base64.b64encode(img_bytes).decode("utf-8")
                 mime_type = self._get_mime_type(img_bytes)
             except Exception:
