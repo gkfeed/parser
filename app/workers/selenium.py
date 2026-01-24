@@ -1,5 +1,5 @@
-from dataclasses import dataclass, asdict
-from typing import Callable
+from dataclasses import asdict
+from typing import Callable, Optional
 import time
 import pickle
 import os
@@ -7,20 +7,11 @@ import os
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.configs.selenium import SELENIUM_COOKIES_PATH
+from app.services.selenium.schemas import SeleniumGetHtmlArgs
 
 import app.configs  # noqa: F401
 from app.utils.inject import inject
 from . import worker_sync
-
-
-@dataclass
-class SeleniumGetHtmlArgs:
-    url: str
-    should_delete_cookies: bool
-    should_load_cookies: bool
-    should_save_cookies: bool
-    make_actions_function: Callable[[WebDriver], None]
-    selenium_wait_timeout_seconds: int
 
 
 @worker_sync
@@ -35,7 +26,7 @@ async def _get_html(
     should_delete_cookies: bool,
     should_load_cookies: bool,
     should_save_cookies: bool,
-    make_actions_function: Callable[[WebDriver], None],
+    make_actions_function: Optional[Callable[[WebDriver], None]],
     selenium_wait_timeout_seconds: int,
 ) -> str:
     try:
@@ -51,7 +42,8 @@ async def _get_html(
         driver.get(url)
         time.sleep(selenium_wait_timeout_seconds)
 
-        make_actions_function(driver)
+        if make_actions_function:
+            make_actions_function(driver)
 
         html = driver.page_source
 

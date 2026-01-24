@@ -4,7 +4,7 @@ from abc import ABC
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.services.cache.use_temporary import async_store_in_cache_for
-from app.workers.selenium import get_html, SeleniumGetHtmlArgs
+from app.services.selenium import SeleniumService, SeleniumGetHtmlArgs
 from .http import HttpParserExtension
 
 
@@ -24,7 +24,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
         )
 
     async def get_html(self, url: str) -> bytes:
-        return await get_html(
+        html = await SeleniumService.get_html(
             SeleniumGetHtmlArgs(
                 url=url,
                 should_delete_cookies=self._should_delete_cookies,
@@ -34,6 +34,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
                 selenium_wait_timeout_seconds=self._selenium_wait_time,
             )
         )
+        return html.encode()
 
     def make_actions(self, driver: WebDriver):
         pass
