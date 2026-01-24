@@ -1,4 +1,6 @@
 import time
+import base64
+import re
 from typing import override
 from datetime import timedelta
 
@@ -9,8 +11,8 @@ from selenium.common.exceptions import NoSuchElementException
 
 from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
+from app.services.http import HttpService
 from app.services.hash import HashService
-from app.services.catbox import CatboxUploader
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -25,8 +27,10 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     @override
     async def _generate_hash(self, item: Item) -> str:
-        # FIXME: hash_file_from_url
-        return await HashService.hash_video_from_url(item.link)
+        match = re.search(r'src="data:[^;]+;base64,([^"]+)"', item.text)
+        if match:
+            return HashService.hash_str(match.group(1))
+        return HashService.hash_str(item.text)
 
     @property
     async def items(self) -> list[Item]:
@@ -45,6 +49,18 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
         return items
 
+    @staticmethod
+    def _get_mime_type(data: bytes) -> str:
+        if data.startswith(b"\xff\xd8"):
+            return "image/jpeg"
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+            return "image/gif"
+        if data.startswith(b"RIFF") and b"WEBP" in data[:16]:
+            return "image/webp"
+        return "image/jpeg"
+
     async def _create_item_from_media(self, media: Tag) -> Item | None:
         img = media.find("img")
         if not isinstance(img, Tag):
@@ -57,13 +73,32 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         if not src or not isinstance(src, str):
             return None
 
-        link = await CatboxUploader.upload_with_url(src)
+        if src.startswith("data:"):
+            # Handle data URI
+            try:
+                header, encoded = src.split(",", 1)
+                mime_type = header.split(";")[0].split(":")[1]
+                # encoded is already base64 string
+            except (ValueError, IndexError):
+                return None
+        else:
+            # Handle remote URL
+            try:
+                img_bytes = await HttpService.get(src)
+                encoded = base64.b64encode(img_bytes).decode("utf-8")
+                mime_type = self._get_mime_type(img_bytes)
+            except Exception:
+                return None
+
+        img_tag = (
+            f'<img src="data:{mime_type};base64,{encoded}" alt="{self._user_name}" />'
+        )
 
         return Item(
             title="inst: " + self._user_name,
-            text=self._user_name,
+            text=f"{self._user_name}<br>{img_tag}",
             date=constant_datetime,
-            link=link,
+            link=self.feed.url,
         )
 
     @override

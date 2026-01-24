@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from app.configs.env import EXTERNAL_SELENIUM_BROKER_URL
-from app.services.broker import BrokerService, BrokerError
+from app.services.broker import BrokerService
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
 
 
