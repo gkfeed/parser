@@ -15,7 +15,19 @@ else
 endif
 
 dev:
-	IS_WORKER=1 $(PYTHON) < app/main.py
+	IS_WORKER=1 $(PYTHON) -m app.main
+
+dispatcher:
+	IS_WORKER=1 $(PYTHON) -m app.run.dispatcher
+
+worker_light: redis
+	IS_WORKER=1 $(PYTHON) -m app.run.worker_light
+
+worker_heavy: redis
+	IS_WORKER=1 $(PYTHON) -m app.run.worker_heavy
+
+redis:
+	docker compose start redis
 
 debug:
 ifdef FILE

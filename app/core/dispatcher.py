@@ -1,47 +1,59 @@
 import asyncio
-import random
-from typing import Coroutine
+from datetime import datetime, timezone, timedelta
 
-from app.serializers.feed import Feed
+from pydantic import TypeAdapter
+
+from app.services.broker import BrokerService, BrokerError
+from app.serializers.feed import Item, Feed
+from app.services.repositories.feed_parser import FeedParserRepository
+from app.parsers import PARSERS
 from .storage import ItemsStorage, FeedStorage
-from .middlewares import MiddlewaresWrapper
-from .parsers import FeedParsingContext
 
 
-class Dispatcher(MiddlewaresWrapper, FeedParsingContext, FeedStorage, ItemsStorage):
-    _tasks_on_startup: list[Coroutine] = []
-    __queue: list = []
+class Dispatcher(ItemsStorage, FeedStorage):
+    def __init__(self, broker_url: str):
+        self.broker = BrokerService(broker_url)
 
-    def __init__(self):
-        super().__init__()
-        super(MiddlewaresWrapper, self).__init__()
-
-    async def on_startup(self):
-        for task in self._tasks_on_startup:
-            await task
-
-    def add_task_on_startup(self, task: Coroutine):
-        self._tasks_on_startup.append(task)
-
-    async def start_polling(self):
-        print("Start polling")
-
+    async def dispatch(self):
+        feeds = await self._get_all_feeds()
         async with asyncio.TaskGroup() as tg:
-            while 1:
-                feeds = await self._get_all_feeds()
-                random.shuffle(feeds)
-                for feed in feeds:
-                    if feed not in self.__queue:
-                        self.__queue.append(feed)
-                        # await self._fetch_feed(feed)
-                        tg.create_task(self._fetch_feed(feed))
-                        await asyncio.sleep(1)
+            for feed in feeds:
+                if not await self._should_process_feed(feed):
+                    continue
 
-    async def _fetch_feed(self, feed: Feed):
-        data = self.get_parser_initial_data(feed)
-        parse_feed = self._wrap_middlewares(self.execute_parser)
-        items = await parse_feed(feed, data)
+                tg.create_task(self._fetch_feed_items(feed))
+                await asyncio.sleep(1)
+
+    async def _should_process_feed(self, feed: Feed) -> bool:
+        feed_parser = await FeedParserRepository.get_by_feed_id(feed.id)
+        if feed_parser and feed_parser.valid_for > datetime.now(timezone.utc):
+            return False
+        return True
+
+    async def _fetch_feed_items(self, feed: Feed) -> None:
+        parser_cls = PARSERS.get(feed.type)
+        if not parser_cls:
+            return
+
+        try:
+            items_json = await self.broker.put_and_wait_for_result(
+                f"gkfeed.process_feed_{feed.type}",
+                (feed.model_dump_json(),),
+                timeout=300,
+            )
+        except BrokerError as e:
+            print(f"Failed to process feed {feed.url}")
+            print(e)
+            delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
+            new_valid_for = datetime.now(timezone.utc) + delta
+            return
+
+        adapter = TypeAdapter(list[Item])
+        items = adapter.validate_json(items_json)
         await self._save_items(feed, items)
+        print(f"Saved {len(items)} items for feed: {feed.url}")
 
-        if feed in self.__queue:
-            self.__queue.remove(feed)
+        delta = getattr(parser_cls, "_cache_storage_time_if_success", timedelta(days=1))
+
+        new_valid_for = datetime.now(timezone.utc) + delta
+        await FeedParserRepository.upsert(feed.id, new_valid_for)

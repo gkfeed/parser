@@ -5,9 +5,10 @@ from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
 
 from app.utils.is_in_docker import IS_IN_DOCKER
+from app.configs.env import SELENIUM_DOCKER_URL
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
-IS_HEADLESS = False
+IS_HEADLESS = True
 
 
 def get_driver() -> WebDriver:
@@ -27,7 +28,7 @@ def _get_local_chrome_driver() -> WebDriver:
 
 def _get_docker_driver() -> WebDriver:
     return webdriver.Remote(
-        "http://10.5.0.5:4444",
+        SELENIUM_DOCKER_URL,
         options=webdriver.ChromeOptions(),
     )
 

@@ -1,6 +1,6 @@
 from dataclasses import asdict
 
-from app.configs.env import EXTERNAL_SELENIUM_BROKER_URL
+from app.configs.env import BROKER_URL
 from app.services.broker import BrokerService
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
 
@@ -12,12 +12,10 @@ class ExternalSeleniumError(Exception):
 class ExternalSelenium:
     @classmethod
     async def get_html(cls, args: SeleniumGetHtmlArgs, timeout: int = 60) -> str:
-        if not EXTERNAL_SELENIUM_BROKER_URL:
-            raise ExternalSeleniumError(
-                "EXTERNAL_SELENIUM_BROKER_URL is not configured"
-            )
+        if not BROKER_URL:
+            raise ExternalSeleniumError("BROKER_URL is not configured")
 
-        broker = BrokerService(EXTERNAL_SELENIUM_BROKER_URL)
+        broker = BrokerService(BROKER_URL)
 
         data = asdict(args)
         if "make_actions_function" in data:
