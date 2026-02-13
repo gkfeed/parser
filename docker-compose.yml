@@ -1,68 +1,69 @@
-version: '3'
 services:
-  gkfeed-parser:
+  dispatcher:
     build:
       context: .
+      dockerfile: docker/dispatcher/Dockerfile
     tty: True
     restart: on-failure
     volumes:
       - ~/.local/share/gkfeed/data:/data
     env_file:
       - .env
-    networks:
-      - gkfeed-bridge
+    # only for dev
+    environment:
+      - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
+      - REDIS_HOST=redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
-      - chrome
-    container_name: gkfeed-parser
-  worker:
+
+  worker_light:
     build:
       context: .
-      dockerfile: worker.Dockerfile
+      dockerfile: docker/worker/Dockerfile
+    command: python -m app.run.worker_light
     tty: True
-    env_file:
-      - .env
-    networks:
-      - gkfeed-bridge
-    depends_on:
-      - redis
-      - chrome
-    container_name: gkfeed-worker
-  worker-sync:
-    build:
-      context: .
-      dockerfile: syncWorker.Dockerfile
+    restart: on-failure
     volumes:
       - ~/.local/share/gkfeed/data:/data
-    tty: True
     env_file:
       - .env
-    networks:
-      - gkfeed-bridge
+    environment:
+      - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
+      - REDIS_HOST=redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+
+  worker_heavy:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    command: python -m app.run.worker_heavy
+    tty: True
+    restart: on-failure
+    volumes:
+      - ~/.local/share/gkfeed/data:/data
+    env_file:
+      - .env
+    environment:
+      - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
+      - REDIS_HOST=redis
+      - SELENIUM_DOCKER_URL=http://chrome:4444
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
       - chrome
-    container_name: gkfeed-worker-sync
+
   redis:
     image: redis:alpine
-    networks:
-      gkfeed-bridge:
-        ipv4_address: 10.5.0.4
-    container_name: gkfeed-parser-redis
+    restart: always
+
   chrome:
     image: selenium/standalone-chrome:latest
-    ports:
-      - "7900:7900"
+    restart: always
     volumes:
       - /dev/shm:/dev/shm
-    networks:
-      gkfeed-bridge:
-        ipv4_address: 10.5.0.5
-    container_name: gkfeed-parser-chrome
-networks:
-  gkfeed-bridge:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 10.5.0.0/16
-          gateway: 10.5.0.1
