@@ -17,3 +17,4 @@ class Item(BaseModel):
     date: datetime
     link: str
     guid: Optional[str] = None
+    hash: Optional[str] = None

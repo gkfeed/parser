@@ -16,6 +16,12 @@ class ItemsHashExtension(_BaseFeed):
         super().__init__(feed, data)
 
     async def _generate_hash(self, item: Item) -> str:
-        model_dict = item.json()
-        data_str = json.dumps(model_dict, sort_keys=True)
+        model_dict = item.model_dump()
+        data_str = json.dumps(model_dict, sort_keys=True, default=str)
         return HashService.hash_str(data_str)
+
+    async def apply_hashes(self, items: list[Item]) -> list[Item]:
+        for item in items:
+            if item.hash is None:
+                item.hash = await self._generate_hash(item)
+        return items

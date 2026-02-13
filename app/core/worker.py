@@ -4,6 +4,7 @@ from datetime import datetime
 
 from app.parsers import PARSERS
 from app.configs.env import BROKER_URL
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.serializers.feed import Feed
 from app.services.broker import BrokerService
 
@@ -25,7 +26,11 @@ async def run_worker(type: str):
         raise ValueError(f"No parser found for feed type: {feed.type}")
 
     try:
-        items = await parser(feed, {}).items
+        parser_instance = parser(feed, {})
+        items = await parser_instance.items
+
+        if isinstance(parser_instance, ItemsHashExtension):
+            items = await parser_instance.apply_hashes(items)
     except Exception as e:
         print(f"Error processing {type}: {e}")
         await BrokerService(BROKER_URL).submit_error(task.id, "failed")
