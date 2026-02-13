@@ -27,15 +27,13 @@ class Dispatcher(ItemsStorage, FeedStorage):
     async def _should_process_feed(self, feed: Feed) -> bool:
         feed_parser = await FeedParserRepository.get_by_feed_id(feed.id)
         if not feed_parser:
-            return False
+            return True
 
         valid_for = feed_parser.valid_for
         if valid_for.tzinfo is None:
             valid_for = valid_for.replace(tzinfo=timezone.utc)
 
-        if valid_for > datetime.now(timezone.utc):
-            return False
-        return True
+        return valid_for < datetime.now(timezone.utc)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
         parser_cls = PARSERS.get(feed.type)
