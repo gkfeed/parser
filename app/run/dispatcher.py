@@ -1,6 +1,6 @@
 import asyncio
 
-from app.core.new_dispatcher import Dispatcher
+from app.core.dispatcher import Dispatcher
 from app.configs.env import BROKER_URL
 
 
