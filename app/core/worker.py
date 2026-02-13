@@ -2,8 +2,6 @@ import asyncio
 import json
 from datetime import datetime
 
-import requests
-
 from app.parsers import PARSERS
 from app.configs.env import BROKER_URL
 from app.serializers.feed import Feed
@@ -31,11 +29,6 @@ async def run_worker(type: str):
     except Exception as e:
         print(f"Error processing {type}: {e}")
         await BrokerService(BROKER_URL).submit_error(task.id, "failed")
-        # resp = requests.post(
-        #     f"{BROKER_URL}/submit_error",
-        #     json={"task_id": task.id, "error_message": "failed"},
-        #     timeout=10,
-        # )
         return
 
     items_json = json.dumps(
@@ -44,9 +37,3 @@ async def run_worker(type: str):
     )
 
     await BrokerService(BROKER_URL).submit_result(task.id, items_json)
-    # resp = requests.post(
-    #     f"{BROKER_URL}/submit_result",
-    #     json={"task_id": task.id, "result": items_json},
-    #     timeout=10,
-    # )
-    # resp.raise_for_status()
