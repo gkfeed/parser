@@ -14,7 +14,11 @@ class RezkaFeed(SeleniumParserExtension):
         items = []
 
         if "/films/" in show_url:
-            h2_tag = soup.find_all("h2")[-1]
+            h2_tags = soup.find_all("h2")
+            if not h2_tags:
+                raise ValueError("Could not extract h2 tags: No <h2> tags found")
+
+            h2_tag = h2_tags[-1]
 
             if not (h2_tag and isinstance(h2_tag, Tag)):
                 raise ValueError("Could not extract h2 tag for film")
