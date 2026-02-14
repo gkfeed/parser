@@ -23,11 +23,14 @@ class ItemsRepository(BaseRepository):
                         await cls._create_item(session, feed, item)
 
     @classmethod
-    async def _check_if_exists(cls, session: AsyncSession, feed: Feed, item: Item) -> bool:
+    async def _check_if_exists(
+        cls, session: AsyncSession, feed: Feed, item: Item
+    ) -> bool:
         stmt = select(_Item).where(
             _Item.feed_id == feed.id,
             _Item.title == item.title,
             _Item.link == item.link,
+            _Item.text == item.text,
         )
         existing = (await session.execute(stmt)).scalars().first()
         return existing is not None
