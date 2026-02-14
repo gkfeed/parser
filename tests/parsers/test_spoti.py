@@ -2,12 +2,18 @@ import pytest
 from app.parsers.spoti import SpotifyFeed, SpotifyPlaylistFeed
 from . import fetch_items  # noqa
 
-SPOTIFY_FEED_DATA = {
-    "type": "spoti",
-    "parser": SpotifyFeed,
-    # "url": "https://open.spotify.com/artist/4t8lDh2zuWn1d9cyJQkESe",
-    "url": "https://open.spotify.com/artist/3Fl31gc0mEUC2H0JWL1vic/",
-}
+SPOTIFY_FEED_DATA = [
+    {
+        "type": "spoti",
+        "parser": SpotifyFeed,
+        "url": "https://open.spotify.com/artist/3Fl31gc0mEUC2H0JWL1vic/",
+    },
+    {
+        "type": "spoti",
+        "parser": SpotifyFeed,
+        "url": "https://open.spotify.com/artist/0ChMIwzbYxHbebgoPeETfV",
+    },
+]
 
 SPOTIFY_PLAYLIST_FEED_DATA = [
     {
@@ -23,7 +29,7 @@ SPOTIFY_PLAYLIST_FEED_DATA = [
 ]
 
 
-@pytest.mark.parametrize("fetch_items", [SPOTIFY_FEED_DATA], indirect=True)
+@pytest.mark.parametrize("fetch_items", SPOTIFY_FEED_DATA, indirect=True)
 async def test_spoti_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0
 

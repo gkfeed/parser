@@ -2,12 +2,14 @@ from datetime import timedelta
 from bs4.element import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.hash import ItemsHashExtension
+
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
-class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension):
+class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
 
@@ -30,7 +32,10 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension):
         if _url.endswith("/"):
             _url = _url[:-1]
 
-        return await self.get_soup(_url + "/discography")
+        soup = await self.get_soup(_url + "/discography")
+        if soup.title and "Page not found" in soup.title.text:
+            return await self.get_soup(_url)
+        return soup
 
     async def _parse_releases_links(self, soup) -> list[Tag]:
         links = soup.find_all("a")
@@ -49,6 +54,14 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension):
         return await self._parse_releases_links(soup)
 
     async def _parse_artist_name(self, soup) -> str:
+        meta_title = soup.find("meta", property="og:title")
+        if meta_title and isinstance(meta_title, Tag) and meta_title.get("content"):
+            return meta_title["content"]
+
+        h1 = soup.find("h1")
+        if h1 and h1.text and h1.text != "Your Library":
+            return h1.text
+
         links = soup.find_all("a")
         for link in links:
             if isinstance(link, Tag) and "href" in link.attrs:
