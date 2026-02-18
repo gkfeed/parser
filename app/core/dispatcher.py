@@ -41,6 +41,21 @@ class Dispatcher(ItemsStorage, FeedStorage):
         if not parser_cls:
             return
 
+        items = await self._request_items_from_broker(feed)
+
+        if len(items) != 0:
+            delta = getattr(
+                parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
+            )
+            await self._save_items(feed, items)
+            print(f"Saved {len(items)} items for feed: {feed.url}")
+        else:
+            delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
+
+        new_valid_for = datetime.now(timezone.utc) + delta
+        await FeedParserRepository.upsert(feed.id, new_valid_for)
+
+    async def _request_items_from_broker(self, feed: Feed) -> list[Item]:
         try:
             items_json = await self.broker.put_and_wait_for_result(
                 f"gkfeed.process_feed_{feed.type}",
@@ -50,31 +65,26 @@ class Dispatcher(ItemsStorage, FeedStorage):
         except BrokerError as e:
             print(f"Failed to process feed {feed.url}")
             print(e)
-            delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
-            new_valid_for = datetime.now(timezone.utc) + delta
-            return
+            return []
 
         adapter = TypeAdapter(list[Item])
         items = adapter.validate_json(items_json)
 
         items = await self._filter_seen_items(feed.id, items)
-
-        await self._save_items(feed, items)
-        print(f"Saved {len(items)} items for feed: {feed.url}")
-
-        delta = getattr(parser_cls, "_cache_storage_time_if_success", timedelta(days=1))
-
-        new_valid_for = datetime.now(timezone.utc) + delta
-        await FeedParserRepository.upsert(feed.id, new_valid_for)
+        return items
 
     @staticmethod
     async def _filter_seen_items(feed_id: int, items: list[Item]) -> list[Item]:
         filtered_items = []
         for item in items:
-            if item.hash:
-                if not await ItemsHashRepository.contains(item.hash, feed_id):
-                    await ItemsHashRepository.save(item.hash, feed_id)
-                    filtered_items.append(item)
-            else:
+            if not item.hash:
+                print(f"warning: item has no hash, skipping seen check {item.link}")
                 filtered_items.append(item)
+                continue
+
+            if await ItemsHashRepository.contains(item.hash, feed_id):
+                continue
+
+            await ItemsHashRepository.save(item.hash, feed_id)
+            filtered_items.append(item)
         return filtered_items
