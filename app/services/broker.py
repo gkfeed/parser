@@ -37,7 +37,7 @@ class BrokerService:
             if status == "completed":
                 return result_data.get("result")
             if status == "failed":
-                raise BrokerError(f"Task failed: ")
+                raise BrokerError("Task failed: ")
 
             await asyncio.sleep(1)
 
