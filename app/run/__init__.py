@@ -6,7 +6,6 @@ light_parsers = [
     "web",
     "kinogo",
     "twitch",
-    "vk",
     "hltv",
     "liquidpedia",
     "shiki",
