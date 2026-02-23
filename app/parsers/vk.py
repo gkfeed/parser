@@ -1,18 +1,22 @@
-from datetime import timedelta, datetime, date
+from datetime import timedelta
+import time
 from typing import override
 
 from bs4 import Tag
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.common.by import By
 
-from app.utils.datetime import convert_datetime, constant_datetime
+from app.utils.datetime import constant_datetime
 from app.services.hash import HashService
 from app.serializers.feed import Item
-from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 
 
-class VkFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class VkFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
+    _selenium_wait_time = 5
 
     @property
     async def items(self) -> list[Item]:
@@ -33,53 +37,50 @@ class VkFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     @property
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        return [p for p in soup.find_all(class_="post") if isinstance(p, Tag)]
+        return [p for p in soup.find_all(class_="wall_post_cont") if isinstance(p, Tag)]
+
+    @override
+    def make_actions(self, driver: WebDriver):
+        # Bypass robot check if present
+        try:
+            buttons = driver.find_elements(By.CLASS_NAME, "start")
+            if buttons:
+                buttons[0].click()
+                time.sleep(5)
+        except Exception:
+            pass
 
     def _get_post_title(self, post: Tag) -> str:
+        # Try to find author name in the same page or use feed title
         try:
-            return post.find_all(class_="PostHeaderTitle__authorName")[0].text
-        except IndexError:
-            raise ValueError
+            author = post.find_all(class_="PostHeaderTitle__authorName")
+            if author:
+                return author[0].text
+            return self.feed.title or "VK Post"
+        except (IndexError, AttributeError):
+            return "VK Post"
 
     def _get_post_text(self, post: Tag) -> str:
         try:
+            if item := post.find(class_="vkitShowMoreText__text--vRrhr"):
+                return item.text
+
             if item := post.find(class_="wall_post_text"):
                 return item.text
 
-            if item := post.find(class_="post_video_title"):
-                return item.text
-
-            return post.find_all(class_="PostHeaderTitle__authorName")[0].text
-        except IndexError:
-            raise ValueError
-
-    def _get_post_datetime(self, post: Tag) -> datetime:
-        # NOTE: broken
-        try:
-            datetime_str = post.find_all("time")[0].text
-            return self._parse_datetime(datetime_str)
-        except IndexError:
-            raise ValueError
-
-    def _parse_datetime(self, datetime_str: str) -> datetime:
-        if datetime_str.startswith("today"):
-            today_str = date.today().strftime("%m/%d/%Y")
-            datetime_str = today_str + datetime_str.split("at")[1]
-
-        if datetime_str.startswith("yesterday"):
-            yesterday = date.today() - timedelta(days=1)
-            yesterday_str = yesterday.strftime("%m/%d/%Y")
-            datetime_str = yesterday_str + datetime_str.split("at")[1]
-
-        try:
-            return convert_datetime(datetime_str)
-        except Exception as e:
-            print(e)
-            return constant_datetime
+            return ""
+        except Exception:
+            return ""
 
     def _get_post_link(self, post: Tag) -> str:
-        try:
-            link = "https://vk.com/wall" + str(post["id"])[4:]
-            return link
-        except IndexError:
-            raise ValueError
+        post_id = post.get("id")
+
+        if not isinstance(post_id, str):
+            raise ValueError("Post ID is not a string")
+
+        if not post_id.startswith("wpt"):
+            raise ValueError(f"Could not extract post link for post: {post_id}")
+
+        raw_id = post_id[3:]
+        clean_id = raw_id if raw_id.startswith("-") else f"-{raw_id}"
+        return f"https://vk.com/wall{clean_id}"
