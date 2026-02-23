@@ -27,6 +27,7 @@ from .anilibria import AnilibriaFeed
 from .pornhub import PornHubFeed
 from .hltv import HltvFeed
 from .liquidpedia import LiquidpediaFeed
+from .sasflix import SasflixFeed
 
 
 PARSERS: dict[str, Type[BaseFeed]] = {
@@ -58,4 +59,5 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "pornhub": PornHubFeed,
     "hltv": HltvFeed,
     "liquidpedia": LiquidpediaFeed,
+    "sasflix": SasflixFeed,
 }
