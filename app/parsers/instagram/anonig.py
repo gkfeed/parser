@@ -27,6 +27,10 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     @override
     async def _generate_hash(self, item: Item) -> str:
+        video_match = re.search(r'<video[^>]+src="([^"]+)"', item.text)
+        if video_match:
+            return HashService.hash_str(video_match.group(1))
+
         match = re.search(r'src="data:[^;]+;base64,([^"]+)"', item.text)
         if match:
             return HashService.hash_str(match.group(1))
@@ -65,6 +69,34 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         img = media.find("img")
         if not isinstance(img, Tag):
             return None
+
+        # Check if it's a video
+        is_video = False
+        video_tag_indicator = media.find(class_="tags__item--video")
+        if video_tag_indicator:
+            is_video = True
+
+        link_tag = media.find("a")
+        media_url = None
+        if isinstance(link_tag, Tag):
+            media_url = link_tag.get("href")
+
+        if (
+            is_video
+            and media_url
+            and isinstance(media_url, str)
+            and ".mp4" in media_url
+        ):
+            video_html = (
+                f'<video src="{media_url}" controls preload="metadata" '
+                f'style="max-width: 100%; height: auto;"></video>'
+            )
+            return Item(
+                title="inst: " + self._user_name,
+                text=f"{self._user_name}<br>{video_html}",
+                date=constant_datetime,
+                link=self.feed.url,
+            )
 
         src = img.get("src")
         if isinstance(src, list):
