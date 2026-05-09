@@ -1,8 +1,8 @@
 import pytest
 
-from app.core.dispatcher import Dispatcher
+from app.core.middlewares import MiddlewaresWrapper
+from app.core.parsers import FeedParsingContext
 from app.serializers.feed import Feed, Item
-import app.configs  # noqa
 
 
 class MockedItemsStorage:
@@ -17,13 +17,19 @@ class MockedItemsStorage:
             self.items.append(i)
 
 
-class FakeDispatcher(MockedItemsStorage, Dispatcher):
+class FakeDispatcher(MockedItemsStorage, FeedParsingContext, MiddlewaresWrapper):
     def __init__(self):
         super().__init__()
-        super(MockedItemsStorage, self).__init__()
+        FeedParsingContext.__init__(self)
+        MiddlewaresWrapper.__init__(self)
 
     async def fetch_feed(self, feed: Feed):
-        return await self._fetch_feed(feed)
+        if feed.type not in self._parsers:
+            return
+
+        parser = self._wrap_middlewares(self.execute_parser)
+        items = await parser(feed, self.get_parser_initial_data(feed))
+        await self._save_items(feed, items)
 
 
 @pytest.fixture
