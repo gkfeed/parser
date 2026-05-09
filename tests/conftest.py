@@ -1,23 +1,33 @@
+import os
+from typing import Any
+
 import pytest
-from app.services.cache.use_temporary import UseTemporaryCacheServiceExtension
-from app.services.cache.temporary import TemporaryCacheService
+from dotenv import load_dotenv
+
+from app.services.cache.storage._base import BaseStorage
 
 
-class MockStorage:
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env.test"), override=True)
+
+
+class MockStorage(BaseStorage):
     def __init__(self):
         self.data = {}
 
-    def get(self, id: str):
+    def get(self, id: str) -> Any:
         if id not in self.data:
             raise ValueError("No such index: " + id)
         return self.data[id]
 
-    def set(self, id: str, data):
+    def set(self, id: str, data: Any) -> None:
         self.data[id] = data
 
 
 @pytest.fixture(autouse=True)
 def mock_cache_extension(monkeypatch):
+    from app.services.cache.temporary import TemporaryCacheService
+    from app.services.cache.use_temporary import UseTemporaryCacheServiceExtension
+
     # Create a new service with mock storage
     mock_service = TemporaryCacheService(storage=MockStorage())
 
