@@ -27,7 +27,7 @@ worker_heavy: redis
 	IS_WORKER=1 $(PYTHON) -m app.run.worker_heavy
 
 redis:
-	docker compose start redis
+	docker compose up -d redis
 
 debug:
 ifdef FILE
