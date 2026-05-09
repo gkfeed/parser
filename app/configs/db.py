@@ -2,7 +2,11 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 import app.models  # noqa: F401
-from .env import DB_URL
+from .env import DB_URL as ENV_DB_URL
+
+
+DB_URL = ENV_DB_URL.replace("postgres://", "postgresql+asyncpg://")
+DB_URL = DB_URL.replace("sqlite://", "sqlite+aiosqlite://")
 
 
 connect_args = {}

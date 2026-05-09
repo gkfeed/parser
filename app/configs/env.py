@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 try:
-    DB_URL = os.environ["DB_URL"].replace("postgres://", "postgresql+asyncpg://")
+    # Do not import this value for database setup; use app.configs.db.DB_URL instead.
+    DB_URL = os.environ["DB_URL"]
     TWITCH_CLIENT_ID = os.environ["TWITCH_CLIENT_ID"]
     TWITCH_CLIENT_SECRET = os.environ["TWITCH_CLIENT_SECRET"]
     REDIS_HOST = os.environ["REDIS_HOST"]
