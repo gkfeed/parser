@@ -36,6 +36,7 @@ async def run_worker(type: str):
         await BrokerService(BROKER_URL).submit_error(task.id, "failed")
         return
 
+    print(f"{type}: {len(items)} items found")
     items_json = json.dumps(
         [i.model_dump() for i in items],
         default=lambda o: o.isoformat() if isinstance(o, datetime) else None,
