@@ -1,23 +1,22 @@
 from datetime import timedelta, datetime
-
+from typing import override
 
 from bs4.element import Tag
 
-from app.utils.datetime import convert_datetime, constant_datetime
-from app.serializers.feed import Item
+from app.utils.datetime import convert_datetime
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class ShikiFeed(ItemsHashExtension, HttpParserExtension):
+class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 
     @property
-    async def items(self) -> list[Item]:
+    @override
+    async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self._url)
-
-        title = await self._show_title
         menu_links = soup.find_all(class_="b-menu-links")
 
         if not menu_links:
@@ -29,18 +28,36 @@ class ShikiFeed(ItemsHashExtension, HttpParserExtension):
                 "The first element with class 'b-menu-links' is not a Tag instance."
             )
 
-        news = [n for n in menu_link.find_all(class_="entry") if isinstance(n, Tag)]
-
         return [
-            Item(
-                title=title + " " + self._get_item_status(item),
-                text=self._get_item_status(item),
-                date=self._get_item_date(item),
-                link=self._url,
-            )
-            for item in reversed(news)
-            if isinstance(item, Tag)
+            n
+            for n in reversed(list(menu_link.find_all(class_="entry")))
+            if isinstance(n, Tag)
         ]
+
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        show_title = await self._show_title
+        status = self._get_item_status(post)
+        return f"{show_title} {status}"
+
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        return self._get_item_status(post)
+
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        return self._url
+
+    @override
+    async def _get_post_datetime(self, post: Tag) -> datetime:
+        span_tag = post.find("span")
+        if isinstance(span_tag, Tag):
+            time_tag = span_tag.find("time")
+            if isinstance(time_tag, Tag):
+                datetime_str = time_tag.get("datetime")
+                if isinstance(datetime_str, str):
+                    return convert_datetime(datetime_str)
+        return await super()._get_post_datetime(post)
 
     @property
     async def _show_title(self) -> str:
@@ -61,13 +78,3 @@ class ShikiFeed(ItemsHashExtension, HttpParserExtension):
         if isinstance(span_tag, Tag):
             return span_tag.text
         raise ValueError
-
-    def _get_item_date(self, item: Tag) -> datetime:
-        span_tag = item.find("span")
-        if isinstance(span_tag, Tag):
-            time_tag = span_tag.find("time")
-            if isinstance(time_tag, Tag):
-                datetime_str = time_tag.get("datetime")
-                if isinstance(datetime_str, str):
-                    return convert_datetime(datetime_str)
-        return constant_datetime

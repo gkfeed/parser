@@ -1,48 +1,48 @@
 from bs4 import Tag
 from datetime import timedelta
 from urllib.parse import urljoin
+from typing import override
 
-from app.serializers.feed import Item
-from app.utils.datetime import constant_datetime
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class AnilibriaFeed(SeleniumParserExtension, CacheFeedExtension):
+class AnilibriaFeed(PostToItemsMixin, SeleniumParserExtension, CacheFeedExtension):
     _cache_storage_time_if_success = timedelta(days=1)
     _cache_storage_time = timedelta(seconds=5)
     _selenium_wait_time = 5
 
     @property
-    async def items(self) -> list[Item]:
+    @override
+    async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
         alias = self._get_alias_from_url()
-
-        title = self._extract_title(soup)
         episodes_container = self._find_episodes_container(soup, alias)
-        episodes = episodes_container.find_all("a", class_="v-card")
-        items = []
-        for episode in episodes:
-            if not isinstance(episode, Tag):
-                continue
-            episode_text = self._extract_episode_text(episode)
-            episode_link = self._extract_episode_link(episode)
-            episode_image_url = self._extract_episode_image_url(episode)
+        return [
+            a
+            for a in episodes_container.find_all("a", class_="v-card")
+            if isinstance(a, Tag)
+        ]
 
-            show_status = f"{title} {episode_text}"
-            episode_url = urljoin("https://anilibria.top", episode_link)
-            image_url = urljoin("https://anilibria.top", episode_image_url)
-            text = f'<img src="{image_url}" alt="episode"><br>{episode_text}'
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        soup = await self.get_soup(self.feed.url)
+        show_title = self._extract_title(soup)
+        episode_text = self._extract_episode_text(post)
+        return f"{show_title} {episode_text}"
 
-            items.append(
-                Item(
-                    title=show_status,
-                    link=episode_url,
-                    text=text,
-                    date=constant_datetime,
-                )
-            )
-        return items
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        episode_text = self._extract_episode_text(post)
+        episode_image_url = self._extract_episode_image_url(post)
+        image_url = urljoin("https://anilibria.top", episode_image_url)
+        return f'<img src="{image_url}" alt="episode"><br>{episode_text}'
+
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        episode_link = self._extract_episode_link(post)
+        return urljoin("https://anilibria.top", episode_link)
 
     def _get_alias_from_url(self) -> str:
         return self.feed.url.strip("/").split("/")[-2]

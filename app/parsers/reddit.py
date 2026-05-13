@@ -4,7 +4,7 @@ from typing import override
 
 from bs4 import Tag
 
-from app.utils.datetime import convert_datetime, constant_datetime
+from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.http import HttpService
 from app.services.hash import HashService
@@ -12,9 +12,10 @@ from app.services.url_ranker import URLRanker
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class RedditFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
     __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
     __base_urls_cache: list[str] | None = None
@@ -39,18 +40,7 @@ class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
         return HashService.hash_str(item.link)
 
     @property
-    async def items(self) -> list[Item]:
-        return [
-            Item(
-                title=self._get_post_title(p),
-                text=self._get_post_text(p),
-                date=self._get_post_datetime(p),
-                link=self._get_post_link(p),
-            )
-            for p in await self._posts
-        ]
-
-    @property
+    @override
     async def _posts(self) -> list[Tag]:
         base_urls = await self._get_base_urls()
         posts: list[Tag] = []
@@ -70,13 +60,15 @@ class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
 
         return posts
 
-    def _get_post_title(self, post: Tag) -> str:
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
         title_tag = post.find(class_="post_title")
         if title_tag and isinstance(title_tag, Tag):
             return title_tag.text
         return ""
 
-    def _get_post_text(self, post: Tag) -> str:
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
         body = post.find(class_="post_body")
         text = ""
         if body and isinstance(body, Tag):
@@ -85,7 +77,7 @@ class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
                     text += p.text
 
         if not text:
-            text = self._get_post_title(post)
+            text = await self._get_post_title(post)
 
         feed_url_parts = self.feed.url.split("/")
         subreddit_name = (
@@ -93,7 +85,8 @@ class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
         )
         return text + "<br/><br/>r/" + subreddit_name
 
-    def _get_post_datetime(self, post: Tag) -> datetime:
+    @override
+    async def _get_post_datetime(self, post: Tag) -> datetime:
         datetime_tag = post.find(class_="created")
         if (
             datetime_tag
@@ -103,9 +96,10 @@ class RedditFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
             datetime_str = datetime_tag["title"]
             if isinstance(datetime_str, str):
                 return convert_datetime(datetime_str)
-        return constant_datetime
+        return await super()._get_post_datetime(post)
 
-    def _get_post_link(self, post: Tag) -> str:
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
         base_url = "https://www.reddit.com/"
         comments_tag = post.find(class_="post_comments")
         if (

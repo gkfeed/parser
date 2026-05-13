@@ -1,55 +1,49 @@
 from datetime import datetime, timedelta
+from typing import override
 
 from bs4 import Tag
 
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
-from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class ShikiOngoingFeed(ItemsHashExtension, HttpParserExtension):
+class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 
     @property
-    async def items(self) -> list[Item]:
+    @override
+    async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
 
         container = soup.find("div", class_="fc-ongoings")
         if not isinstance(container, Tag):
             return []
 
-        articles = container.find_all("article")
+        return [a for a in container.find_all("article") if isinstance(a, Tag)]
 
-        return [
-            Item(
-                title=self._get_item_title(article),
-                text=self._get_item_title(article),
-                date=self._get_item_date(article),
-                link=self._get_item_link(article),
-            )
-            for article in articles
-            if isinstance(article, Tag)
-        ]
-
-    def _get_item_title(self, article: Tag) -> str:
-        title_tag = article.find("span", class_="name-en")
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        title_tag = post.find("span", class_="name-en")
         if title_tag and isinstance(title_tag, Tag):
             return title_tag.text
         raise ValueError("Title not found")
 
-    def _get_item_link(self, article: Tag) -> str:
-        link_tag = article.find("a")
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        link_tag = post.find("a")
         if link_tag and isinstance(link_tag, Tag):
             href = link_tag.get("href")
             if isinstance(href, str):
                 return href
         raise ValueError("Link not found")
 
-    def _get_item_date(self, article: Tag) -> datetime:
-        date_meta = article.find("meta", itemprop="dateCreated")
+    @override
+    async def _get_post_datetime(self, post: Tag) -> datetime:
+        date_meta = post.find("meta", itemprop="dateCreated")
         if (
             date_meta
             and isinstance(date_meta, Tag)

@@ -1,6 +1,5 @@
 from datetime import datetime
-from urllib.parse import urlparse
-from typing import Optional
+from typing import override, Optional
 
 from bs4 import Tag
 from bs4.element import NavigableString
@@ -8,12 +7,14 @@ from bs4.element import NavigableString
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 
 
-class HltvFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class HltvFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     @property
-    async def items(self) -> list[Item]:
+    @override
+    async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
 
         def is_upcoming_matches_headline(tag: Tag) -> bool:
@@ -45,45 +46,69 @@ class HltvFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
         if not isinstance(match_table, Tag):
             raise ValueError("Match table not found or invalid.")
 
+        return [
+            row
+            for row in match_table.find_all("tr", class_="team-row")
+            if isinstance(row, Tag)
+        ]
+
+    @property
+    @override
+    async def items(self) -> list[Item]:
+        # Hltv has try-except logic per row in old implementation, we can override items to replicate it
+        # or just implement _get_post methods and let mixin handle it.
+        # The old implementation skipped rows that failed to parse.
         items = []
-        for row in match_table.find_all("tr", class_="team-row"):
-            if isinstance(row, Tag):
-                item = self._parse_match_row(row)
-                if item:
-                    items.append(item)
+        for p in await self._posts:
+            try:
+                items.append(
+                    Item(
+                        title=await self._get_post_title(p),
+                        text=await self._get_post_text(p),
+                        date=await self._get_post_datetime(p),
+                        link=await self._get_post_link(p),
+                    )
+                )
+            except (ValueError, IndexError):
+                continue
         return items
 
-    def _parse_match_row(self, row: Tag) -> Optional[Item]:
-        try:
-            date = self._extract_match_date(row)
-            teams = self._extract_teams(row)
-            if not teams:
-                return None
-            team1_name, team2_name = teams
-            link = self._extract_match_link(row)
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        teams = self._extract_teams(post)
+        if not teams:
+            raise ValueError("Teams not found")
+        team1_name, team2_name = teams
+        return f"{team1_name} vs {team2_name}"
 
-            if not date or not team1_name or not team2_name or not link:
-                return None
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        title = await self._get_post_title(post)
+        return f"Upcoming match: {title}"
 
-            return Item(
-                title=f"{team1_name} vs {team2_name}",
-                text=f"Upcoming match: {team1_name} vs {team2_name}",
-                date=date,
-                link=link,
-            )
-        except (ValueError, IndexError):
-            return None
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        matchpage_button_cell = post.find("td", class_="matchpage-button-cell")
+        if not isinstance(matchpage_button_cell, Tag):
+            raise ValueError("Link cell not found")
 
-    def _extract_match_date(self, row: Tag) -> Optional[datetime]:
-        date_cell = row.find("td", class_="date-cell")
+        match_link_tag = matchpage_button_cell.find("a")
+        if not isinstance(match_link_tag, Tag) or not match_link_tag.has_attr("href"):
+            raise ValueError("Link tag not found")
+
+        return "https://www.hltv.org" + str(match_link_tag["href"])
+
+    @override
+    async def _get_post_datetime(self, post: Tag) -> datetime:
+        date_cell = post.find("td", class_="date-cell")
         if not isinstance(date_cell, Tag):
-            return None
+            raise ValueError("Date cell not found")
 
         unix_timestamp_ms_tag = date_cell.find("span")
         if not isinstance(
             unix_timestamp_ms_tag, Tag
         ) or not unix_timestamp_ms_tag.has_attr("data-unix"):
-            return None
+            raise ValueError("Timestamp tag not found")
 
         unix_timestamp = int(str(unix_timestamp_ms_tag["data-unix"])) / 1000
         return datetime.fromtimestamp(unix_timestamp)
@@ -108,26 +133,3 @@ class HltvFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
             return None
 
         return team1_name_tag.text, team2_name_tag.text
-
-    def _extract_match_link(self, row: Tag) -> Optional[str]:
-        matchpage_button_cell = row.find("td", class_="matchpage-button-cell")
-        if not isinstance(matchpage_button_cell, Tag):
-            return None
-
-        match_link_tag = matchpage_button_cell.find("a")
-        if not isinstance(match_link_tag, Tag) or not match_link_tag.has_attr("href"):
-            return None
-
-        return "https://www.hltv.org" + str(match_link_tag["href"])
-
-    @property
-    def _team_id(self) -> str:
-        return self._parsed_url.path.split("/")[2]
-
-    @property
-    def _team_name(self) -> str:
-        return self._parsed_url.path.split("/")[3]
-
-    @property
-    def _parsed_url(self):
-        return urlparse(self.feed.url)

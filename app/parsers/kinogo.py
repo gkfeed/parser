@@ -1,39 +1,44 @@
 from datetime import timedelta
+from typing import override
 
-from app.utils.datetime import constant_datetime
-from app.serializers.feed import Item
+from bs4 import Tag
+
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class KinogoFeed(HttpParserExtension, CacheFeedExtension):
+class KinogoFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
 
     @property
-    async def items(self) -> list[Item]:
-        title = await self._show_title
-        status = await self._show_status
-        return [
-            Item(
-                title=title + " " + status,
-                text=status,
-                date=constant_datetime,
-                link=self.feed.url,
-            )
-        ]
+    @override
+    async def _posts(self) -> list[Tag]:
+        soup = await self.get_soup(self.feed.url)
+        return [soup]
 
-    @property
-    async def _show_status(self) -> str:
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        title = await self._show_title(post)
+        status = await self._show_status(post)
+        return f"{title} {status}"
+
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        return await self._show_status(post)
+
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        return self.feed.url
+
+    async def _show_status(self, soup: Tag) -> str:
         try:
-            soup = await self.get_soup(self.feed.url)
             return soup.find_all(class_="status7")[0].text
         except IndexError:
             raise ValueError
 
-    @property
-    async def _show_title(self) -> str:
+    async def _show_title(self, soup: Tag) -> str:
         try:
-            soup = await self.get_soup(self.feed.url)
             return soup.find_all("h1")[0].text
         except IndexError:
             raise ValueError("Couldn'n find status of show: " + self.feed.url)

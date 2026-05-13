@@ -1,75 +1,58 @@
+from typing import override
 from bs4 import Tag
 
-from app.serializers.feed import Item
-from app.utils.datetime import constant_datetime
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.services.http import HttpService
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class RezkaFeed(SeleniumParserExtension):
+class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):
     @property
-    async def items(self) -> list[Item]:
+    @override
+    async def _posts(self) -> list[Tag]:
         show_url = self.feed.url
         soup = await self._show_soup
-        items = []
 
         if "/films/" in show_url:
             h2_tags = soup.find_all("h2")
             if not h2_tags:
                 raise ValueError("Could not extract h2 tags: No <h2> tags found")
-
-            h2_tag = h2_tags[-1]
-
-            if not (h2_tag and isinstance(h2_tag, Tag)):
-                raise ValueError("Could not extract h2 tag for film")
-
-            items.append(
-                Item(
-                    title=h2_tag.text,
-                    link=show_url,
-                    text=h2_tag.text,
-                    date=constant_datetime,
-                )
-            )
+            last_h2 = h2_tags[-1]
+            if not isinstance(last_h2, Tag):
+                raise ValueError("Last h2 is not a Tag")
+            return [last_h2]
         else:
-            title = self._extract_title(soup)
-            return await self._extract_last_season_episodes_items(soup, title)
-
-        return items
-
-    async def _extract_last_season_episodes_items(
-        self, soup: Tag, title: str
-    ) -> list[Item]:
-        active_season = soup.select_one(".b-simple_season__item.active")
-
-        if active_season:
-            season_text = active_season.text
-            tab_id = active_season.get("data-tab_id")
+            active_season = soup.select_one(".b-simple_season__item.active")
+            tab_id = active_season.get("data-tab_id") if active_season else "1"
             tab_id = str(tab_id) if tab_id else "1"
-        else:
-            # FIXME: do not hardcode number to 1 get actual last
-            season_text = "1 Сезон"
-            tab_id = "1"
+            return self._extract_episodes(soup, tab_id)
 
-        episodes = self._extract_episodes(soup, tab_id)
-        return [
-            Item(
-                title=f"{title} {season_text} {ep.text}",
-                link=self.feed.url,
-                text=ep.text,
-                date=constant_datetime,
-            )
-            for ep in episodes
-        ]
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
+        show_url = self.feed.url
+        if "/films/" in show_url:
+            return post.text
+        else:
+            soup = await self._show_soup
+            title = self._extract_title(soup)
+            active_season = soup.select_one(".b-simple_season__item.active")
+            season_text = active_season.text if active_season else "1 Сезон"
+            return f"{title} {season_text} {post.text}"
+
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        return post.text
+
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        return self.feed.url
 
     @property
     async def _show_soup(self) -> Tag:
         _url = self.feed.url
-
         status = await HttpService.get_status(_url)
         if status != 200 and not _url.endswith("-latest.html"):
             _url = _url.replace(".html", "-latest.html")
-
         return await self.get_soup(_url)
 
     def _extract_title(self, soup: Tag) -> str:
@@ -86,7 +69,6 @@ class RezkaFeed(SeleniumParserExtension):
             raise ValueError(
                 f"Could not extract episodes container for tab_id {tab_id}"
             )
-
         return [
             a
             for a in container.find_all(class_="b-simple_episode__item")
