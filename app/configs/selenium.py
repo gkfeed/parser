@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.chrome.service import Service
@@ -9,11 +11,16 @@ from app.configs.env import SELENIUM_DOCKER_URL
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
 IS_HEADLESS = True
+FALLBACK_TO_EXTERNAL_SELENIUM = True
 
 
 def get_driver() -> WebDriver:
     if IS_IN_DOCKER:
         return _get_docker_driver()
+
+    if not Path("/usr/bin/chromedriver").exists():
+        raise ValueError("chromedriver (chromium) should be installed")
+
     if IS_HEADLESS:
         return _get_local_headless_chrome_driver()
     return _get_local_chrome_driver()

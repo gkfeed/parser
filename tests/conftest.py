@@ -33,3 +33,11 @@ def mock_cache_extension(monkeypatch):
 
     # Patch the class attribute 'cache' on UseTemporaryCacheServiceExtension
     monkeypatch.setattr(UseTemporaryCacheServiceExtension, "cache", mock_service)
+
+
+@pytest.fixture(autouse=True)
+def disable_external_selenium_fallback(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.selenium.FALLBACK_TO_EXTERNAL_SELENIUM",
+        False,
+    )
