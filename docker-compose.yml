@@ -17,7 +17,6 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - redis
-
   worker_light:
     build:
       context: .
@@ -36,7 +35,6 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - redis
-
   worker_heavy:
     build:
       context: .
@@ -57,13 +55,14 @@ services:
     depends_on:
       - redis
       - chrome
-
+  # should be in services/redis.compose
   redis:
     image: redis:alpine
     restart: always
-
+  # should be in services/chrome.compose
   chrome:
     image: selenium/standalone-chrome:latest
     restart: always
     volumes:
       - /dev/shm:/dev/shm
+
