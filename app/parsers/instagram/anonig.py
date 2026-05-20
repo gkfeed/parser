@@ -1,6 +1,6 @@
+import re
 import time
 import base64
-import re
 from typing import override
 from datetime import timedelta
 
@@ -87,16 +87,20 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             and isinstance(media_url, str)
             and ".mp4" in media_url
         ):
-            video_html = (
-                f'<video src="{media_url}" controls preload="metadata" '
-                f'style="max-width: 100%; height: auto;"></video>'
+            print(
+                f"warning: Instagram video is tmp unavailable because media links expire: {media_url}"
             )
-            return Item(
-                title="inst: " + self._user_name,
-                text=f"{self._user_name}<br>{video_html}",
-                date=constant_datetime,
-                link=self.feed.url,
-            )
+            # video_html = (
+            #     f'<video src="{media_url}" controls preload="metadata" '
+            #     f'style="max-width: 100%; height: auto;"></video>'
+            # )
+            # return Item(
+            #     title="inst: " + self._user_name,
+            #     text=f"{self._user_name}<br>{video_html}",
+            #     date=constant_datetime,
+            #     link=self.feed.url,
+            # )
+            return None
 
         src = img.get("src")
         if isinstance(src, list):
