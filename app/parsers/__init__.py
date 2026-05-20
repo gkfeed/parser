@@ -25,6 +25,7 @@ from .matreshka import MatreshkaFeed
 from .shiki_ongoing import ShikiOngoingFeed
 from .anilibria import AnilibriaFeed
 from .pornhub import PornHubFeed
+from .porno365 import Porno365Feed
 from .hltv import HltvFeed
 from .liquidpedia import LiquidpediaFeed
 from .sasflix import SasflixFeed
@@ -57,6 +58,7 @@ PARSERS: dict[str, Type[BaseFeed]] = {
     "shiki:ongoing": ShikiOngoingFeed,
     "anilibria": AnilibriaFeed,
     "pornhub": PornHubFeed,
+    "porno365": Porno365Feed,
     "hltv": HltvFeed,
     "liquidpedia": LiquidpediaFeed,
     "sasflix": SasflixFeed,
