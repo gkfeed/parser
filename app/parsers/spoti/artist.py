@@ -56,7 +56,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
     async def _parse_artist_name(self, soup) -> str:
         meta_title = soup.find("meta", property="og:title")
         if meta_title and isinstance(meta_title, Tag) and meta_title.get("content"):
-            return meta_title["content"]
+            return str(meta_title["content"])
 
         h1 = soup.find("h1")
         if h1 and h1.text and h1.text != "Your Library":
