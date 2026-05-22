@@ -17,6 +17,16 @@ This command executes `IS_WORKER=1 .venv/bin/alembic upgrade head`.
 
 The application requires several environment variables to be set (typically in a `.env` file).
 
+## Worker Parser Configuration
+
+Worker parser types are configured in `app/configs/workers.py`.
+
+To skip parser types in both light and heavy workers, add them to `ignored_parser_types`:
+
+```python
+ignored_parser_types = ["yt", "rezka:collection"]
+```
+
 ### Database Configuration
 
 `DB_URL` must use an asynchronous driver.
