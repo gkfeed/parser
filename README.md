@@ -11,7 +11,7 @@ To apply database migrations using Alembic, run:
 make migrate
 ```
 
-This command executes `IS_WORKER=1 .venv/bin/alembic upgrade head`.
+This command executes `.venv/bin/alembic upgrade head`.
 
 ## Environment Variables
 

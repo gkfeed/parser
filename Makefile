@@ -9,40 +9,40 @@ merge-to-master:
 
 test:
 ifdef FILE
-	IS_WORKER=1 $(PYTHON) -m pytest $(FILE)
+	$(PYTHON) -m pytest $(FILE)
 else
-	IS_WORKER=1 $(PYTHON) -m pytest
+	$(PYTHON) -m pytest
 endif
 
 dev:
-	IS_WORKER=1 $(PYTHON) -m app.main
+	$(PYTHON) -m app.main
 
 dispatcher:
-	IS_WORKER=1 $(PYTHON) -m app.run.dispatcher
+	$(PYTHON) -m app.run.dispatcher
 
 worker_light: redis
-	IS_WORKER=1 $(PYTHON) -m app.run.worker_light
+	$(PYTHON) -m app.run.worker_light
 
 worker_heavy: redis
-	IS_WORKER=1 $(PYTHON) -m app.run.worker_heavy
+	$(PYTHON) -m app.run.worker_heavy
 
 redis:
 	docker compose up -d redis
 
 debug:
 ifdef FILE
-	IS_WORKER=1 $(PYTHON) -m pytest --pdb $(FILE)
+	$(PYTHON) -m pytest --pdb $(FILE)
 else
-	IS_WORKER=1 $(PYTHON) -m pytest --pdb
+	$(PYTHON) -m pytest --pdb
 endif
 
 .PHONY: merge-to-master test dev debug format migrate makemigrations
 
 migrate:
-	IS_WORKER=1 $(ALEMBIC) upgrade head
+	$(ALEMBIC) upgrade head
 
 makemigrations:
-	IS_WORKER=1 $(ALEMBIC) revision --autogenerate -m "$(MSG)"
+	$(ALEMBIC) revision --autogenerate -m "$(MSG)"
 
 init-dev:
 	uv sync --all-extras

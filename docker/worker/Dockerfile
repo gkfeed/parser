@@ -10,8 +10,6 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.t
 
 
 FROM python:3.12-alpine
-
-ENV IS_WORKER 1
 #ENV PYTHONUNBUFFERED 1
 
 COPY --from=builder /app/wheels /wheels

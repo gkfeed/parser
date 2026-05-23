@@ -31,12 +31,8 @@ cffi==1.17.1 ; implementation_name != 'pypy' and os_name == 'nt'
     # via trio
 charset-normalizer==3.4.2
     # via requests
-click==8.2.1
-    # via rq
 colorama==0.4.6 ; sys_platform == 'win32'
-    # via
-    #   click
-    #   pytest
+    # via pytest
 fakeredis==2.32.1
 frozenlist==1.7.0
     # via
@@ -108,10 +104,7 @@ redis==6.2.0
     # via
     #   fakeredis
     #   parser
-    #   rq
 requests==2.32.4
-    # via parser
-rq==2.4.0
     # via parser
 selenium==4.34.2
     # via parser

@@ -1,11 +1,7 @@
 from typing import Any
 import inspect
 
-from app.configs.env import IS_WORKER
 from app.services.container import Container
-
-if IS_WORKER:
-    import app.configs  # noqa: F401
 
 
 def inject(params: dict[str, Any], call: bool = False):

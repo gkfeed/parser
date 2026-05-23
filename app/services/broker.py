@@ -20,6 +20,7 @@ class BrokerService:
     def __init__(self, broker_url: str):
         self.broker_url = broker_url.rstrip("/")
 
+    # TODO: should have background task and make batch request
     async def put_and_wait_for_result(
         self, func: str, args: Sequence[Any], timeout: int
     ) -> Any:

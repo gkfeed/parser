@@ -80,7 +80,7 @@ class Parser(Enum):
     PORNO365 = ParserConfig("porno365", Porno365Feed, WorkerKind.LIGHT)
 
 
-# NOTE: inconsistant api
+# NOTE: inconsistent api
 PARSERS: dict[str, type[BaseFeed]] = {
     parser.value.id: parser.value.handler for parser in Parser
 }

@@ -1,22 +1,17 @@
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable, TypeVar
 
-from app.configs.env import IS_WORKER
-from app.services.queue import QueueService
+T = TypeVar("T")
 
 
-def worker(func) -> Callable[..., Awaitable]:
+def worker(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     async def wrapper(*args, **kwargs):
-        if IS_WORKER:
-            return await func(*args, **kwargs)
-        return await QueueService.put_and_wait_for_result(func, args)
+        return await func(*args, **kwargs)
 
     return wrapper
 
 
-def worker_sync(func) -> Callable[..., Awaitable]:
+def worker_sync(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
     async def wrapper(*args, **kwargs):
-        if IS_WORKER:
-            return await func(*args, **kwargs)
-        return await QueueService.put_and_wait_for_result_sync(func, args)
+        return await func(*args, **kwargs)
 
     return wrapper
