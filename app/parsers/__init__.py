@@ -1,4 +1,5 @@
-from typing import Type
+from dataclasses import dataclass
+from enum import Enum, StrEnum
 
 from app.extensions.parsers.base import BaseFeed
 from .web import WebFeed
@@ -31,35 +32,55 @@ from .liquidpedia import LiquidpediaFeed
 from .sasflix import SasflixFeed
 
 
-PARSERS: dict[str, Type[BaseFeed]] = {
-    "web": WebFeed,
-    "tiktok": TikTokFeed,
-    "kinogo": KinogoFeed,
-    "twitch": TwitchFeed,
-    "yummyanime": YummyAnimeFeed,
-    "shiki": ShikiFeed,
-    "reddit": RedditFeed,
-    "vk": VkFeed,
-    # "yt": YoutubeFeed,
-    "yt": AlternativeYoutubeFeed,
-    "ranobe.me": RanobeMeFeed,
-    "spoti": SpotifyFeed,
-    "rezka": RezkaFeed,
-    "inst": InstagramFeed,
-    "stories": InstagramStoriesFeed,
-    "insolarance": InsolaranceFeed,
-    "mangalib": MangaLibFeed,
-    "x": XFeed,
-    "spoti:playlist": SpotifyPlaylistFeed,
-    "onefootball": OneFootballFeed,
-    "rtl": RTLSeriesFeed,
-    "rezka:collection": RezkaCollectionFeed,
-    "matreshka": MatreshkaFeed,
-    "shiki:ongoing": ShikiOngoingFeed,
-    "anilibria": AnilibriaFeed,
-    "pornhub": PornHubFeed,
-    "porno365": Porno365Feed,
-    "hltv": HltvFeed,
-    "liquidpedia": LiquidpediaFeed,
-    "sasflix": SasflixFeed,
+class WorkerKind(StrEnum):
+    LIGHT = "light"
+    HEAVY = "heavy"
+
+
+@dataclass(frozen=True)
+class ParserConfig:
+    id: str
+    handler: type[BaseFeed]
+    worker_kind: WorkerKind
+
+
+class Parser(Enum):
+    WEB = ParserConfig("web", WebFeed, WorkerKind.LIGHT)
+    TIKTOK = ParserConfig("tiktok", TikTokFeed, WorkerKind.LIGHT)
+    KINOGO = ParserConfig("kinogo", KinogoFeed, WorkerKind.LIGHT)
+    TWITCH = ParserConfig("twitch", TwitchFeed, WorkerKind.LIGHT)
+    YUMMYANIME = ParserConfig("yummyanime", YummyAnimeFeed, WorkerKind.HEAVY)
+    SHIKI = ParserConfig("shiki", ShikiFeed, WorkerKind.LIGHT)
+    REDDIT = ParserConfig("reddit", RedditFeed, WorkerKind.HEAVY)
+    VK = ParserConfig("vk", VkFeed, WorkerKind.HEAVY)
+    YT = ParserConfig("yt", AlternativeYoutubeFeed, WorkerKind.LIGHT)
+    RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed, WorkerKind.HEAVY)
+    SPOTI = ParserConfig("spoti", SpotifyFeed, WorkerKind.HEAVY)
+    REZKA = ParserConfig("rezka", RezkaFeed, WorkerKind.HEAVY)
+    INST = ParserConfig("inst", InstagramFeed, WorkerKind.HEAVY)
+    STORIES = ParserConfig("stories", InstagramStoriesFeed, WorkerKind.HEAVY)
+    INSOLARANCE = ParserConfig("insolarance", InsolaranceFeed, WorkerKind.HEAVY)
+    MANGALIB = ParserConfig("mangalib", MangaLibFeed, WorkerKind.HEAVY)
+    X = ParserConfig("x", XFeed, WorkerKind.HEAVY)
+    SPOTI_PLAYLIST = ParserConfig(
+        "spoti:playlist", SpotifyPlaylistFeed, WorkerKind.HEAVY
+    )
+    ONEFOOTBALL = ParserConfig("onefootball", OneFootballFeed, WorkerKind.HEAVY)
+    RTL = ParserConfig("rtl", RTLSeriesFeed, WorkerKind.HEAVY)
+    REZKA_COLLECTION = ParserConfig(
+        "rezka:collection", RezkaCollectionFeed, WorkerKind.HEAVY
+    )
+    MATRESHKA = ParserConfig("matreshka", MatreshkaFeed, WorkerKind.HEAVY)
+    SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed, WorkerKind.HEAVY)
+    ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed, WorkerKind.HEAVY)
+    PORNHUB = ParserConfig("pornhub", PornHubFeed, WorkerKind.LIGHT)
+    HLTV = ParserConfig("hltv", HltvFeed, WorkerKind.LIGHT)
+    LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed, WorkerKind.LIGHT)
+    SASFLIX = ParserConfig("sasflix", SasflixFeed, WorkerKind.HEAVY)
+    PORNO365 = ParserConfig("porno365", Porno365Feed, WorkerKind.LIGHT)
+
+
+# NOTE: inconsistant api
+PARSERS: dict[str, type[BaseFeed]] = {
+    parser.value.id: parser.value.handler for parser in Parser
 }
