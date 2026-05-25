@@ -11,10 +11,8 @@ from app.services.selenium.schemas import SeleniumGetHtmlArgs
 
 import app.configs  # noqa: F401
 from app.utils.inject import inject
-from . import worker_sync
 
 
-@worker_sync
 async def get_html(args: SeleniumGetHtmlArgs) -> str:
     return await _get_html(**asdict(args))
 

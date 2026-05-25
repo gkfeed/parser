@@ -2,7 +2,6 @@ from abc import ABC
 from bs4 import BeautifulSoup
 from datetime import timedelta
 
-from app.workers import worker
 from app.services.http import HttpService, HttpRequestError
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
@@ -12,7 +11,6 @@ from .exceptions import UnavailableFeed
 from .base import BaseFeed as _BaseFeed
 
 
-@worker
 async def http_get_in_queue(url: str, headers: dict) -> bytes:
     return await HttpService.get(url, headers=headers)
 
@@ -21,6 +19,7 @@ async def http_get_in_queue(url: str, headers: dict) -> bytes:
 class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
     _http_response_storage_time = timedelta(minutes=5)
     _headers = HttpService.headers
+    # NOTE: deprecated use heavy worker instead
     _http_run_in_queue = False
 
     def __init_subclass__(cls, **kwargs):

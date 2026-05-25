@@ -2,10 +2,7 @@ import hashlib
 
 import requests
 
-from . import worker
 
-
-@worker
 async def hash_video_from_url(
     url: str, algorithm: str = "sha256", chunk_size: int = 8192
 ) -> str:

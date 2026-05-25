@@ -1,9 +1,6 @@
 import yt_dlp
 
-from . import worker
 
-
-@worker
 async def extract_info(url: str, opts: dict, keys: list[str] | None = None) -> dict:
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
