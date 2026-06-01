@@ -73,7 +73,7 @@ class Parser(Enum):
     MATRESHKA = ParserConfig("matreshka", MatreshkaFeed, WorkerKind.HEAVY)
     SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed, WorkerKind.HEAVY)
     ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed, WorkerKind.HEAVY)
-    PORNHUB = ParserConfig("pornhub", PornHubFeed, WorkerKind.LIGHT)
+    PORNHUB = ParserConfig("pornhub", PornHubFeed, WorkerKind.HEAVY)
     HLTV = ParserConfig("hltv", HltvFeed, WorkerKind.LIGHT)
     LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed, WorkerKind.LIGHT)
     SASFLIX = ParserConfig("sasflix", SasflixFeed, WorkerKind.HEAVY)
