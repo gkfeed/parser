@@ -2,10 +2,11 @@ import asyncio
 
 from app.core.dispatcher import Dispatcher
 from app.configs.env import BROKER_URL
+from app.services.broker import BrokerService
 
 
 async def dispatch_broker():
-    dispatcher = Dispatcher(BROKER_URL)
+    dispatcher = Dispatcher(broker=BrokerService(BROKER_URL))
     while 1:
         print("Starting dispatch cycle...")
         await dispatcher.dispatch()

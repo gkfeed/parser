@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone, timedelta
+from collections.abc import Mapping
 
 from pydantic import TypeAdapter
 
@@ -8,12 +9,22 @@ from app.serializers.feed import Item, Feed
 from app.services.repositories.feed_parser import FeedParserRepository
 from app.services.repositories.item_hash import ItemsHashRepository
 from app.parsers import PARSERS
+from app.extensions.parsers.base import BaseFeed
 from .storage import ItemsStorage, FeedStorage
 
 
 class Dispatcher(ItemsStorage, FeedStorage):
-    def __init__(self, broker_url: str):
-        self.broker = BrokerService(broker_url)
+    def __init__(
+        self,
+        broker: BrokerService,
+        feed_parser_repository: type[FeedParserRepository] = FeedParserRepository,
+        item_hash_repository: type[ItemsHashRepository] = ItemsHashRepository,
+        parsers: Mapping[str, type[BaseFeed]] = PARSERS,
+    ):
+        self.broker = broker
+        self.feed_parser_repository = feed_parser_repository
+        self.item_hash_repository = item_hash_repository
+        self.parsers = parsers
 
     async def dispatch(self):
         feeds = await self._get_all_feeds()
@@ -26,7 +37,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
                 await asyncio.sleep(1)
 
     async def _should_process_feed(self, feed: Feed) -> bool:
-        feed_parser = await FeedParserRepository.get_by_feed_id(feed.id)
+        feed_parser = await self.feed_parser_repository.get_by_feed_id(feed.id)
         if not feed_parser:
             return True
 
@@ -37,7 +48,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         return valid_for < datetime.now(timezone.utc)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
-        parser_cls = PARSERS.get(feed.type)
+        parser_cls = self.parsers.get(feed.type)
         if not parser_cls:
             return
 
@@ -53,7 +64,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
         new_valid_for = datetime.now(timezone.utc) + delta
-        await FeedParserRepository.upsert(feed.id, new_valid_for)
+        await self.feed_parser_repository.upsert(feed.id, new_valid_for)
 
     async def _request_items_from_broker(self, feed: Feed) -> list[Item]:
         try:
@@ -73,8 +84,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         items = await self._filter_seen_items(feed.id, items)
         return items
 
-    @staticmethod
-    async def _filter_seen_items(feed_id: int, items: list[Item]) -> list[Item]:
+    async def _filter_seen_items(self, feed_id: int, items: list[Item]) -> list[Item]:
         filtered_items = []
         for item in items:
             if not item.hash:
@@ -82,9 +92,9 @@ class Dispatcher(ItemsStorage, FeedStorage):
                 filtered_items.append(item)
                 continue
 
-            if await ItemsHashRepository.contains(item.hash, feed_id):
+            if await self.item_hash_repository.contains(item.hash, feed_id):
                 continue
 
-            await ItemsHashRepository.save(item.hash, feed_id)
+            await self.item_hash_repository.save(item.hash, feed_id)
             filtered_items.append(item)
         return filtered_items
