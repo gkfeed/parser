@@ -22,6 +22,7 @@ class PornHubFeed(PostToItemsMixin, SeleniumParserExtension):
             "claimedRecentVideoSection",
             "uploadedVideosSection",
             "mostRecentVideosSection",
+            "pornstarsVideoSection",
         ]:
             container = soup.find("ul", id=section_id)
             if not isinstance(container, Tag):
@@ -67,7 +68,7 @@ class PornHubFeed(PostToItemsMixin, SeleniumParserExtension):
     def _get_posts_url(self) -> str:
         url = self.feed.url.rstrip("/")
         path = urlparse(url).path
-        if path.startswith(("/channels/", "/model/", "/pornstar/")):
+        if path.startswith(("/channels/", "/model/")):
             return f"{url}/videos"
         return self.feed.url
 
