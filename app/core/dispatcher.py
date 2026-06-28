@@ -58,6 +58,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
+            items = await self._filter_seen_items(feed.id, items)
             await self._save_items(feed, items)
             print(f"Saved {len(items)} items for feed: {feed.url}")
         else:
@@ -81,7 +82,6 @@ class Dispatcher(ItemsStorage, FeedStorage):
         adapter = TypeAdapter(list[Item])
         items = adapter.validate_json(items_json)
 
-        items = await self._filter_seen_items(feed.id, items)
         return items
 
     async def _filter_seen_items(self, feed_id: int, items: list[Item]) -> list[Item]:
