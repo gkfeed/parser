@@ -23,6 +23,7 @@ class PornHubFeed(PostToItemsMixin, SeleniumParserExtension):
             "uploadedVideosSection",
             "mostRecentVideosSection",
             "pornstarsVideoSection",
+            "showAllChanelVideos",
         ]:
             container = soup.find("ul", id=section_id)
             if not isinstance(container, Tag):
