@@ -1,10 +1,6 @@
-from asyncio import TaskGroup
-
-from typing import AsyncGenerator, cast
-
 from app.core.worker_kind import WorkerKind
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import constant_datetime
 from app.serializers.feed import Item
 from app.services.ytdlp import (
     BaseExtractionMode,
@@ -29,45 +25,7 @@ class _BaseYoutubeFeed(BaseFeed):
         return target_url
 
 
-class YoutubeFeed(_BaseYoutubeFeed):
-    @property
-    async def items(self) -> list[Item]:
-        tasks = []
-        async with TaskGroup() as tg:
-            async for v in self._video_urls:
-                tasks.append(tg.create_task(self._create_video_item(v)))
-
-        return [cast(Item, task.result()) for task in tasks if task.result()]
-
-    async def _create_video_item(self, video_url: str) -> Item | None:
-        try:
-            (
-                title,
-                date_str,
-                channel_name,
-            ) = await YtdlpInfoExtractor.extract_video_info(video_url)
-            item = Item(
-                title="YT: " + channel_name,
-                text=title,
-                date=convert_datetime(date_str),
-                link=video_url,
-            )
-            return item
-        except (TypeError, ValueError):
-            return None
-
-    @property
-    async def _video_urls(self) -> AsyncGenerator[str, str]:
-        videos_url = self._get_target_url()
-        extraction_mode = self._choose_extraction_mode(videos_url)
-        max_videos = 5  # FIXME: feed options
-        for url in await YtdlpInfoExtractor.extract_video_urls(
-            videos_url, extraction_mode, max_videos
-        ):
-            yield url
-
-
-class AlternativeYoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
+class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
     worker_kind = WorkerKind.LIGHT
 
     @property

@@ -11,7 +11,7 @@ from .yummyanime import YummyAnimeFeed
 from .shiki import ShikiFeed
 from .reddit import RedditFeed
 from .vk import VkFeed
-from .youtube import AlternativeYoutubeFeed
+from .youtube import YoutubeFeed
 from .ranobeme import RanobeMeFeed
 from .spoti import SpotifyFeed, SpotifyPlaylistFeed
 from .rezka import RezkaFeed
@@ -52,7 +52,7 @@ class Parser(Enum):
     SHIKI = ParserConfig("shiki", ShikiFeed)
     REDDIT = ParserConfig("reddit", RedditFeed)
     VK = ParserConfig("vk", VkFeed)
-    YT = ParserConfig("yt", AlternativeYoutubeFeed)
+    YT = ParserConfig("yt", YoutubeFeed)
     RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed)
     SPOTI = ParserConfig("spoti", SpotifyFeed)
     REZKA = ParserConfig("rezka", RezkaFeed)
