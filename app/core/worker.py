@@ -20,7 +20,7 @@ async def run_worker(type: str):
 
     feed = Feed.model_validate_json(task.args[0])
     parser = PARSERS.get(feed.type)
-    print(f"{type}: {feed.url}")
+    print(f"{datetime.now().strftime('%H:%M')} {type}: {feed.url}")
 
     if not parser:
         raise ValueError(f"No parser found for feed type: {feed.type}")
