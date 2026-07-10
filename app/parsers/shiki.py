@@ -3,6 +3,7 @@ from typing import override
 
 from bs4.element import Tag
 
+from app.core.worker_kind import WorkerKind
 from app.utils.datetime import convert_datetime
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -10,6 +11,7 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+    worker_kind = WorkerKind.LIGHT
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 

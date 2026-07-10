@@ -1,5 +1,6 @@
 from typing import override
 
+from app.core.worker_kind import WorkerKind
 from app.utils.datetime import convert_datetime
 from app.serializers.feed import Item
 from app.services.hash import HashService
@@ -9,6 +10,8 @@ from app.extensions.parsers.hash import ItemsHashExtension
 
 
 class WebFeed(ItemsHashExtension, HttpParserExtension):
+    worker_kind = WorkerKind.LIGHT
+
     @override
     async def _generate_hash(self, item: Item) -> str:
         if item.guid:

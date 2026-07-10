@@ -3,12 +3,14 @@ from abc import ABC
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
+from app.core.worker_kind import WorkerKind
 from app.services.cache.use_temporary import async_store_in_cache_for
 from app.services.selenium import SeleniumService, SeleniumGetHtmlArgs
 from .http import HttpParserExtension
 
 
 class SeleniumParserExtension(HttpParserExtension, ABC):
+    worker_kind = WorkerKind.HEAVY
     _http_response_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
     _should_delete_cookies = False
@@ -17,8 +19,6 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        # @async_store_in_cache_for(_http_response_storage_time)
-        # async def get_html(self, url: str) -> bytes:
         cls.get_html = async_store_in_cache_for(cls._http_response_storage_time)(
             cls.get_html
         )

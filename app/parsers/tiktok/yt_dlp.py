@@ -2,13 +2,15 @@ from datetime import datetime
 
 from app.utils.datetime import convert_datetime
 
+from app.core.worker_kind import WorkerKind
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.services.ytdlp.modes import BaseExtractionMode
 from ._base import BaseTikTokFeed
 
 
 class TikTokFeed(BaseTikTokFeed):
-    _max_videos = 5
+    worker_kind = WorkerKind.LIGHT
+    _max_videos = 10
 
     @property
     async def _video_links(self) -> list[str]:

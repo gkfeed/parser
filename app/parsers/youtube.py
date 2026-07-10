@@ -2,6 +2,7 @@ from asyncio import TaskGroup
 
 from typing import AsyncGenerator, cast
 
+from app.core.worker_kind import WorkerKind
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.utils.datetime import constant_datetime, convert_datetime
 from app.serializers.feed import Item
@@ -67,6 +68,8 @@ class YoutubeFeed(_BaseYoutubeFeed):
 
 
 class AlternativeYoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
+    worker_kind = WorkerKind.LIGHT
+
     @property
     async def items(self) -> list[Item]:
         videos_url = self._get_target_url()

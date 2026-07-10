@@ -1,7 +1,10 @@
-from app.parsers import Parser, WorkerKind
+from app.core.worker_kind import WorkerKind
+from app.parsers import Parser
 
 
-ignored_parser_types: set[Parser] = set()
+ignored_parser_types: set[Parser] = {
+    Parser.X,
+}
 
 
 def _filter_by_worker_type(worker_kind: WorkerKind, ignore: set[Parser]) -> list[str]:

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from enum import Enum, StrEnum
+from enum import Enum
 
+from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
 from .web import WebFeed
 from .tiktok import TikTokFeed
@@ -32,52 +33,46 @@ from .liquidpedia import LiquidpediaFeed
 from .sasflix import SasflixFeed
 
 
-class WorkerKind(StrEnum):
-    LIGHT = "light"
-    HEAVY = "heavy"
-
-
 @dataclass(frozen=True)
 class ParserConfig:
     id: str
     handler: type[BaseFeed]
-    worker_kind: WorkerKind
+
+    @property
+    def worker_kind(self) -> WorkerKind:
+        return self.handler.worker_kind
 
 
 class Parser(Enum):
-    WEB = ParserConfig("web", WebFeed, WorkerKind.LIGHT)
-    TIKTOK = ParserConfig("tiktok", TikTokFeed, WorkerKind.LIGHT)
-    KINOGO = ParserConfig("kinogo", KinogoFeed, WorkerKind.LIGHT)
-    TWITCH = ParserConfig("twitch", TwitchFeed, WorkerKind.LIGHT)
-    YUMMYANIME = ParserConfig("yummyanime", YummyAnimeFeed, WorkerKind.HEAVY)
-    SHIKI = ParserConfig("shiki", ShikiFeed, WorkerKind.LIGHT)
-    REDDIT = ParserConfig("reddit", RedditFeed, WorkerKind.HEAVY)
-    VK = ParserConfig("vk", VkFeed, WorkerKind.HEAVY)
-    YT = ParserConfig("yt", AlternativeYoutubeFeed, WorkerKind.LIGHT)
-    RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed, WorkerKind.HEAVY)
-    SPOTI = ParserConfig("spoti", SpotifyFeed, WorkerKind.HEAVY)
-    REZKA = ParserConfig("rezka", RezkaFeed, WorkerKind.HEAVY)
-    INST = ParserConfig("inst", InstagramFeed, WorkerKind.HEAVY)
-    STORIES = ParserConfig("stories", InstagramStoriesFeed, WorkerKind.HEAVY)
-    INSOLARANCE = ParserConfig("insolarance", InsolaranceFeed, WorkerKind.HEAVY)
-    MANGALIB = ParserConfig("mangalib", MangaLibFeed, WorkerKind.HEAVY)
-    X = ParserConfig("x", XFeed, WorkerKind.HEAVY)
-    SPOTI_PLAYLIST = ParserConfig(
-        "spoti:playlist", SpotifyPlaylistFeed, WorkerKind.HEAVY
-    )
-    ONEFOOTBALL = ParserConfig("onefootball", OneFootballFeed, WorkerKind.HEAVY)
-    RTL = ParserConfig("rtl", RTLSeriesFeed, WorkerKind.HEAVY)
-    REZKA_COLLECTION = ParserConfig(
-        "rezka:collection", RezkaCollectionFeed, WorkerKind.HEAVY
-    )
-    MATRESHKA = ParserConfig("matreshka", MatreshkaFeed, WorkerKind.HEAVY)
-    SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed, WorkerKind.HEAVY)
-    ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed, WorkerKind.HEAVY)
-    PORNHUB = ParserConfig("pornhub", PornHubFeed, WorkerKind.HEAVY)
-    HLTV = ParserConfig("hltv", HltvFeed, WorkerKind.LIGHT)
-    LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed, WorkerKind.LIGHT)
-    SASFLIX = ParserConfig("sasflix", SasflixFeed, WorkerKind.HEAVY)
-    PORNO365 = ParserConfig("porno365", Porno365Feed, WorkerKind.LIGHT)
+    WEB = ParserConfig("web", WebFeed)
+    TIKTOK = ParserConfig("tiktok", TikTokFeed)
+    KINOGO = ParserConfig("kinogo", KinogoFeed)
+    TWITCH = ParserConfig("twitch", TwitchFeed)
+    YUMMYANIME = ParserConfig("yummyanime", YummyAnimeFeed)
+    SHIKI = ParserConfig("shiki", ShikiFeed)
+    REDDIT = ParserConfig("reddit", RedditFeed)
+    VK = ParserConfig("vk", VkFeed)
+    YT = ParserConfig("yt", AlternativeYoutubeFeed)
+    RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed)
+    SPOTI = ParserConfig("spoti", SpotifyFeed)
+    REZKA = ParserConfig("rezka", RezkaFeed)
+    INST = ParserConfig("inst", InstagramFeed)
+    STORIES = ParserConfig("stories", InstagramStoriesFeed)
+    INSOLARANCE = ParserConfig("insolarance", InsolaranceFeed)
+    MANGALIB = ParserConfig("mangalib", MangaLibFeed)
+    X = ParserConfig("x", XFeed)
+    SPOTI_PLAYLIST = ParserConfig("spoti:playlist", SpotifyPlaylistFeed)
+    ONEFOOTBALL = ParserConfig("onefootball", OneFootballFeed)
+    RTL = ParserConfig("rtl", RTLSeriesFeed)
+    REZKA_COLLECTION = ParserConfig("rezka:collection", RezkaCollectionFeed)
+    MATRESHKA = ParserConfig("matreshka", MatreshkaFeed)
+    SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed)
+    ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed)
+    PORNHUB = ParserConfig("pornhub", PornHubFeed)
+    HLTV = ParserConfig("hltv", HltvFeed)
+    LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed)
+    SASFLIX = ParserConfig("sasflix", SasflixFeed)
+    PORNO365 = ParserConfig("porno365", Porno365Feed)
 
 
 # NOTE: inconsistent api

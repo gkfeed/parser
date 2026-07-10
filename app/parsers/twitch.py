@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from app.core.worker_kind import WorkerKind
 from app.serializers.feed import Item
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
@@ -8,6 +9,7 @@ from app.extensions.parsers.cache import CacheFeedExtension
 
 
 class TwitchFeed(CacheFeedExtension, _BaseFeed):
+    worker_kind = WorkerKind.LIGHT
     _cache_storage_time_if_success = timedelta(hours=1)
 
     @property
