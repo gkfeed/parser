@@ -7,6 +7,8 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):
+    _selenium_wait_time = 5
+
     @property
     @override
     async def _posts(self) -> list[Tag]:

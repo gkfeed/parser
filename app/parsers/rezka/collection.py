@@ -7,6 +7,7 @@ from app.extensions.parsers.selenium import SeleniumParserExtension
 class RezkaCollectionFeed(SeleniumParserExtension):
     _base_url = "https://hdrezka.me"
     _max_items = 5
+    _selenium_wait_time = 5
 
     @property
     async def items(self) -> list[Item]:
