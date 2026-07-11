@@ -32,6 +32,8 @@ class FakeDispatcher(MockedItemsStorage, FeedParsingContext):
 @pytest.fixture
 async def fetch_items(request):
     feed_data = getattr(request, "param", {})
+    if callable(feed_data):
+        feed_data = feed_data()
     if feed_data:
         dp = FakeDispatcher()
         dp.register_parser(feed_data["type"], feed_data["parser"])

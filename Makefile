@@ -9,9 +9,16 @@ merge-to-master:
 
 test:
 ifdef FILE
-	$(PYTHON) -m pytest $(FILE)
+	$(PYTHON) -m pytest -m "not integration" $(FILE)
 else
-	$(PYTHON) -m pytest
+	$(PYTHON) -m pytest -m "not integration"
+endif
+
+test-integration:
+ifdef FILE
+	$(PYTHON) -m pytest -m integration $(FILE)
+else
+	$(PYTHON) -m pytest -m integration
 endif
 
 dev:
@@ -36,7 +43,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test dev debug format migrate makemigrations
+.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations
 
 migrate:
 	$(ALEMBIC) upgrade head

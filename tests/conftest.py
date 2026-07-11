@@ -10,6 +10,12 @@ from app.services.cache.storage._base import BaseStorage
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env.test"), override=True)
 
 
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if "fetch_items" in item.fixturenames:
+            item.add_marker(pytest.mark.integration)
+
+
 class MockStorage(BaseStorage):
     def __init__(self):
         self.data = {}
