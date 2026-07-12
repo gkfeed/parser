@@ -116,20 +116,13 @@ async def test_request_items_from_broker_success(dispatcher):
     ]
     items_json = f"[{items[0].model_dump_json()}]"
 
-    with (
-        patch.object(
-            dispatcher, "_filter_seen_items", new_callable=AsyncMock
-        ) as mock_filter,
-    ):
-        dispatcher.broker.put_and_wait_for_result.return_value = items_json
-        mock_filter.return_value = items
+    dispatcher.broker.put_and_wait_for_result.return_value = items_json
 
-        result = await dispatcher._request_items_from_broker(feed)
+    result = await dispatcher._request_items_from_broker(feed)
 
-        assert len(result) == 1
-        assert result[0].title == "Item 1"
-        dispatcher.broker.put_and_wait_for_result.assert_called_once()
-        mock_filter.assert_called_once()
+    assert len(result) == 1
+    assert result[0].title == "Item 1"
+    dispatcher.broker.put_and_wait_for_result.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -175,12 +168,17 @@ async def test_fetch_feed_items_success(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
+        patch.object(
+            dispatcher, "_filter_seen_items", new_callable=AsyncMock
+        ) as mock_filter,
         patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
     ):
         mock_request.return_value = items
+        mock_filter.return_value = items
 
         await dispatcher._fetch_feed_items(feed)
 
+        mock_filter.assert_awaited_once_with(feed.id, items)
         mock_save.assert_called_once_with(feed, items)
         dispatcher.feed_parser_repository.upsert.assert_called_once()
         # Verify that the expiration date is roughly current time + 2 hours

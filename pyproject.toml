@@ -39,6 +39,9 @@ venv = ".venv"
 [tool.mypy]
 ignore_missing_imports = true
 
+[tool.typos.default.extend-identifiers]
+showAllChanelVideos = "showAllChanelVideos"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
