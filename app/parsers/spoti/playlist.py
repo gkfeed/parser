@@ -12,10 +12,6 @@ class SpotifyPlaylistFeed(SeleniumParserExtension):
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         first_track = self._get_first_track_element(soup)
-
-        if not first_track:
-            raise ValueError("Could not find the first track element.")
-
         anchor_tag = self._get_track_anchor_tag(first_track)
         first_track_name = self._get_track_name(anchor_tag)
         first_track_artist = self._get_track_artist(anchor_tag)
@@ -31,63 +27,59 @@ class SpotifyPlaylistFeed(SeleniumParserExtension):
         ]
 
     def _get_first_track_element(self, soup: Tag) -> Tag:
-        img_tags = soup.find_all("img")
-        if len(img_tags) < 2:
-            raise ValueError("Could not find the image tags.")
+        track_anchor = soup.find(
+            "a",
+            href=lambda href: isinstance(href, str) and href.startswith("/track/"),
+        )
+        if not isinstance(track_anchor, Tag):
+            raise ValueError("Could not find the first track element.")
 
-        track_tag = img_tags[1].parent
-        if not track_tag or not track_tag.get("class"):
-            if len(img_tags) < 3:
-                raise ValueError("Could not find the track tag.")
-            track_tag = img_tags[2].parent
+        track_element = track_anchor.parent
+        while isinstance(track_element, Tag):
+            artist_anchor = track_element.find(
+                "a",
+                href=lambda href: isinstance(href, str)
+                and href.startswith("/artist/"),
+            )
+            if isinstance(artist_anchor, Tag):
+                return track_element
+            track_element = track_element.parent
 
-        if not isinstance(track_tag, Tag):
-            raise ValueError("Track tag is not a Tag.")
-
-        parent = track_tag.parent
-        if not isinstance(parent, Tag):
-            raise ValueError("Parent is not a Tag.")
-
-        grandparent = parent.parent
-        if not isinstance(grandparent, Tag):
-            raise ValueError("Grandparent is not a Tag.")
-
-        return grandparent
+        raise ValueError("Could not find the first track artist.")
 
     def _get_track_anchor_tag(self, first_track: Tag) -> Tag:
-        a_tags = first_track.find_all("a")
-        if not a_tags:
-            raise ValueError("Could not find the anchor tag for the track.")
-        anchor_tag = a_tags[0]
+        anchor_tag = first_track.find(
+            "a",
+            href=lambda href: isinstance(href, str) and href.startswith("/track/"),
+        )
         if not isinstance(anchor_tag, Tag):
-            raise ValueError("Found element is not a Tag.")
+            raise ValueError("Could not find the anchor tag for the track.")
         return anchor_tag
 
     def _get_track_name(self, anchor_tag: Tag) -> str:
-        div_tag = anchor_tag.find("div")
-        if not div_tag:
-            raise ValueError("Could not find the div tag for the track name.")
-        if not isinstance(div_tag, Tag):
-            raise ValueError("Found element is not a Tag.")
-        return div_tag.text
+        track_name = anchor_tag.get_text(strip=True)
+        if not track_name:
+            raise ValueError("Could not find the track name.")
+        return track_name
 
     def _get_track_artist(self, anchor_tag: Tag) -> str:
-        if not (anchor_tag.parent and isinstance(anchor_tag.parent, Tag)):
-            raise ValueError("Could not find the parent of the anchor tag.")
+        track_element = anchor_tag.parent
+        while isinstance(track_element, Tag):
+            artist_tags = track_element.find_all(
+                "a",
+                href=lambda href: isinstance(href, str)
+                and href.startswith("/artist/"),
+            )
+            artist_names = [tag.get_text(strip=True) for tag in artist_tags]
+            artist_names = [name for name in artist_names if name]
+            if artist_names:
+                return ", ".join(artist_names)
+            track_element = track_element.parent
 
-        span_tags = anchor_tag.parent.find_all("span")
-        if not span_tags:
-            raise ValueError("Could not find the span tag for the artist.")
-
-        last_span_tag = span_tags[-1]
-        if not isinstance(last_span_tag, Tag):
-            raise ValueError("Found element is not a Tag.")
-        artist_a_tag = last_span_tag.find("a")
-        if not (artist_a_tag and isinstance(artist_a_tag, Tag)):
-            raise ValueError("Could not find the artist anchor tag.")
-        return artist_a_tag.text
+        raise ValueError("Could not find the artist anchor tag.")
 
     def _get_track_id(self, anchor_tag: Tag) -> str:
-        if not ("href" in anchor_tag.attrs and isinstance(anchor_tag["href"], str)):
+        href = anchor_tag.get("href")
+        if not isinstance(href, str) or not href.startswith("/track/"):
             raise ValueError("Could not find the href attribute for the track ID.")
-        return str(anchor_tag["href"]).split("/")[-1]
+        return href.removeprefix("/track/").split("?", maxsplit=1)[0].rstrip("/")

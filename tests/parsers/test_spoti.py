@@ -1,5 +1,8 @@
 import pytest
+from bs4 import BeautifulSoup
+
 from app.parsers.spoti import SpotifyFeed, SpotifyPlaylistFeed
+from app.serializers.feed import Feed
 from . import fetch_items  # noqa
 
 SPOTIFY_FEED_DATA = [
@@ -37,3 +40,43 @@ async def test_spoti_feed(fetch_items):  # noqa: F811
 @pytest.mark.parametrize("fetch_items", SPOTIFY_PLAYLIST_FEED_DATA, indirect=True)
 async def test_spoti_playlist_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0
+
+
+def test_spoti_playlist_extracts_first_track_by_link():
+    soup = BeautifulSoup(
+        """
+        <main>
+          <img src="playlist-cover.jpg">
+          <img src="playlist-owner.jpg">
+          <div class="track-row">
+            <img src="track-cover.jpg">
+            <div><a href="/track/track-id?si=abc"><div>Track name</div></a></div>
+            <span>
+              <a href="/artist/first-artist">First artist</a>
+              <a href="/artist/second-artist">Second artist</a>
+            </span>
+          </div>
+        </main>
+        """,
+        "html.parser",
+    )
+    parser = SpotifyPlaylistFeed(
+        Feed(id=1, title="Playlist", url="https://example.com", type="spoti"), {}
+    )
+
+    track = parser._get_first_track_element(soup)
+    anchor = parser._get_track_anchor_tag(track)
+
+    assert parser._get_track_name(anchor) == "Track name"
+    assert parser._get_track_artist(anchor) == "First artist, Second artist"
+    assert parser._get_track_id(anchor) == "track-id"
+
+
+def test_spoti_playlist_requires_track_link():
+    soup = BeautifulSoup('<a href="/artist/artist-id">Artist</a>', "html.parser")
+    parser = SpotifyPlaylistFeed(
+        Feed(id=1, title="Playlist", url="https://example.com", type="spoti"), {}
+    )
+
+    with pytest.raises(ValueError, match="first track"):
+        parser._get_first_track_element(soup)
