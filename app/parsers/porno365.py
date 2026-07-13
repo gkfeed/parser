@@ -1,5 +1,5 @@
 from typing import override
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import Tag
 
@@ -11,6 +11,9 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+    _canonical_scheme = "http"
+    _canonical_host = "porno365.broker"
+
     @override
     async def _generate_hash(self, item: Item) -> str:
         return HashService.hash_str(item.link)
@@ -47,5 +50,14 @@ class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     async def _get_post_link(self, post: Tag) -> str:
         link = post.find("a", class_="image")
         if isinstance(link, Tag) and "href" in link.attrs:
-            return urljoin(self.feed.url, str(link["href"]))
+            parsed_link = urlsplit(urljoin(self.feed.url, str(link["href"])))
+            return urlunsplit(
+                (
+                    self._canonical_scheme,
+                    self._canonical_host,
+                    parsed_link.path,
+                    parsed_link.query,
+                    parsed_link.fragment,
+                )
+            )
         raise ValueError("No link found in post")
