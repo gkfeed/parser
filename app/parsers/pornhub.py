@@ -43,7 +43,9 @@ class PornHubFeed(PostToItemsMixin, SeleniumParserExtension):
                 if "href" not in p.attrs:
                     continue
 
-                if not p.img or "title" not in p.img.attrs:
+                try:
+                    await self._get_post_title(p)
+                except ValueError:
                     continue
 
                 link = await self._get_post_link(p)
@@ -56,8 +58,12 @@ class PornHubFeed(PostToItemsMixin, SeleniumParserExtension):
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        if post.img and "title" in post.img.attrs:
-            return str(post.img["title"])
+        image = post.find("img")
+        if isinstance(image, Tag):
+            for attribute in ("title", "data-title", "alt"):
+                title = image.attrs.get(attribute)
+                if title and str(title).strip():
+                    return str(title).strip()
         raise ValueError("No title found in post")
 
     @override
