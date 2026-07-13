@@ -1,87 +1,110 @@
-from bs4 import Tag
+import json
+from collections.abc import Mapping
 from datetime import timedelta
-from urllib.parse import urljoin
-from typing import override
+from typing import Any, override
+from urllib.parse import quote, urljoin, urlsplit
 
-from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.extensions.parsers.http import HttpParserExtension
+from app.serializers.feed import Item
+from app.utils.datetime import constant_datetime
 
 
-class AnilibriaFeed(PostToItemsMixin, SeleniumParserExtension, CacheFeedExtension):
+class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time_if_success = timedelta(days=1)
     _cache_storage_time = timedelta(seconds=5)
-    _selenium_wait_time = 5
+    _api_base_url = "https://aniliberty.top/api/v1/"
+    _cdn_base_url = "https://cdn.anilibria.top/"
 
     @property
     @override
-    async def _posts(self) -> list[Tag]:
-        soup = await self.get_soup(self.feed.url)
-        alias = self._get_alias_from_url()
-        episodes_container = self._find_episodes_container(soup, alias)
+    async def items(self) -> list[Item]:
+        release = self._parse_release(
+            await self.get_html(
+                urljoin(
+                    self._api_base_url,
+                    f"anime/releases/{quote(self._get_alias_from_url(), safe='')}",
+                )
+            )
+        )
+        show_title = self._required_string(release, "name", "main")
+        episodes = release.get("episodes")
+        if not isinstance(episodes, list):
+            raise ValueError("Could not extract episodes from AniLibria API response")
+
         return [
-            a
-            for a in episodes_container.find_all("a", class_="v-card")
-            if isinstance(a, Tag)
+            self._episode_to_item(show_title, episode)
+            for episode in reversed(episodes)
+            if isinstance(episode, Mapping)
         ]
 
-    @override
-    async def _get_post_title(self, post: Tag) -> str:
-        soup = await self.get_soup(self.feed.url)
-        show_title = self._extract_title(soup)
-        episode_text = self._extract_episode_text(post)
-        return f"{show_title} {episode_text}"
+    def _episode_to_item(
+        self, show_title: str, episode: Mapping[str, Any]
+    ) -> Item:
+        episode_id = self._required_string(episode, "id")
+        ordinal = episode.get("ordinal")
+        if not isinstance(ordinal, int):
+            raise ValueError("Could not extract episode ordinal")
 
-    @override
-    async def _get_post_text(self, post: Tag) -> str:
-        episode_text = self._extract_episode_text(post)
-        episode_image_url = self._extract_episode_image_url(post)
-        image_url = urljoin("https://anilibria.top", episode_image_url)
-        return f'<img src="{image_url}" alt="episode"><br>{episode_text}'
+        episode_text = f"{ordinal} эпизод"
+        episode_name = episode.get("name")
+        if isinstance(episode_name, str) and episode_name:
+            episode_text += f" — {episode_name}"
 
-    @override
-    async def _get_post_link(self, post: Tag) -> str:
-        episode_link = self._extract_episode_link(post)
-        return urljoin("https://anilibria.top", episode_link)
+        image_url = self._episode_image_url(episode)
+        site_base_url = self._site_base_url()
+        return Item(
+            title=f"{show_title} {episode_text}",
+            text=f'<img src="{image_url}" alt="episode"><br>{episode_text}',
+            date=constant_datetime,
+            link=urljoin(site_base_url, f"anime/video/episode/{episode_id}"),
+        )
 
     def _get_alias_from_url(self) -> str:
-        return self.feed.url.strip("/").split("/")[-2]
+        parts = [part for part in urlsplit(self.feed.url).path.split("/") if part]
+        try:
+            release_index = parts.index("release")
+            alias = parts[release_index + 1]
+        except (ValueError, IndexError):
+            raise ValueError(f"Could not extract release alias from URL: {self.feed.url}")
 
-    def _extract_title(self, soup: Tag) -> str:
-        title_tag = soup.find("div", class_="text-autosize")
-        if not (title_tag and isinstance(title_tag, Tag)):
-            raise ValueError(
-                "Could not extract title: <div class='text-autosize'> not found or not a Tag instance."
-            )
-        return title_tag.text.strip()
+        if not alias:
+            raise ValueError(f"Could not extract release alias from URL: {self.feed.url}")
+        return alias
 
-    def _find_episodes_container(self, soup: Tag, alias: str) -> Tag:
-        episodes_container = soup.find("div", attrs={"alias": alias})
-        if not (episodes_container and isinstance(episodes_container, Tag)):
-            raise ValueError("Could not find episodes container.")
-        return episodes_container
+    def _site_base_url(self) -> str:
+        parsed_url = urlsplit(self.feed.url)
+        return f"{parsed_url.scheme}://{parsed_url.netloc}/"
 
-    def _extract_episode_text(self, episode_tag: Tag) -> str:
-        episode_text_tag = episode_tag.find(
-            "div", class_="fz-80 ff-heading font-weight-bold"
-        )
-        if not (episode_text_tag and isinstance(episode_text_tag, Tag)):
-            raise ValueError("Could not extract episode text")
+    def _episode_image_url(self, episode: Mapping[str, Any]) -> str:
+        preview = episode.get("preview")
+        if not isinstance(preview, Mapping):
+            raise ValueError("Could not extract episode image URL")
 
-        return episode_text_tag.text.strip()
+        image_path = preview.get("src")
+        if not isinstance(image_path, str) or not image_path:
+            raise ValueError("Could not extract episode image URL")
+        return urljoin(self._cdn_base_url, image_path)
 
-    def _extract_episode_link(self, episode_tag: Tag) -> str:
-        if not (
-            episode_tag
-            and isinstance(episode_tag, Tag)
-            and "href" in episode_tag.attrs
-        ):
-            raise ValueError("Could not extract episode link")
+    @staticmethod
+    def _parse_release(response: bytes) -> Mapping[str, Any]:
+        try:
+            release = json.loads(response)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise ValueError("AniLibria API returned invalid JSON") from error
 
-        return str(episode_tag["href"])
+        if not isinstance(release, Mapping):
+            raise ValueError("AniLibria API returned an invalid release")
+        return release
 
-    def _extract_episode_image_url(self, episode_tag: Tag) -> str:
-        img_tag = episode_tag.find("img", class_="v-img__img")
-        if not (img_tag and isinstance(img_tag, Tag) and "src" in img_tag.attrs):
-            raise ValueError("Could not extract episode image url")
-        return str(img_tag["src"])
+    @staticmethod
+    def _required_string(data: Mapping[str, Any], *path: str) -> str:
+        value: Any = data
+        for key in path:
+            if not isinstance(value, Mapping):
+                raise ValueError(f"Could not extract {'.'.join(path)}")
+            value = value.get(key)
+
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"Could not extract {'.'.join(path)}")
+        return value
