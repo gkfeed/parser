@@ -1,17 +1,22 @@
 from datetime import datetime
 from typing import override, Optional
+from urllib.parse import urljoin
 
 from bs4 import Tag
 from bs4.element import NavigableString
 
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 
 
-class HltvFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class HltvFeed(
+    PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
+):
+    _selenium_wait_time = 10
+
     @property
     @override
     async def _posts(self) -> list[Tag]:
@@ -88,15 +93,13 @@ class HltvFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheF
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        matchpage_button_cell = post.find("td", class_="matchpage-button-cell")
-        if not isinstance(matchpage_button_cell, Tag):
-            raise ValueError("Link cell not found")
-
-        match_link_tag = matchpage_button_cell.find("a")
+        match_link_tag = post.select_one(
+            "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
+        )
         if not isinstance(match_link_tag, Tag) or not match_link_tag.has_attr("href"):
             raise ValueError("Link tag not found")
 
-        return "https://www.hltv.org" + str(match_link_tag["href"])
+        return urljoin("https://www.hltv.org", str(match_link_tag["href"]))
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
