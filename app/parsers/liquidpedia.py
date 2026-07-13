@@ -1,7 +1,9 @@
+import json
 from datetime import datetime
 from typing import override
+from urllib.parse import unquote, urlencode, urlsplit, urlunsplit
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -10,34 +12,46 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class LiquidpediaFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+    _headers = {
+        **HttpParserExtension._headers,
+        "User-Agent": "gkfeed-parser/0.1 (https://github.com/gkfeed/parser)",
+    }
+
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        soup = await self.get_soup(self.feed.url)
-        matches_element = await self._extract_matches_element(soup)
-        return [t for t in matches_element.find_all("table") if isinstance(t, Tag)]
+        soup = await self._get_page_soup()
+        upcoming_matches_heading = soup.find(id="Upcoming_Matches")
+        if not isinstance(upcoming_matches_heading, Tag):
+            raise ValueError("Upcoming matches heading not found")
+
+        heading_container = upcoming_matches_heading.parent
+        if not isinstance(heading_container, Tag):
+            raise ValueError("Upcoming matches heading container not found")
+
+        matches_container = heading_container.find_next_sibling()
+        if not isinstance(matches_container, Tag):
+            raise ValueError("Upcoming matches container not found")
+
+        return [
+            match
+            for match in matches_container.select(".match-info")
+            if isinstance(match, Tag)
+        ]
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        team_left_tag = post.find(class_="team-left")
-        team_right_tag = post.find(class_="team-right")
+        team_names = []
+        for opponent in post.select(".match-info-opponent-row"):
+            name_tag = opponent.select_one(".name")
+            if not isinstance(name_tag, Tag):
+                raise ValueError("Team name not found")
+            team_names.append(name_tag.get_text(" ", strip=True))
 
-        if not isinstance(team_left_tag, Tag) or not isinstance(team_right_tag, Tag):
-            raise ValueError("Team tags not found")
+        if len(team_names) != 2 or not all(team_names):
+            raise ValueError("Expected two team names")
 
-        team_left_img = team_left_tag.find("img")
-        team_right_img = team_right_tag.find("img")
-
-        if not isinstance(team_left_img, Tag) or not isinstance(team_right_img, Tag):
-            raise ValueError("Team images not found")
-
-        team_left = team_left_img.get("alt")
-        team_right = team_right_img.get("alt")
-
-        if not isinstance(team_left, str) or not isinstance(team_right, str):
-            raise ValueError("Team names not found")
-
-        return f"{team_left} vs {team_right}"
+        return f"{team_names[0]} vs {team_names[1]}"
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
@@ -45,7 +59,7 @@ class LiquidpediaFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension,
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        timer_span = post.find("span", class_="timer-object timer-object-countdown-only")
+        timer_span = post.select_one(".timer-object[data-timestamp]")
         if not isinstance(timer_span, Tag):
             raise ValueError("Timer span not found")
 
@@ -55,21 +69,31 @@ class LiquidpediaFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension,
 
         return datetime.fromtimestamp(int(timestamp_str))
 
-    async def _extract_matches_element(self, soup: Tag) -> Tag:
-        infobox_headers = soup.find_all(class_="infobox-header")
-        if len(infobox_headers) < 2:
-            raise ValueError("Could not find enough infobox headers.")
+    async def _get_page_soup(self) -> BeautifulSoup:
+        response = json.loads(await self.get_html(self._get_api_url()))
+        try:
+            html = response["parse"]["text"]["*"]
+        except (KeyError, TypeError) as error:
+            raise ValueError("Unexpected Liquipedia API response") from error
 
-        infobox_header = infobox_headers[-2]
-        if not isinstance(infobox_header, Tag):
-            raise ValueError("Infobox header is not a Tag.")
+        if not isinstance(html, str):
+            raise ValueError("Liquipedia API response does not contain HTML")
 
-        parent = infobox_header.parent
-        if not isinstance(parent, Tag):
-            raise ValueError("Infobox header parent is not a Tag.")
+        return BeautifulSoup(html, "html.parser")
 
-        parent_of_parent = parent.parent
-        if not isinstance(parent_of_parent, Tag):
-            raise ValueError("Infobox header grandparent is not a Tag.")
+    def _get_api_url(self) -> str:
+        url = urlsplit(self.feed.url)
+        path_parts = url.path.strip("/").split("/", maxsplit=1)
+        if len(path_parts) != 2 or not all(path_parts):
+            raise ValueError("Invalid Liquipedia page URL")
 
-        return parent_of_parent
+        wiki, page = path_parts
+        query = urlencode(
+            {
+                "action": "parse",
+                "page": unquote(page),
+                "prop": "text",
+                "format": "json",
+            }
+        )
+        return urlunsplit((url.scheme, url.netloc, f"/{wiki}/api.php", query, ""))
