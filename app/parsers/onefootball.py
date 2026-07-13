@@ -1,5 +1,7 @@
-from datetime import timedelta, datetime
+import re
+from datetime import datetime, timedelta
 from typing import override
+from urllib.parse import urljoin
 
 from bs4 import Tag
 
@@ -11,32 +13,28 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
     __base_url = "https://onefootball.com"
+    __match_path = re.compile(r"^/[^/]+/match/\d+/?$")
     _cache_storage_time = timedelta(hours=1)
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        links = [link for link in soup.find_all("a") if isinstance(link, Tag)]
-        # Assuming links[16] and links[18] are always valid and Tag objects after filtering
-        if len(links) <= 18:
-            return []
-        return [links[16], links[18]]
+        matches = []
+
+        for link in soup.find_all("a", href=self.__match_path):
+            if isinstance(link, Tag) and link.find("time"):
+                matches.append(link)
+
+        return matches[:2]
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        first_team_span = post.find("span")
-        second_team_span = post.find_all("span")
+        team_names = post.select('span[class*="simpleMatchCardTeam__name"]')
+        if len(team_names) != 2:
+            raise ValueError("Could not find both team names")
 
-        if not (first_team_span and isinstance(first_team_span, Tag)):
-            raise ValueError("Could not find first team span")
-        if not (len(second_team_span) > 2 and isinstance(second_team_span[2], Tag)):
-            raise ValueError("Could not find second team span")
-
-        first_team_name = first_team_span.text
-        second_team_name = second_team_span[2].text
-
-        return first_team_name + " vs " + second_team_name
+        return " vs ".join(team.get_text(strip=True) for team in team_names)
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
@@ -54,4 +52,4 @@ class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
         href = post["href"]
         if not isinstance(href, str):
             raise ValueError("Match 'href' attribute is not a string")
-        return self.__base_url + href
+        return urljoin(self.__base_url, href)
