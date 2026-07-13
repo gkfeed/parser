@@ -1,45 +1,47 @@
-import time
 from typing import override
-from bs4 import BeautifulSoup, Tag
+from urllib.parse import urljoin
 
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.common.by import By
+from bs4 import Tag
 
-from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class RTLSeriesFeed(PostToItemsMixin, SeleniumParserExtension):
-    _selenium_wait_time = 20
+class RTLSeriesFeed(PostToItemsMixin, HttpParserExtension):
     _base_url = "https://plus.rtl.de"
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        html = await self.get_html(self.feed.url)
-        soup = BeautifulSoup(html, "html.parser")
+        soup = await self.get_soup(self.feed.url)
         return [
             link
-            for link in soup.find_all(class_="series-teaser__link")
-            if isinstance(link, Tag)
+            for link in soup.find_all("a", href=True)
+            if isinstance(link, Tag) and self._is_free_episode_link(link)
         ]
+
+    @staticmethod
+    def _is_free_episode_link(link: Tag) -> bool:
+        card = link.find_parent("article")
+        is_locked = isinstance(card, Tag) and card.find(
+            attrs={"aria-label": "Blockierter Inhalt"}
+        )
+        return (
+            "/video/" in str(link["href"])
+            and link.find("p") is not None
+            and not is_locked
+        )
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        return post.h3.text if post.h3 and isinstance(post.h3, Tag) else ""
+        paragraphs = post.find_all("p")
+        if paragraphs:
+            return paragraphs[-1].get_text(" ", strip=True)
+        raise ValueError("Episode link does not contain a title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        if "href" in post.attrs and isinstance(post["href"], str):
-            return self._base_url + str(post["href"])
+        href = post.get("href")
+        if isinstance(href, str):
+            return urljoin(self._base_url, href)
         raise ValueError("Link element does not contain a valid href")
-
-    @override
-    def make_actions(self, driver: WebDriver):
-        # Button Kostenlose Folden in top of the page
-        button = driver.find_element(
-            By.XPATH,
-            "/html/body/plus-root/ng-component/main/div/watch-watch/watch-format/watch-format-tab-navigation/mat-tab-group/mat-tab-header/div/div/div/div[2]/div",
-        )
-        driver.execute_script("arguments[0].click();", button)
-        time.sleep(self._selenium_wait_time)
