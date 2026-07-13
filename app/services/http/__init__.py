@@ -58,10 +58,12 @@ class HttpService:
                 raise HttpRequestError
 
     @classmethod
-    async def post_json(cls, url: str, json: dict) -> dict:
+    async def post_json(
+        cls, url: str, json: dict, headers: Optional[dict] = headers
+    ) -> dict:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
-                async with session.post(url, json=json) as response:
+                async with session.post(url, json=json, headers=headers) as response:
                     return await response.json()
             except ClientError:
                 raise HttpRequestError
