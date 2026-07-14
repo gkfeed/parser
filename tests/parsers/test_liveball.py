@@ -1,4 +1,5 @@
 import pytest
+
 from app.parsers.liveball import LiveballFeed
 from . import fetch_items  # noqa
 
@@ -10,5 +11,5 @@ LIVEBALL_FEED_DATA = {
 
 
 @pytest.mark.parametrize("fetch_items", [LIVEBALL_FEED_DATA], indirect=True)
-async def test_matreshka_feed(fetch_items):  # noqa: F811
+async def test_liveball_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0

@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime, timezone
 from typing import override
+from urllib.parse import urljoin
 
 from bs4 import Tag
 
@@ -10,12 +11,12 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 class LiveballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
-    _base_url = "https://liveball.my"
+    _base_url = "https://liveball.to"
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        soup = await self.get_soup(self.feed.url)
+        soup = await self.get_soup(self._base_url)
 
         top_match_container = soup.find("section", class_="top_match_section")
         if not top_match_container or not isinstance(top_match_container, Tag):
@@ -43,10 +44,7 @@ class LiveballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
         if not match_url:
             raise ValueError("Match URL not found")
 
-        match_url = str(match_url)
-        if not match_url.startswith("http"):
-            match_url = self._base_url + match_url
-        return match_url
+        return urljoin(self._base_url, str(match_url))
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
