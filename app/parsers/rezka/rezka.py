@@ -2,7 +2,6 @@ from typing import override
 from bs4 import Tag
 
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.services.http import HttpService
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
@@ -52,10 +51,18 @@ class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):
     @property
     async def _show_soup(self) -> Tag:
         _url = self.feed.url
-        status = await HttpService.get_status(_url)
-        if status != 200 and not _url.endswith("-latest.html"):
-            _url = _url.replace(".html", "-latest.html")
-        return await self.get_soup(_url)
+        soup = await self.get_soup(_url)
+
+        if not _url.endswith("-latest.html") and not self._has_show_content(soup):
+            latest_url = _url.replace(".html", "-latest.html")
+            soup = await self.get_soup(latest_url)
+
+        return soup
+
+    def _has_show_content(self, soup: Tag) -> bool:
+        if "/films/" in self.feed.url:
+            return bool(soup.find_all("h2"))
+        return soup.select_one(".b-simple_episode__item") is not None
 
     def _extract_title(self, soup: Tag) -> str:
         title_tag = soup.find("h1")
