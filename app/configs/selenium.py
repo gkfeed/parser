@@ -59,6 +59,9 @@ def _get_chrome_options() -> webdriver.ChromeOptions:
     # Chrome identifies itself as HeadlessChrome by default. Some sites, including
     # Rezka's Anubis protection, reject that user agent before serving a challenge.
     options.add_argument(f"--user-agent={_CHROME_USER_AGENT}")
+    # VK rejects its robot challenge when Chromium exposes WebDriver automation.
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
     return options
 
 
