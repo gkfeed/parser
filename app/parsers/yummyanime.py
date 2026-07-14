@@ -27,17 +27,23 @@ class YummyAnimeFeed(PostToItemsMixin, HttpParserExtension):
         return self._show_url
 
     async def _show_status(self, soup: Tag) -> str:
-        try:
-            return soup.find_all(class_="anime-r")[1].text
-        except IndexError:
-            raise ValueError
+        status = soup.select_one(".status-category div")
+        if isinstance(status, Tag):
+            return status.get_text(" ", strip=True)
+
+        legacy_statuses = soup.find_all(class_="anime-r")
+        if len(legacy_statuses) > 1:
+            return legacy_statuses[1].get_text(" ", strip=True)
+
+        raise ValueError("Couldn't find status of show: " + self._show_url)
 
     async def _show_title(self, soup: Tag) -> str:
-        try:
-            return soup.find_all("h1")[0].text
-        except IndexError:
-            raise ValueError("Couldn'n find status of show: " + self._show_url)
+        title = soup.find("h1")
+        if isinstance(title, Tag):
+            return title.get_text(" ", strip=True)
+
+        raise ValueError("Couldn't find title of show: " + self._show_url)
 
     @property
     def _show_url(self) -> str:
-        return self.feed.url.replace("yummyanime", "yummy-anime")
+        return self.feed.url
