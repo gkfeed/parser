@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta, datetime
 from typing import override
+from urllib.parse import urljoin
 
 from bs4 import Tag
 
@@ -17,6 +18,7 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 class RedditFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
+    _headers = {"User-Agent": "gkfeed-parser/0.1"}
     __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
     __base_urls_cache: list[str] | None = None
     __url_ranker = URLRanker(data_file="data/reddit_url_ranks.json")
@@ -54,11 +56,12 @@ class RedditFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, Cach
                     self.__url_ranker.demote_url(base_url)
                     continue
                 self.__url_ranker.promote_url(base_url)
+                return posts
             except Exception:
                 self.__url_ranker.demote_url(base_url)
                 continue
 
-        return posts
+        return []
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -100,7 +103,6 @@ class RedditFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, Cach
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        base_url = "https://www.reddit.com/"
         comments_tag = post.find(class_="post_comments")
         if (
             comments_tag
@@ -109,5 +111,5 @@ class RedditFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension, Cach
         ):
             post_href = comments_tag["href"]
             if isinstance(post_href, str):
-                return base_url + "/".join(post_href.split("/")[:-2])
+                return urljoin("https://www.reddit.com", post_href)
         raise ValueError
