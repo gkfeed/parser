@@ -23,7 +23,7 @@ class InstagramStoriesFeed(
     _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
     _should_delete_cookies = True
-    _service_url = "https://storiesig.website/"
+    _service_url = "https://anonyig.com/en/"
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -32,49 +32,62 @@ class InstagramStoriesFeed(
     @property
     async def items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
-        videos = soup.find_all("video")
 
-        items = []
-        for v in videos:
-            if not isinstance(v, Tag):
-                continue
-            if not v.source or "src" not in v.source.attrs:
-                continue
-            items.append(
-                Item(
-                    title="inst: " + self._user_name,
-                    text=self._user_name,
-                    date=constant_datetime,
-                    link=str(v.source["src"]),
-                )
+        return [
+            Item(
+                title="inst: " + self._user_name,
+                text=self._user_name,
+                date=constant_datetime,
+                link=link,
             )
-        return items
+            for link in self._extract_media_links(soup)
+        ]
+
+    @staticmethod
+    def _extract_media_links(soup: Tag) -> list[str]:
+        active_tab = soup.select_one(".tabs-component__button--active")
+        if not isinstance(active_tab, Tag):
+            return []
+        if active_tab.get_text(strip=True).lower() != "stories":
+            return []
+
+        links = []
+        for media in soup.select(".profile-media-list__item"):
+            download = media.select_one("a.download-btn[href]")
+            if isinstance(download, Tag):
+                href = download.get("href")
+                if isinstance(href, str):
+                    links.append(href)
+        return links
 
     @override
     def make_actions(self, driver: WebDriver):
-        # Click consent button on startup
         try:
             button = driver.find_element(
                 By.XPATH,
-                "/html/body/div[2]/div[2]/div[2]/div[2]/div[2]/button[1]",
+                "/html/body/div/div[2]/div[2]/div[3]/div[2]/button[1]",
             )
             driver.execute_script("arguments[0].click();", button)
         except NoSuchElementException:
             pass
 
-        # Insert account name in form
-        link = driver.find_element(By.ID, "link")  # Replace with actual element ID
-        link.send_keys(self.feed.url)
-        time.sleep(self._selenium_wait_time)
-
-        # Click dowbload button
-        button = driver.find_element(
-            By.ID,
-            "btn-download",
+        link = driver.find_element(
+            By.CSS_SELECTOR, "form.search-form input.search-form__input"
         )
-        driver.execute_script("arguments[0].click();", button)
+        link.send_keys(self._user_name)
 
+        button = driver.find_element(By.CSS_SELECTOR, ".search-form__button")
+        driver.execute_script("arguments[0].click();", button)
         time.sleep(self._selenium_wait_time)
+
+        tabs = driver.find_elements(By.CSS_SELECTOR, ".tabs-component__button")
+        if len(tabs) > 1:
+            driver.execute_script("arguments[0].click();", tabs[1])
+            time.sleep(self._selenium_wait_time)
+
+        for _ in range(3):
+            driver.execute_script("window.scrollBy(0, 500);")
+            time.sleep(1)
 
     @property
     def _user_name(self) -> str:
