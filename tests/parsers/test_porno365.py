@@ -19,7 +19,7 @@ PORNO365_FEEDS = [
 @pytest.mark.parametrize("fetch_items", PORNO365_FEEDS, indirect=True)
 async def test_porno365_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) > 0
-    assert fetch_items[0].link.startswith("http://i.porno365.broker/movie/")
+    assert fetch_items[0].link.startswith("http://porno365.broker/movie/")
 
 
 async def test_porno365_hash_uses_link_only():
