@@ -8,6 +8,7 @@ from app.services.ytdlp import (
     PlaylistExtractionMode,
 )
 from app.services.hash import HashService
+from app.services.youtube import YoutubePublishDateService
 from app.extensions.parsers.base import BaseFeed
 from app.extensions.parsers.hash import ItemsHashExtension
 
@@ -40,16 +41,29 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
 
         channel_name = channel_info["channel"]
         entries = channel_info["entries"]
+        channel_id = channel_info.get("channel_id")
+        channel_publish_dates = (
+            await YoutubePublishDateService.get_channel_publish_dates(channel_id)
+            if channel_id
+            else {}
+        )
 
         items = []
         for video_info in entries:
             title = video_info["title"]
             video_url = video_info["url"]
+
+            published_at = YoutubePublishDateService.resolve(
+                video_info, channel_publish_dates
+            )
+            if published_at is None:
+                published_at = constant_datetime
+
             items.append(
                 Item(
                     title="YT: " + channel_name,
                     text=title,
-                    date=constant_datetime,
+                    date=published_at,
                     link=video_url,
                 )
             )
