@@ -1,19 +1,28 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+import random
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 
 from pydantic import TypeAdapter
 
-from app.services.broker import BrokerService, BrokerError
-from app.serializers.feed import Item, Feed
+from app.extensions.parsers.base import BaseFeed
+from app.parsers import PARSERS
+from app.serializers.feed import Feed, Item
+from app.services.broker import BrokerError, BrokerService
 from app.services.repositories.feed_parser import FeedParserRepository
 from app.services.repositories.item_hash import ItemsHashRepository
-from app.parsers import PARSERS
-from app.extensions.parsers.base import BaseFeed
-from .storage import ItemsStorage, FeedStorage
+
+from .storage import FeedStorage, ItemsStorage
 
 
 class Dispatcher(ItemsStorage, FeedStorage):
+    _failure_backoffs = (
+        timedelta(minutes=15),
+        timedelta(hours=1),
+        timedelta(hours=6),
+        timedelta(hours=24),
+    )
+
     def __init__(
         self,
         broker: BrokerService,
@@ -25,6 +34,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         self.feed_parser_repository = feed_parser_repository
         self.item_hash_repository = item_hash_repository
         self.parsers = parsers
+        self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
         feeds = await self._get_all_feeds()
@@ -43,16 +53,24 @@ class Dispatcher(ItemsStorage, FeedStorage):
 
         valid_for = feed_parser.valid_for
         if valid_for.tzinfo is None:
-            valid_for = valid_for.replace(tzinfo=timezone.utc)
+            valid_for = valid_for.replace(tzinfo=UTC)
 
-        return valid_for < datetime.now(timezone.utc)
+        return valid_for < datetime.now(UTC)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
         parser_cls = self.parsers.get(feed.type)
         if not parser_cls:
             return
 
-        items = await self._request_items_from_broker(feed)
+        try:
+            items = await self._request_items_from_broker(feed)
+        except BrokerError as e:
+            print(f"Failed to process feed {feed.url}")
+            print(e)
+            await self._schedule_failure(feed.id)
+            return
+
+        self._failure_counts.pop(feed.id, None)
 
         if len(items) != 0:
             delta = getattr(
@@ -64,20 +82,27 @@ class Dispatcher(ItemsStorage, FeedStorage):
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
-        new_valid_for = datetime.now(timezone.utc) + delta
+        new_valid_for = datetime.now(UTC) + delta
         await self.feed_parser_repository.upsert(feed.id, new_valid_for)
 
+    async def _schedule_failure(self, feed_id: int) -> None:
+        failure_count = self._failure_counts.get(feed_id, 0) + 1
+        self._failure_counts[feed_id] = failure_count
+        backoff = self._failure_backoffs[
+            min(failure_count, len(self._failure_backoffs)) - 1
+        ]
+        jittered_backoff = backoff * random.uniform(0.9, 1.1)
+        await self.feed_parser_repository.upsert(
+            feed_id,
+            datetime.now(UTC) + jittered_backoff,
+        )
+
     async def _request_items_from_broker(self, feed: Feed) -> list[Item]:
-        try:
-            items_json = await self.broker.put_and_wait_for_result(
-                f"gkfeed.process_feed_{feed.type}",
-                (feed.model_dump_json(),),
-                timeout=300,
-            )
-        except BrokerError as e:
-            print(f"Failed to process feed {feed.url}")
-            print(e)
-            return []
+        items_json = await self.broker.put_and_wait_for_result(
+            f"gkfeed.process_feed_{feed.type}",
+            (feed.model_dump_json(),),
+            timeout=300,
+        )
 
         adapter = TypeAdapter(list[Item])
         items = adapter.validate_json(items_json)

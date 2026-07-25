@@ -131,9 +131,8 @@ async def test_request_items_from_broker_error(dispatcher):
 
     dispatcher.broker.put_and_wait_for_result.side_effect = BrokerError("Error")
 
-    result = await dispatcher._request_items_from_broker(feed)
-
-    assert result == []
+    with pytest.raises(BrokerError):
+        await dispatcher._request_items_from_broker(feed)
 
 
 @pytest.mark.asyncio
@@ -226,6 +225,55 @@ async def test_fetch_feed_items_no_items(dispatcher):
             )
             < 10
         )
+
+
+@pytest.mark.asyncio
+async def test_fetch_feed_items_backs_off_after_failures(dispatcher):
+    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    dispatcher.parsers = {"test": object}
+    dispatcher.broker.put_and_wait_for_result.side_effect = BrokerError("Error")
+
+    with patch("app.core.dispatcher.random.uniform", return_value=1):
+        for expected_delay in (
+            timedelta(minutes=15),
+            timedelta(hours=1),
+            timedelta(hours=6),
+            timedelta(hours=24),
+            timedelta(hours=24),
+        ):
+            before = datetime.now(timezone.utc)
+            await dispatcher._fetch_feed_items(feed)
+            after = datetime.now(timezone.utc)
+
+            call_args = dispatcher.feed_parser_repository.upsert.call_args[0]
+            assert call_args[0] == feed.id
+            assert before + expected_delay <= call_args[1] <= after + expected_delay
+            dispatcher.feed_parser_repository.upsert.reset_mock()
+
+
+@pytest.mark.asyncio
+async def test_success_resets_failure_backoff(dispatcher):
+    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    dispatcher.parsers = {"test": object}
+
+    with (
+        patch.object(
+            dispatcher,
+            "_request_items_from_broker",
+            new_callable=AsyncMock,
+            side_effect=[BrokerError("Error"), [], BrokerError("Error")],
+        ),
+        patch("app.core.dispatcher.random.uniform", return_value=1),
+    ):
+        await dispatcher._fetch_feed_items(feed)
+        await dispatcher._fetch_feed_items(feed)
+        before = datetime.now(timezone.utc)
+        await dispatcher._fetch_feed_items(feed)
+        after = datetime.now(timezone.utc)
+
+    retry_at = dispatcher.feed_parser_repository.upsert.call_args[0][1]
+    expected_delay = timedelta(minutes=15)
+    assert before + expected_delay <= retry_at <= after + expected_delay
 
 
 @pytest.mark.asyncio
