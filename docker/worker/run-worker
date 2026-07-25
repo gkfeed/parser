@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -eu
+set -o pipefail
+
+worker_name="${1:?worker name is required}"
+
+python -u -m "app.run.${worker_name}" 2>&1 |
+    tee -a "/logs/${worker_name}.txt"

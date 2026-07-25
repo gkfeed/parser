@@ -27,6 +27,20 @@ To skip parser types in both light and heavy workers, add them to `ignored_parse
 ignored_parser_types = ["yt", "rezka:collection"]
 ```
 
+## Docker worker logs
+
+Docker workers append their stdout and stderr to persistent text files:
+
+- `~/.local/share/gkfeed/logs/worker_light.txt`
+- `~/.local/share/gkfeed/logs/worker_heavy.txt`
+
+The output is also available through `docker compose logs`. Set `WORKER_LOG_DIR`
+before starting Docker Compose to store the files in a different directory:
+
+```bash
+WORKER_LOG_DIR=/path/to/logs docker compose up -d
+```
+
 ### Database Configuration
 
 `DB_URL` must use an asynchronous driver.

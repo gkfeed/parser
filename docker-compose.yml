@@ -21,11 +21,12 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    command: python -m app.run.worker_light
+    command: ["worker_light"]
     tty: True
     restart: on-failure
     volumes:
       - ~/.local/share/gkfeed/data:/data
+      - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
     env_file:
       - .env
     environment:
@@ -39,11 +40,12 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    command: python -m app.run.worker_heavy
+    command: ["worker_heavy"]
     tty: True
     restart: on-failure
     volumes:
       - ~/.local/share/gkfeed/data:/data
+      - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
     env_file:
       - .env
     environment:
@@ -65,4 +67,3 @@ services:
     restart: always
     volumes:
       - /dev/shm:/dev/shm
-

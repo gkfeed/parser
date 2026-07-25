@@ -16,3 +16,8 @@ COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache /wheels/*
 
 COPY ./app ./app
+COPY ./docker/worker/run-worker /usr/local/bin/run-worker
+
+RUN chmod +x /usr/local/bin/run-worker
+
+ENTRYPOINT ["/usr/local/bin/run-worker"]
