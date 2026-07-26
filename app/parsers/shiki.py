@@ -1,13 +1,13 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import override
 
 from bs4.element import Tag
 
 from app.core.worker_kind import WorkerKind
-from app.utils.datetime import convert_datetime
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.datetime import convert_datetime
 
 
 class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
@@ -69,7 +69,7 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
         if not isinstance(h1, Tag):
             raise ValueError("h1 tag not found or not a Tag instance.")
 
-        return h1.text
+        return " ".join(h1.stripped_strings)
 
     @property
     def _url(self) -> str:
