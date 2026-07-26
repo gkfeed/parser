@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.instagram import InstagramFeed
+
 from . import fetch_items  # noqa
 
 INSTAGRAM_FEED_DATA = {

@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.yummyanime import YummyAnimeFeed
+
 from . import fetch_items  # noqa
 
 YUMMYANIME_FEED_DATA = {

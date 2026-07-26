@@ -1,11 +1,10 @@
-from typing import Optional
+import aiohttp
 from dateutil.parser import parse
 
-import aiohttp
-
 from app.configs.env import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
-from .types import Stream
+
 from .auth import TwitchAuthenticator
+from .types import Stream
 
 
 class Twitch:
@@ -18,7 +17,7 @@ class Twitch:
         return {"Client-ID": client_id, "Authorization": "Bearer " + access_token}
 
     @classmethod
-    async def get_stream(cls, streamer_name: str) -> Optional[Stream]:
+    async def get_stream(cls, streamer_name: str) -> Stream | None:
         access_token = await TwitchAuthenticator.get_access_token(
             cls.__client_id, cls.__client_secret
         )
@@ -45,6 +44,8 @@ class Twitch:
 
     @classmethod
     async def get_html(cls, url: str, headers: dict) -> dict:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
-            async with session.get(url, headers=headers) as response:
-                return await response.json()
+        async with (
+            aiohttp.ClientSession(conn_timeout=None) as session,
+            session.get(url, headers=headers) as response,
+        ):
+            return await response.json()

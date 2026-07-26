@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.tiktok import TikTokFeed
+
 from . import fetch_items  # noqa
 
 TIKTOK_FEED_DATA = {

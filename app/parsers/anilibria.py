@@ -1,7 +1,7 @@
 import json
 from collections.abc import Mapping
 from datetime import timedelta
-from typing import Any, override
+from typing import Any, cast, override
 from urllib.parse import quote, urljoin, urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -30,10 +30,12 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
         show_title = self._required_string(release, "name", "main")
         episodes = release.get("episodes")
         if not isinstance(episodes, list):
-            raise ValueError("Could not extract episodes from AniLibria API response")
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Could not extract episodes from AniLibria API response"
+            )
 
         return [
-            self._episode_to_item(show_title, episode)
+            self._episode_to_item(show_title, cast("Mapping[str, Any]", episode))
             for episode in reversed(episodes)
             if isinstance(episode, Mapping)
         ]
@@ -44,7 +46,9 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
         episode_id = self._required_string(episode, "id")
         ordinal = episode.get("ordinal")
         if not isinstance(ordinal, int):
-            raise ValueError("Could not extract episode ordinal")
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Could not extract episode ordinal"
+            )
 
         episode_text = f"{ordinal} эпизод"
         episode_name = episode.get("name")
@@ -79,7 +83,9 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
     def _episode_image_url(self, episode: Mapping[str, Any]) -> str:
         preview = episode.get("preview")
         if not isinstance(preview, Mapping):
-            raise ValueError("Could not extract episode image URL")
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Could not extract episode image URL"
+            )
 
         image_path = preview.get("src")
         if not isinstance(image_path, str) or not image_path:
@@ -94,7 +100,9 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
             raise ValueError("AniLibria API returned invalid JSON") from error
 
         if not isinstance(release, Mapping):
-            raise ValueError("AniLibria API returned an invalid release")
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "AniLibria API returned an invalid release"
+            )
         return release
 
     @staticmethod
@@ -102,7 +110,9 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
         value: Any = data
         for key in path:
             if not isinstance(value, Mapping):
-                raise ValueError(f"Could not extract {'.'.join(path)}")
+                raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                    f"Could not extract {'.'.join(path)}"
+                )
             value = value.get(key)
 
         if not isinstance(value, str) or not value:

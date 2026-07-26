@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -28,7 +28,7 @@ def test_initialization_empty_file(url_ranker):
 def test_initialization_with_existing_data(temp_data_file):
     initial_data = {
         "ranks": {"url1": 1, "url2": 0},
-        "last_failed": {"url1": datetime.now().timestamp()},
+        "last_failed": {"url1": datetime.now(UTC).timestamp()},
     }
     with open(temp_data_file, "w") as f:
         json.dump(initial_data, f)
@@ -41,7 +41,7 @@ def test_initialization_with_existing_data(temp_data_file):
 
 def test_save_ranks(url_ranker, temp_data_file):
     url_ranker.ranks = {"urlA": 5, "urlB": 2}
-    url_ranker.last_failed = {"urlA": datetime.now().timestamp()}
+    url_ranker.last_failed = {"urlA": datetime.now(UTC).timestamp()}
     url_ranker.save_ranks()
 
     with open(temp_data_file, "r") as f:
@@ -67,7 +67,7 @@ def test_get_ranked_urls_existing_ranks(url_ranker):
 
 def test_get_ranked_urls_with_cooldown(url_ranker):
     # Set a URL to have failed recently
-    failed_time = datetime.now() - timedelta(minutes=30)
+    failed_time = datetime.now(UTC) - timedelta(minutes=30)
     url_ranker.last_failed = {"cooldown_url": failed_time.timestamp()}
     url_ranker.cooldown_minutes = 60
 
@@ -76,7 +76,7 @@ def test_get_ranked_urls_with_cooldown(url_ranker):
     assert ranked_urls == ["normal_url"]  # cooldown_url should be filtered out
 
     # Test after cooldown period
-    past_failed_time = datetime.now() - timedelta(minutes=90)
+    past_failed_time = datetime.now(UTC) - timedelta(minutes=90)
     url_ranker.last_failed = {"cooldown_url": past_failed_time.timestamp()}
     ranked_urls_after_cooldown = url_ranker.get_ranked_urls(urls)
     assert "cooldown_url" in ranked_urls_after_cooldown
@@ -95,7 +95,7 @@ def test_demote_url(url_ranker):
 
 def test_promote_url(url_ranker):
     url_ranker.ranks = {"url1": 2}
-    url_ranker.last_failed = {"url1": datetime.now().timestamp()}
+    url_ranker.last_failed = {"url1": datetime.now(UTC).timestamp()}
     url_ranker.promote_url("url1")
     assert url_ranker.ranks["url1"] == 1
     assert "url1" not in url_ranker.last_failed

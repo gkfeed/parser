@@ -1,11 +1,12 @@
-from bs4 import BeautifulSoup, Tag
 from typing import override
 
-from app.serializers.feed import Item
-from app.utils.datetime import convert_datetime
-from app.extensions.parsers.http import HttpParserExtension
+from bs4 import BeautifulSoup, Tag
+
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.serializers.feed import Item
 from app.services.hash import HashService
+from app.utils.datetime import convert_datetime
 
 
 class SasflixFeed(ItemsHashExtension, HttpParserExtension):

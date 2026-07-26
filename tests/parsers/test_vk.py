@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.vk import VkFeed
+
 from . import fetch_items  # noqa
 
 VK_FEED_DATA = [

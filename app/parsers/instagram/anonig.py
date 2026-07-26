@@ -1,20 +1,21 @@
+import base64
 import re
 import time
-import base64
-from typing import override
 from datetime import timedelta
+from typing import override
 
 from bs4.element import Tag
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 
-from app.utils.datetime import constant_datetime
+from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.services.http import HttpRequestError
+from app.utils.datetime import constant_datetime
 from app.workers.http import get_html
 
 
@@ -59,7 +60,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             return "image/jpeg"
         if data.startswith(b"\x89PNG\r\n\x1a\n"):
             return "image/png"
-        if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        if data.startswith((b"GIF87a", b"GIF89a")):
             return "image/gif"
         if data.startswith(b"RIFF") and b"WEBP" in data[:16]:
             return "image/webp"
@@ -123,7 +124,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 img_bytes = await get_html(src)
                 encoded = base64.b64encode(img_bytes).decode("utf-8")
                 mime_type = self._get_mime_type(img_bytes)
-            except Exception:
+            except HttpRequestError:
                 return None
 
         img_tag = (

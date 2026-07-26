@@ -1,7 +1,8 @@
-from typing import override
 from datetime import timedelta
+from typing import override
 
 from app.serializers.feed import Feed
+
 from .base import BaseFeed as _BaseFeed
 
 

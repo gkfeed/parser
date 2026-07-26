@@ -1,16 +1,17 @@
+from typing import Any
+
 import yt_dlp
 
 
-async def extract_info(url: str, opts: dict, keys: list[str] | None = None) -> dict:
+async def extract_info(
+    url: str, opts: Any, keys: list[str] | None = None
+) -> dict[str, Any]:
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info: Any = ydl.extract_info(url, download=False)
         if info is None:
             raise ValueError("Could not extract info from URL")
         if keys:
-            _info = {}
-            for key in keys:
-                _info[key] = info[key]
-            info = _info
+            info = {key: info[key] for key in keys}
     if not info:
         raise ValueError
     return info

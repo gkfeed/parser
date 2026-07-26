@@ -1,7 +1,8 @@
 from bs4 import Tag
+
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
 class RezkaCollectionFeed(SeleniumParserExtension):

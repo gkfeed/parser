@@ -6,6 +6,7 @@ from app.services.cache.use_temporary import (
     async_store_in_cache_for,
 )
 from app.workers.youtube import extract_info
+
 from .modes import BaseExtractionMode, VideoExtractionMode
 
 
@@ -44,7 +45,9 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
     async def get_info(
         cls,
         url: str,
-        mode: BaseExtractionMode = BaseExtractionMode(),
+        mode: BaseExtractionMode | None = None,
         keys: list[str] | None = None,
     ) -> dict:
+        if mode is None:
+            mode = BaseExtractionMode()
         return await extract_info(url, mode.opts, keys)

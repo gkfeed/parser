@@ -1,5 +1,5 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from selenium.webdriver.remote.webdriver import WebDriver
 

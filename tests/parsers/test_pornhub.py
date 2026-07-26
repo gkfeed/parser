@@ -1,8 +1,9 @@
 import pytest
+
 from app.parsers.pornhub import PornHubFeed
 from app.serializers.feed import Feed
-from . import fetch_items  # noqa
 
+from . import fetch_items  # noqa
 
 PORNHUB_FEEDS = [
     {

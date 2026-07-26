@@ -1,7 +1,8 @@
 import pytest
-from app.parsers.sasflix import SasflixFeed
-from . import fetch_items  # noqa
 
+from app.parsers.sasflix import SasflixFeed
+
+from . import fetch_items  # noqa
 
 SASFLIX_FEEDS = [
     {

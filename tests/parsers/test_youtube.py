@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.youtube import YoutubeFeed
+
 from . import fetch_items  # noqa
 
 YOUTUBE_FEED_DATA = {

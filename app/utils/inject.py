@@ -1,5 +1,5 @@
-from typing import Any
 import inspect
+from typing import Any
 
 from app.services.container import Container
 
@@ -9,8 +9,8 @@ def inject(params: dict[str, Any], call: bool = False):
         is_async = inspect.iscoroutinefunction(func)
 
         def _inject_kwargs(kwargs):
-            for param in params:
-                injected_value = getattr(Container.get_data(), params[param])
+            for param, dependency in params.items():
+                injected_value = getattr(Container.get_data(), dependency)
                 if call:
                     injected_value = injected_value()
                 kwargs[param] = injected_value

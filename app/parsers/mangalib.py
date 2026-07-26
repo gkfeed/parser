@@ -3,9 +3,9 @@ from typing import override
 
 from bs4 import Tag
 
-from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
 class MangaLibFeed(PostToItemsMixin, SeleniumParserExtension, CacheFeedExtension):

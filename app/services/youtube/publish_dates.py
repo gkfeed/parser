@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from xml.etree import ElementTree
 
 from app.services.http import HttpService
@@ -35,9 +35,9 @@ class YoutubePublishDateService:
             return published_at
 
         if (timestamp := video_info.get("timestamp")) is not None:
-            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return datetime.fromtimestamp(timestamp, tz=UTC)
 
         if upload_date := video_info.get("upload_date"):
-            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=timezone.utc)
+            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
 
         return None

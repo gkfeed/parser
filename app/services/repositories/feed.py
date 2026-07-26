@@ -1,18 +1,19 @@
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
+
 from app.models.feed import Feed as _Feed
 from app.serializers.feed import Feed
+
 from ._base import BaseRepository
 
 
 class FeedRepository(BaseRepository):
     @classmethod
     async def create(cls, item: Feed) -> Feed:
-        async with cls._session_factory() as session:
-            async with session.begin():
-                _item = _Feed(title=item.title, url=item.url, type=item.type)
-                session.add(_item)
-                await session.flush()
-                return await cls._unserialize(_item)
+        async with cls._session_factory() as session, session.begin():
+            _item = _Feed(title=item.title, url=item.url, type=item.type)
+            session.add(_item)
+            await session.flush()
+            return await cls._unserialize(_item)
 
     @classmethod
     async def get_all(cls) -> list[Feed]:
@@ -30,9 +31,8 @@ class FeedRepository(BaseRepository):
 
     @classmethod
     async def delete_by_id(cls, id: int) -> None:
-        async with cls._session_factory() as session:
-            async with session.begin():
-                await session.execute(delete(_Feed).where(_Feed.id == id))
+        async with cls._session_factory() as session, session.begin():
+            await session.execute(delete(_Feed).where(_Feed.id == id))
 
     @classmethod
     async def _unserialize(cls, feed: _Feed) -> Feed:

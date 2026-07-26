@@ -1,6 +1,8 @@
-from typing import Any, cast
 import pickle
+from typing import Any, cast
+
 import redis
+
 from app.configs.env import REDIS_HOST
 
 from ._base import BaseStorage

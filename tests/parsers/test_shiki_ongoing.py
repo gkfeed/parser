@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.shiki_ongoing import ShikiOngoingFeed
+
 from . import fetch_items  # noqa
 
 SHIKI_ONGOING_FEED_DATA = {

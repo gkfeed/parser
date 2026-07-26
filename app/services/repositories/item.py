@@ -1,7 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.item import Item as _Item
 from app.serializers.feed import Feed, Item
+
 from ._base import BaseRepository
 
 
@@ -16,11 +18,10 @@ class ItemsRepository(BaseRepository):
 
     @classmethod
     async def add_items_to_feed(cls, feed: Feed, items: list[Item]):
-        async with cls._session_factory() as session:
-            async with session.begin():
-                for item in items:
-                    if not await cls._check_if_exists(session, feed, item):
-                        await cls._create_item(session, feed, item)
+        async with cls._session_factory() as session, session.begin():
+            for item in items:
+                if not await cls._check_if_exists(session, feed, item):
+                    await cls._create_item(session, feed, item)
 
     @classmethod
     async def _check_if_exists(

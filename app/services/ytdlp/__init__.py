@@ -1,15 +1,15 @@
 __all__ = (
-    "YtdlpInfoExtractor",
-    "ChannelExtractionMode",
-    "VideoExtractionMode",
-    "PlaylistExtractionMode",
     "BaseExtractionMode",
+    "ChannelExtractionMode",
+    "PlaylistExtractionMode",
+    "VideoExtractionMode",
+    "YtdlpInfoExtractor",
 )
 
 from .extractor import YtdlpInfoExtractor
 from .modes import (
     BaseExtractionMode,
     ChannelExtractionMode,
-    VideoExtractionMode,
     PlaylistExtractionMode,
+    VideoExtractionMode,
 )

@@ -1,6 +1,6 @@
 import asyncio
-from app.main import main
 
+from app.run.dispatcher import dispatch_broker
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(dispatch_broker())

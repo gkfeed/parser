@@ -1,14 +1,13 @@
-from typing import Type
 
-from app.serializers.feed import Feed, Item
 from app.extensions.parsers.base import BaseFeed
+from app.serializers.feed import Feed, Item
 
 
 class FeedParsingContext:
     def __init__(self) -> None:
-        self._parsers: dict[str, Type[BaseFeed]] = {}
+        self._parsers: dict[str, type[BaseFeed]] = {}
 
-    def register_parser(self, feed_type: str, parser: Type[BaseFeed]):
+    def register_parser(self, feed_type: str, parser: type[BaseFeed]):
         self._parsers[feed_type] = parser
 
     def get_parser_initial_data(self, feed: Feed) -> dict:

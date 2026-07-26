@@ -1,7 +1,17 @@
+from collections.abc import Callable
+from typing import TypedDict, cast
+
 import pytest
 
 from app.core.parsers import FeedParsingContext
+from app.extensions.parsers.base import BaseFeed
 from app.serializers.feed import Feed, Item
+
+
+class FeedData(TypedDict):
+    type: str
+    parser: type[BaseFeed]
+    url: str
 
 
 class MockedItemsStorage:
@@ -31,10 +41,15 @@ class FakeDispatcher(MockedItemsStorage, FeedParsingContext):
 
 @pytest.fixture
 async def fetch_items(request):
-    feed_data = getattr(request, "param", {})
-    if callable(feed_data):
-        feed_data = feed_data()
-    if feed_data:
+    raw_feed_data = getattr(request, "param", None)
+    feed_data: FeedData | None = None
+    if isinstance(raw_feed_data, dict):
+        feed_data = cast("FeedData", raw_feed_data)
+    elif raw_feed_data is not None:
+        factory = cast("Callable[[], FeedData]", raw_feed_data)
+        feed_data = factory()
+
+    if feed_data is not None:
         dp = FakeDispatcher()
         dp.register_parser(feed_data["type"], feed_data["parser"])
 

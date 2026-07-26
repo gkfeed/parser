@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.onefootball import OneFootballFeed
+
 from . import fetch_items  # noqa
 
 ONEFOOTBALL_FEED_DATA = {

@@ -1,5 +1,7 @@
 import pytest
-from app.parsers.rezka import RezkaFeed, RezkaCollectionFeed
+
+from app.parsers.rezka import RezkaCollectionFeed, RezkaFeed
+
 from . import fetch_items  # noqa
 
 REZKA_FEED_DATA = [

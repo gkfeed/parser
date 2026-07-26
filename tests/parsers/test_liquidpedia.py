@@ -1,6 +1,7 @@
 import pytest
 
 from app.parsers.liquidpedia import LiquidpediaFeed
+
 from . import fetch_items  # noqa
 
 LIQUIDPEDIA_FEED_DATA = {

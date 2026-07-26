@@ -1,5 +1,7 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime
+
 from app.serializers.feed import Feed
 from app.services.repositories.feed import FeedRepository
 
@@ -9,7 +11,7 @@ async def test_feed_repository():
     feed_data = Feed(
         id=0,
         title="Test Feed",
-        url=f"https://test.com/{datetime.now().timestamp()}",
+        url=f"https://test.com/{datetime.now(UTC).timestamp()}",
         type="test",
     )
 

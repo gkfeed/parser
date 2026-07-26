@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.reddit import RedditFeed
+
 from . import fetch_items  # noqa
 
 REDDIT_FEED_DATA = {

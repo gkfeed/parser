@@ -1,10 +1,10 @@
 from datetime import timedelta
+
 from bs4.element import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.hash import ItemsHashExtension
-
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
@@ -29,8 +29,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
 
     async def _get_discography_soup(self):
         _url = self.feed.url
-        if _url.endswith("/"):
-            _url = _url[:-1]
+        _url = _url.removesuffix("/")
 
         soup = await self.get_soup(_url + "/discography")
         if soup.title and "Page not found" in soup.title.text:

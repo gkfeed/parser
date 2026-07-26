@@ -3,9 +3,9 @@ from typing import override
 
 from bs4 import Tag
 
-from app.utils.datetime import convert_datetime
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.datetime import convert_datetime
 
 
 class XFeed(PostToItemsMixin, HttpParserExtension):

@@ -1,6 +1,6 @@
 from app.serializers.feed import Feed, Item
-from app.services.repositories.item import ItemsRepository
 from app.services.repositories.feed import FeedRepository
+from app.services.repositories.item import ItemsRepository
 
 
 class ItemsStorage:

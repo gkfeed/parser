@@ -3,34 +3,34 @@ from enum import Enum
 
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
-from .web import WebFeed
-from .tiktok import TikTokFeed
-from .kinogo import KinogoFeed
-from .twitch import TwitchFeed
-from .yummyanime import YummyAnimeFeed
-from .shiki import ShikiFeed
-from .reddit import RedditFeed
-from .vk import VkFeed
-from .youtube import YoutubeFeed
-from .ranobeme import RanobeMeFeed
-from .spoti import SpotifyFeed, SpotifyPlaylistFeed
-from .rezka import RezkaFeed
-from .instagram import InstagramFeed
-from .stories import InstagramStoriesFeed
-from .insolarance import InsolaranceFeed
-from .mangalib import MangaLibFeed
-from .x import XFeed
-from .onefootball import OneFootballFeed
-from .rtl import RTLSeriesFeed
-from .rezka import RezkaCollectionFeed
-from .matreshka import MatreshkaFeed
-from .shiki_ongoing import ShikiOngoingFeed
+
 from .anilibria import AnilibriaFeed
+from .hltv import HltvFeed
+from .insolarance import InsolaranceFeed
+from .instagram import InstagramFeed
+from .kinogo import KinogoFeed
+from .liquidpedia import LiquidpediaFeed
+from .mangalib import MangaLibFeed
+from .matreshka import MatreshkaFeed
+from .onefootball import OneFootballFeed
 from .pornhub import PornHubFeed
 from .porno365 import Porno365Feed
-from .hltv import HltvFeed
-from .liquidpedia import LiquidpediaFeed
+from .ranobeme import RanobeMeFeed
+from .reddit import RedditFeed
+from .rezka import RezkaCollectionFeed, RezkaFeed
+from .rtl import RTLSeriesFeed
 from .sasflix import SasflixFeed
+from .shiki import ShikiFeed
+from .shiki_ongoing import ShikiOngoingFeed
+from .spoti import SpotifyFeed, SpotifyPlaylistFeed
+from .stories import InstagramStoriesFeed
+from .tiktok import TikTokFeed
+from .twitch import TwitchFeed
+from .vk import VkFeed
+from .web import WebFeed
+from .x import XFeed
+from .youtube import YoutubeFeed
+from .yummyanime import YummyAnimeFeed
 
 
 @dataclass(frozen=True)

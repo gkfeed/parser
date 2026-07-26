@@ -1,8 +1,7 @@
-from typing import Optional
-
 from app.configs.selenium import FALLBACK_TO_EXTERNAL_SELENIUM
-from ._worker import WorkerSelenium
+
 from ._external import ExternalSelenium
+from ._worker import WorkerSelenium
 from .schemas import SeleniumGetHtmlArgs
 
 
@@ -10,7 +9,7 @@ class SeleniumService:
     @staticmethod
     async def get_html(
         args: SeleniumGetHtmlArgs,
-        fallback_to_external_selenium: Optional[bool] = None,
+        fallback_to_external_selenium: bool | None = None,
     ) -> str:
         if fallback_to_external_selenium is None:
             fallback_to_external_selenium = FALLBACK_TO_EXTERNAL_SELENIUM

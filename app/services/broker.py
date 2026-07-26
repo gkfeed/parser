@@ -1,8 +1,9 @@
 import asyncio
-from typing import Any, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
-from app.services.http import HttpService, HttpRequestError
+from app.services.http import HttpRequestError, HttpService
 
 
 class BrokerError(Exception):

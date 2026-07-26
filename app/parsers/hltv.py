@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import override, Optional
+from datetime import UTC, datetime
+from typing import override
 from urllib.parse import urljoin
 
 from bs4 import Tag
@@ -38,10 +38,12 @@ class HltvFeed(
             is_upcoming_matches_headline, limit=1
         )
         upcoming_matches_headline_tag = (
-            upcoming_matches_headlines[0] if upcoming_matches_headlines else None
+            upcoming_matches_headlines[0]
+            if len(upcoming_matches_headlines) > 0
+            else None
         )
 
-        if not upcoming_matches_headline_tag:
+        if upcoming_matches_headline_tag is None:
             raise ValueError("Upcoming matches headline not found.")
 
         match_table = upcoming_matches_headline_tag.find_next_sibling(
@@ -49,7 +51,9 @@ class HltvFeed(
         )
 
         if not isinstance(match_table, Tag):
-            raise ValueError("Match table not found or invalid.")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Match table not found or invalid."
+            )
 
         return [
             row
@@ -105,7 +109,9 @@ class HltvFeed(
     async def _get_post_datetime(self, post: Tag) -> datetime:
         date_cell = post.find("td", class_="date-cell")
         if not isinstance(date_cell, Tag):
-            raise ValueError("Date cell not found")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Date cell not found"
+            )
 
         unix_timestamp_ms_tag = date_cell.find("span")
         if not isinstance(
@@ -114,9 +120,9 @@ class HltvFeed(
             raise ValueError("Timestamp tag not found")
 
         unix_timestamp = int(str(unix_timestamp_ms_tag["data-unix"])) / 1000
-        return datetime.fromtimestamp(unix_timestamp)
+        return datetime.fromtimestamp(unix_timestamp, UTC)
 
-    def _extract_teams(self, row: Tag) -> Optional[tuple[str, str]]:
+    def _extract_teams(self, row: Tag) -> tuple[str, str] | None:
         team_center_cell = row.find("td", class_="team-center-cell")
         if not isinstance(team_center_cell, Tag):
             return None

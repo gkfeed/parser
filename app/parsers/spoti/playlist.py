@@ -1,8 +1,8 @@
 from bs4 import Tag
-from app.serializers.feed import Item
-from app.utils.datetime import constant_datetime
 
 from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.serializers.feed import Item
+from app.utils.datetime import constant_datetime
 
 
 class SpotifyPlaylistFeed(SeleniumParserExtension):
@@ -32,7 +32,9 @@ class SpotifyPlaylistFeed(SeleniumParserExtension):
             href=lambda href: isinstance(href, str) and href.startswith("/track/"),
         )
         if not isinstance(track_anchor, Tag):
-            raise ValueError("Could not find the first track element.")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Could not find the first track element."
+            )
 
         track_element = track_anchor.parent
         while isinstance(track_element, Tag):
@@ -53,7 +55,9 @@ class SpotifyPlaylistFeed(SeleniumParserExtension):
             href=lambda href: isinstance(href, str) and href.startswith("/track/"),
         )
         if not isinstance(anchor_tag, Tag):
-            raise ValueError("Could not find the anchor tag for the track.")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Could not find the anchor tag for the track."
+            )
         return anchor_tag
 
     def _get_track_name(self, anchor_tag: Tag) -> str:

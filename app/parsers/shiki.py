@@ -26,7 +26,7 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
 
         menu_link = menu_links[0]
         if not isinstance(menu_link, Tag):
-            raise ValueError(
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
                 "The first element with class 'b-menu-links' is not a Tag instance."
             )
 
@@ -67,7 +67,9 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
         h1 = soup.find("h1")
 
         if not isinstance(h1, Tag):
-            raise ValueError("h1 tag not found or not a Tag instance.")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "h1 tag not found or not a Tag instance."
+            )
 
         return " ".join(h1.stripped_strings)
 

@@ -1,4 +1,5 @@
 from typing import override
+
 from bs4 import Tag
 
 from app.extensions.parsers.http import HttpParserExtension

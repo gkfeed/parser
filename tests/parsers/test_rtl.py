@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.rtl import RTLSeriesFeed
+
 from . import fetch_items  # noqa
 
 RTL_FEED_DATA = {

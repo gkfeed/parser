@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 
 from app.parsers.hltv import HltvFeed
 from app.serializers.feed import Feed
+
 from . import fetch_items  # noqa
 
 HLTV_FEED_DATA = {

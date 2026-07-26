@@ -1,15 +1,14 @@
-from dataclasses import asdict
-from typing import Callable, Optional
-import time
-import pickle
+import asyncio
 import os
+import pickle
+from collections.abc import Callable
+from dataclasses import asdict
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
+import app.configs  # noqa: F401
 from app.configs.selenium import SELENIUM_COOKIES_PATH
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
-
-import app.configs  # noqa: F401
 from app.utils.inject import inject
 
 
@@ -24,7 +23,7 @@ async def _get_html(
     should_delete_cookies: bool,
     should_load_cookies: bool,
     should_save_cookies: bool,
-    make_actions_function: Optional[Callable[[WebDriver], None]],
+    make_actions_function: Callable[[WebDriver], None] | None,
     selenium_wait_timeout_seconds: int,
 ) -> str:
     try:
@@ -38,7 +37,7 @@ async def _get_html(
                 driver.add_cookie(cookie)
 
         driver.get(url)
-        time.sleep(selenium_wait_timeout_seconds)
+        await asyncio.sleep(selenium_wait_timeout_seconds)
 
         if make_actions_function:
             make_actions_function(driver)
@@ -46,18 +45,24 @@ async def _get_html(
         html = driver.page_source
 
         if should_save_cookies:
-            pickle.dump(driver.get_cookies(), open(SELENIUM_COOKIES_PATH, "wb"))
+            await asyncio.to_thread(_save_cookies, driver.get_cookies())
 
         driver.close()
         driver.quit()
         return html
-    except Exception as e:
+    except Exception:
         driver.close()
         driver.quit()
-        raise e
+        raise
 
 
 def _load_cookies():
     if not os.path.isfile(SELENIUM_COOKIES_PATH):
         return []
-    return pickle.load(open(SELENIUM_COOKIES_PATH, "rb"))
+    with open(SELENIUM_COOKIES_PATH, "rb") as cookies_file:
+        return pickle.load(cookies_file)
+
+
+def _save_cookies(cookies) -> None:
+    with open(SELENIUM_COOKIES_PATH, "wb") as cookies_file:
+        pickle.dump(cookies, cookies_file)

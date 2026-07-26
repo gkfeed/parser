@@ -1,19 +1,18 @@
 import time
-from typing import override
 from datetime import timedelta
-
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
+from typing import override
 
 from bs4 import Tag
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 
-from app.utils.datetime import constant_datetime
+from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.utils.datetime import constant_datetime
 
 
 class InstagramStoriesFeed(

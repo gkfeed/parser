@@ -6,7 +6,6 @@ from bs4 import Tag
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-
 from app.utils.datetime import constant_datetime
 
 

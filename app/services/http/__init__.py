@@ -1,7 +1,5 @@
-from typing import Optional
-
 import aiohttp
-from aiohttp.client_exceptions import ClientError, ClientConnectorError, InvalidURL
+from aiohttp.client_exceptions import ClientConnectorError, ClientError, InvalidURL
 
 _headers = {
     "User-Agent": (
@@ -30,7 +28,7 @@ class HttpService:
 
     @classmethod
     async def post(
-        cls, url: str, body: dict, headers: Optional[dict] = headers
+        cls, url: str, body: dict, headers: dict | None = headers
     ) -> bytes:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
@@ -59,7 +57,7 @@ class HttpService:
 
     @classmethod
     async def post_json(
-        cls, url: str, json: dict, headers: Optional[dict] = headers
+        cls, url: str, json: dict, headers: dict | None = headers
     ) -> dict:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
@@ -69,7 +67,7 @@ class HttpService:
                 raise HttpRequestError
 
     @classmethod
-    async def get_status(cls, url: str, headers: Optional[dict] = headers) -> int:
+    async def get_status(cls, url: str, headers: dict | None = headers) -> int:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
                 async with session.get(url, headers=headers) as response:

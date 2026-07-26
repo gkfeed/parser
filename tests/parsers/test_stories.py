@@ -1,6 +1,7 @@
 import pytest
 
 from app.parsers.stories import InstagramStoriesFeed
+
 from . import fetch_items  # noqa
 
 STORIES_FEED_DATA = {

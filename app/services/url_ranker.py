@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 
 class URLRanker:
@@ -36,8 +36,8 @@ class URLRanker:
         active_urls = []
         for url in all_urls:
             if url in self.last_failed:
-                last_fail_time = datetime.fromtimestamp(self.last_failed[url])
-                if datetime.now() - last_fail_time < timedelta(
+                last_fail_time = datetime.fromtimestamp(self.last_failed[url], UTC)
+                if datetime.now(UTC) - last_fail_time < timedelta(
                     minutes=self.cooldown_minutes
                 ):
                     continue  # Still in cooldown
@@ -49,7 +49,7 @@ class URLRanker:
 
     def demote_url(self, url: str):
         self.ranks[url] = self.ranks.get(url, 0) + 1
-        self.last_failed[url] = datetime.now().timestamp()
+        self.last_failed[url] = datetime.now(UTC).timestamp()
         self.save_ranks()
 
     def promote_url(self, url: str):

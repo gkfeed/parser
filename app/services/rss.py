@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup, Tag
+
 from app.services.http import HttpService
 
 

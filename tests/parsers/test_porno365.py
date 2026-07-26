@@ -4,8 +4,8 @@ from app.parsers.porno365 import Porno365Feed
 from app.serializers.feed import Feed, Item
 from app.services.hash import HashService
 from app.utils.datetime import constant_datetime
-from . import fetch_items  # noqa
 
+from . import fetch_items  # noqa
 
 PORNO365_FEEDS = [
     {

@@ -1,11 +1,11 @@
-from datetime import timedelta, datetime, timezone
+from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urljoin
 
 from bs4 import Tag
 
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
@@ -57,7 +57,7 @@ class LiveballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
             return await super()._get_post_datetime(post)
 
         timestamp = int(str(timestamp_str))
-        return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        return datetime.fromtimestamp(timestamp, tz=UTC)
 
     def _extract_league_name(self, match: Tag) -> str:
         league_elem = match.select_one(".tm_league_name")

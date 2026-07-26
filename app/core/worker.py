@@ -1,10 +1,10 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
-from app.parsers import PARSERS
 from app.configs.env import BROKER_URL
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.parsers import PARSERS
 from app.serializers.feed import Feed
 from app.services.broker import BrokerService
 
@@ -20,7 +20,7 @@ async def run_worker(type: str):
 
     feed = Feed.model_validate_json(task.args[0])
     parser = PARSERS.get(feed.type)
-    print(f"{datetime.now().strftime('%H:%M')} {type}: {feed.url}")
+    print(f"{datetime.now(UTC).strftime('%H:%M')} {type}: {feed.url}")
 
     if not parser:
         raise ValueError(f"No parser found for feed type: {feed.type}")
@@ -31,7 +31,7 @@ async def run_worker(type: str):
 
         if isinstance(parser_instance, ItemsHashExtension):
             items = await parser_instance.apply_hashes(items)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - isolate failures from individual feed parsers
         print(f"Error processing {type}: {e}")
         await BrokerService(BROKER_URL).submit_error(task.id, "failed")
         return

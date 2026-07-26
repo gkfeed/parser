@@ -1,13 +1,14 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from app.models import Base
-from app.serializers.feed import Feed
-from app.services.repositories.feed import FeedRepository
-from app.services.container import Container
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from app.configs import Data
 from app.configs.selenium import get_driver
-
+from app.models import Base
+from app.serializers.feed import Feed
+from app.services.container import Container
+from app.services.repositories.feed import FeedRepository
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -41,7 +42,7 @@ async def create_feed():
         feed_data = Feed(
             id=0,
             title=title,
-            url=f"https://test.com/{datetime.now().timestamp()}-{title}",
+            url=f"https://test.com/{datetime.now(UTC).timestamp()}-{title}",
             type="test",
         )
         feed = await FeedRepository.create(feed_data)
@@ -52,7 +53,4 @@ async def create_feed():
     
     # Cleanup
     for feed in feeds:
-        try:
-            await FeedRepository.delete_by_id(feed.id)
-        except Exception:
-            pass
+        await FeedRepository.delete_by_id(feed.id)

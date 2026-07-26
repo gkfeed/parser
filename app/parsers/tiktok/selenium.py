@@ -1,6 +1,7 @@
 from bs4 import Tag
 
 from app.extensions.parsers.selenium import SeleniumParserExtension
+
 from ._base import BaseTikTokFeed
 
 

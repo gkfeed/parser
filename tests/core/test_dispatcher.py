@@ -1,7 +1,9 @@
 # NOTE: generated
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime, timezone, timedelta
+
 from app.core.dispatcher import Dispatcher
 from app.serializers.feed import Feed, Item
 from app.services.broker import BrokerError
@@ -38,7 +40,7 @@ async def test_should_process_feed_no_parser(dispatcher):
 async def test_should_process_feed_valid_in_past(dispatcher):
     feed = Feed(id=1, title="Test", url="http://test.com", type="test")
     mock_feed_parser = MagicMock()
-    mock_feed_parser.valid_for = datetime.now(timezone.utc) - timedelta(minutes=1)
+    mock_feed_parser.valid_for = datetime.now(UTC) - timedelta(minutes=1)
     dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
 
     assert await dispatcher._should_process_feed(feed) is True
@@ -49,7 +51,7 @@ async def test_should_process_feed_naive_datetime(dispatcher):
     feed = Feed(id=1, title="Test", url="http://test.com", type="test")
     mock_feed_parser = MagicMock()
     # Naive datetime (past) based on UTC
-    mock_feed_parser.valid_for = datetime.now(timezone.utc).replace(
+    mock_feed_parser.valid_for = datetime.now(UTC).replace(
         tzinfo=None
     ) - timedelta(minutes=10)
     dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
@@ -61,7 +63,7 @@ async def test_should_process_feed_naive_datetime(dispatcher):
 async def test_should_process_feed_valid_in_future(dispatcher):
     feed = Feed(id=1, title="Test", url="http://test.com", type="test")
     mock_feed_parser = MagicMock()
-    mock_feed_parser.valid_for = datetime.now(timezone.utc) + timedelta(minutes=1)
+    mock_feed_parser.valid_for = datetime.now(UTC) + timedelta(minutes=1)
     dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
 
     assert await dispatcher._should_process_feed(feed) is False
@@ -73,21 +75,21 @@ async def test_filter_seen_items(dispatcher):
         Item(
             title="Item 1",
             text="Text 1",
-            date=datetime.now(),
+            date=datetime.now(UTC),
             link="http://item1.com",
             hash="hash1",
         ),
         Item(
             title="Item 2",
             text="Text 2",
-            date=datetime.now(),
+            date=datetime.now(UTC),
             link="http://item2.com",
             hash="hash2",
         ),
         Item(
             title="Item 3",
             text="Text 3",
-            date=datetime.now(),
+            date=datetime.now(UTC),
             link="http://item3.com",
             hash=None,
         ),
@@ -109,7 +111,7 @@ async def test_request_items_from_broker_success(dispatcher):
         Item(
             title="Item 1",
             text="Text 1",
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             link="http://item1.com",
             hash="hash1",
         ),
@@ -153,7 +155,7 @@ async def test_fetch_feed_items_success(dispatcher):
         Item(
             title="Item 1",
             text="Text 1",
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             link="http://item1.com",
         )
     ]
@@ -186,7 +188,7 @@ async def test_fetch_feed_items_success(dispatcher):
         assert (
             abs(
                 (
-                    call_args[1] - (datetime.now(timezone.utc) + timedelta(hours=2))
+                    call_args[1] - (datetime.now(UTC) + timedelta(hours=2))
                 ).total_seconds()
             )
             < 10
@@ -220,7 +222,7 @@ async def test_fetch_feed_items_no_items(dispatcher):
         assert (
             abs(
                 (
-                    call_args[1] - (datetime.now(timezone.utc) + timedelta(minutes=30))
+                    call_args[1] - (datetime.now(UTC) + timedelta(minutes=30))
                 ).total_seconds()
             )
             < 10
@@ -241,9 +243,9 @@ async def test_fetch_feed_items_backs_off_after_failures(dispatcher):
             timedelta(hours=24),
             timedelta(hours=24),
         ):
-            before = datetime.now(timezone.utc)
+            before = datetime.now(UTC)
             await dispatcher._fetch_feed_items(feed)
-            after = datetime.now(timezone.utc)
+            after = datetime.now(UTC)
 
             call_args = dispatcher.feed_parser_repository.upsert.call_args[0]
             assert call_args[0] == feed.id
@@ -267,9 +269,9 @@ async def test_success_resets_failure_backoff(dispatcher):
     ):
         await dispatcher._fetch_feed_items(feed)
         await dispatcher._fetch_feed_items(feed)
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         await dispatcher._fetch_feed_items(feed)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
     retry_at = dispatcher.feed_parser_repository.upsert.call_args[0][1]
     expected_delay = timedelta(minutes=15)

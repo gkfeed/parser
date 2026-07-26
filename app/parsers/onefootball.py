@@ -5,10 +5,10 @@ from urllib.parse import urljoin
 
 from bs4 import Tag
 
-from app.utils.datetime import convert_datetime, constant_datetime
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.datetime import constant_datetime, convert_datetime
 
 
 class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
@@ -51,5 +51,7 @@ class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
             raise ValueError("Match tag has no 'href' attribute")
         href = post["href"]
         if not isinstance(href, str):
-            raise ValueError("Match 'href' attribute is not a string")
+            raise ValueError(  # noqa: TRY004 - malformed page data is a value error
+                "Match 'href' attribute is not a string"
+            )
         return urljoin(self.__base_url, href)

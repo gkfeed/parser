@@ -1,12 +1,12 @@
-from typing import AsyncGenerator
-from urllib.parse import unquote
+from collections.abc import AsyncGenerator
 from datetime import timedelta
+from urllib.parse import unquote
 
 from bs4 import Tag
 
-from app.serializers.feed import Item
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 

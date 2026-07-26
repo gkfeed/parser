@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.kinogo import KinogoFeed
+
 from . import fetch_items  # noqa
 
 KINOGO_FEED_DATA = {

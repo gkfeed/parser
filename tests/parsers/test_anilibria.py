@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.anilibria import AnilibriaFeed
+
 from . import fetch_items  # noqa
 
 ANILIBRIA_FEED_DATA = [

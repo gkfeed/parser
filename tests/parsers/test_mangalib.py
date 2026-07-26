@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.mangalib import MangaLibFeed
+
 from . import fetch_items  # noqa
 
 MANGALIB_FEED_DATA = {

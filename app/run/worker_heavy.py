@@ -1,7 +1,7 @@
 import asyncio
 
-from app.core.worker import run_worker
 from app.configs.workers import heavy_parsers
+from app.core.worker import run_worker
 
 if __name__ == "__main__":
     while True:

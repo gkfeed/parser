@@ -3,11 +3,11 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import Tag
 
+from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.extensions.parsers.http import HttpParserExtension
-from app.extensions.parsers.hash import ItemsHashExtension
-from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
@@ -24,7 +24,9 @@ class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
         soup = await self.get_soup(self.feed.url)
         container = soup.find("ul", class_="videos_ul")
         if not isinstance(container, Tag):
-            raise ValueError("Video list not found")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Video list not found"
+            )
 
         posts = []
         for post in container.find_all("li", class_="video_block"):

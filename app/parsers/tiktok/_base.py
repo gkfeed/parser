@@ -1,16 +1,15 @@
 import asyncio
-from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime, timedelta
 from typing import override
 
-from app.utils.datetime import convert_datetime
-from app.serializers.feed import Item
-
-from app.services.ytdlp.extractor import YtdlpInfoExtractor
-from app.services.hash import HashService
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
+from app.serializers.feed import Item
+from app.services.hash import HashService
+from app.services.ytdlp.extractor import YtdlpInfoExtractor
+from app.utils.datetime import convert_datetime
 
 
 class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
@@ -52,5 +51,5 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
         pass
 
     async def _get_video_publish_date(self, timestamp: float) -> datetime:
-        date_str = datetime.fromtimestamp(timestamp).strftime("%Y%m%d %H:%M:%S")
+        date_str = datetime.fromtimestamp(timestamp, UTC).strftime("%Y%m%d %H:%M:%S")
         return convert_datetime(date_str)

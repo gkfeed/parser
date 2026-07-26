@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.container import Container
+
 from app.configs import Data
+from app.services.container import Container
 
 
 class BaseRepository:

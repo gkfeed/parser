@@ -1,10 +1,12 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
+
+from app.models.item import Item as ItemModel
 from app.serializers.feed import Feed, Item
+from app.services.container import Container
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.item import ItemsRepository
-from app.models.item import Item as ItemModel
-from app.services.container import Container
 
 
 @pytest.mark.asyncio
@@ -13,12 +15,12 @@ async def test_items_repository():
     feed_data = Feed(
         id=0,
         title="Item Test Feed",
-        url=f"https://item-test.com/{datetime.now().timestamp()}",
+        url=f"https://item-test.com/{datetime.now(UTC).timestamp()}",
         type="test",
     )
     feed = await FeedRepository.create(feed_data)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     items = [
         Item(title="Item 1", text="Text 1", date=now, link="https://link1.com"),
         Item(title="Item 2", text="Text 2", date=now, link="https://link2.com"),
@@ -45,30 +47,29 @@ async def test_items_repository():
 async def test_items_repository_handles_existing_duplicates(create_feed):
     feed = await create_feed("Duplicate Test Feed")
     
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     item_link = f"https://dup-test.com/{now.timestamp()}"
     item_title = "Duplicate Item"
     
     # Manually insert two identical items
-    async with Container.get_data().db_session() as session:
-        async with session.begin():
-            # Create two items manually to bypass repository checks
-            item1 = ItemModel(
-                feed_id=feed.id,
-                title=item_title,
-                text="text",
-                date=now,
-                link=item_link
-            )
-            item2 = ItemModel(
-                feed_id=feed.id,
-                title=item_title,
-                text="text",
-                date=now,
-                link=item_link
-            )
-            session.add(item1)
-            session.add(item2)
+    async with Container.get_data().db_session() as session, session.begin():
+        # Create two items manually to bypass repository checks
+        item1 = ItemModel(
+            feed_id=feed.id,
+            title=item_title,
+            text="text",
+            date=now,
+            link=item_link
+        )
+        item2 = ItemModel(
+            feed_id=feed.id,
+            title=item_title,
+            text="text",
+            date=now,
+            link=item_link
+        )
+        session.add(item1)
+        session.add(item2)
             
     # Prepare the item serializer object
     item_to_check = Item(

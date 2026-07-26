@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 from app.services.cache.storage._base import BaseStorage
 
-
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env.test"), override=True)
 
 

@@ -1,6 +1,8 @@
-import pytest
 import random
+
 import fakeredis
+import pytest
+
 from app.services.cache.storage.redis import RedisStorage
 
 

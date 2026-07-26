@@ -4,8 +4,8 @@ from typing import override
 from bs4 import Tag
 
 from app.core.worker_kind import WorkerKind
-from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 

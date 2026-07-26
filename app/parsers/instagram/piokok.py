@@ -1,13 +1,12 @@
+from collections.abc import AsyncGenerator
 from datetime import timedelta
-from typing import AsyncGenerator
 
 from bs4 import Tag
 
+from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
-
-from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.extensions.parsers.cache import CacheFeedExtension
 
 
 class InstagramFeed(SeleniumParserExtension, CacheFeedExtension):

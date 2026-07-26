@@ -1,7 +1,6 @@
 from app.core.worker_kind import WorkerKind
 from app.parsers import Parser
 
-
 ignored_parser_types: set[Parser] = {
     Parser.X,
 }

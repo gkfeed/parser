@@ -1,8 +1,8 @@
-from typing import Any
+from typing import Any, ClassVar
 
 
 class BaseExtractionMode:
-    opts: dict[str, Any] = {
+    opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -13,7 +13,7 @@ class BaseExtractionMode:
 
 class ChannelExtractionMode(BaseExtractionMode):
     max_videos = 5
-    opts: dict[str, Any] = {
+    opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -29,7 +29,7 @@ class ChannelExtractionMode(BaseExtractionMode):
 
 
 class VideoExtractionMode(BaseExtractionMode):
-    opts: dict[str, Any] = {
+    opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
@@ -45,7 +45,7 @@ class VideoExtractionMode(BaseExtractionMode):
 
 
 class PlaylistExtractionMode(BaseExtractionMode):
-    opts: dict[str, Any] = {
+    opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,

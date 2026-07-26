@@ -1,11 +1,11 @@
 from datetime import timedelta
 
 from app.core.worker_kind import WorkerKind
+from app.extensions.parsers.base import BaseFeed as _BaseFeed
+from app.extensions.parsers.cache import CacheFeedExtension
 from app.serializers.feed import Item
 from app.services.twitch import Twitch
 from app.services.twitch.types import Stream
-from app.extensions.parsers.base import BaseFeed as _BaseFeed
-from app.extensions.parsers.cache import CacheFeedExtension
 
 
 class TwitchFeed(CacheFeedExtension, _BaseFeed):

@@ -1,7 +1,8 @@
 from datetime import timedelta
 
-from app.serializers.feed import Item
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.serializers.feed import Item
+
 from ..web import WebFeed
 from ._base import BaseTikTokFeed
 

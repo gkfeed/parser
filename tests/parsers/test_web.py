@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.web import WebFeed
+
 from . import fetch_items  # noqa
 
 WEB_FEED_DATA = {

@@ -1,5 +1,5 @@
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
-from datetime import datetime, timedelta
 
 from . import CacheService
 
@@ -12,7 +12,7 @@ class InvalidCache(Exception):
 
 class TemporaryCacheService(CacheService[_T]):
     def set_with_expiry(self, id: str, data: _T, storage_time: timedelta) -> None:
-        expire_at = (datetime.now() + storage_time).timestamp()
+        expire_at = (datetime.now(UTC) + storage_time).timestamp()
         self._storage.set(f"{id}__timestamp", expire_at)
 
         super().set(id, data)
@@ -29,4 +29,4 @@ class TemporaryCacheService(CacheService[_T]):
         except ValueError:
             return False
 
-        return datetime.now().timestamp() < expired_timestamp
+        return datetime.now(UTC).timestamp() < expired_timestamp

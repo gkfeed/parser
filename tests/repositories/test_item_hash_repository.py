@@ -1,14 +1,17 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime
 from sqlalchemy import select
+
 from app.models.item_hash import ItemHash
-from app.services.repositories.item_hash import ItemsHashRepository
 from app.services.container import Container
+from app.services.repositories.item_hash import ItemsHashRepository
+
 
 @pytest.mark.asyncio
 async def test_item_hash_basic_flow(create_feed):
     feed = await create_feed()
-    hash_val = f"hash-{datetime.now().timestamp()}"
+    hash_val = f"hash-{datetime.now(UTC).timestamp()}"
 
     # 1. Not contained initially
     assert not await ItemsHashRepository.contains(hash_val, feed.id)
@@ -23,7 +26,7 @@ async def test_item_hash_basic_flow(create_feed):
 async def test_item_hash_scoping(create_feed):
     feed1 = await create_feed("Feed 1")
     feed2 = await create_feed("Feed 2")
-    hash_val = f"scoped-hash-{datetime.now().timestamp()}"
+    hash_val = f"scoped-hash-{datetime.now(UTC).timestamp()}"
 
     # Save for Feed 1
     await ItemsHashRepository.save(hash_val, feed1.id)
@@ -40,12 +43,11 @@ async def test_item_hash_scoping(create_feed):
 async def test_item_hash_claim_legacy(create_feed):
     feed1 = await create_feed("Claim Feed 1")
     feed2 = await create_feed("Claim Feed 2")
-    hash_val = f"global-hash-{datetime.now().timestamp()}"
+    hash_val = f"global-hash-{datetime.now(UTC).timestamp()}"
 
     # Manual insert of global hash
-    async with Container.get_data().db_session() as session:
-        async with session.begin():
-            session.add(ItemHash(hash=hash_val, feed_id=None))
+    async with Container.get_data().db_session() as session, session.begin():
+        session.add(ItemHash(hash=hash_val, feed_id=None))
 
     # 1. Feed 1 encounters it -> Claims it
     assert await ItemsHashRepository.contains(hash_val, feed1.id)

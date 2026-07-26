@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 
 from app.parsers.spoti import SpotifyFeed, SpotifyPlaylistFeed
 from app.serializers.feed import Feed
+
 from . import fetch_items  # noqa
 
 SPOTIFY_FEED_DATA = [

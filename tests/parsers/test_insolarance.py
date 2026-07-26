@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.insolarance import InsolaranceFeed
+
 from . import fetch_items  # noqa
 
 INSOLARANCE_FEED_DATA = {

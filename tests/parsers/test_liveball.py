@@ -1,6 +1,7 @@
 import pytest
 
 from app.parsers.liveball import LiveballFeed
+
 from . import fetch_items  # noqa
 
 LIVEBALL_FEED_DATA = {

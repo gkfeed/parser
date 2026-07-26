@@ -1,8 +1,9 @@
 from typing import override
+
 from bs4 import Tag
 
-from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
 class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):

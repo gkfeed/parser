@@ -3,6 +3,7 @@ from typing import override
 
 from app.serializers.feed import Feed, Item
 from app.services.hash import HashService
+
 from .base import BaseFeed as _BaseFeed
 
 

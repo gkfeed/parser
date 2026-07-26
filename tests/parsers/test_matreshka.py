@@ -1,5 +1,7 @@
 import pytest
+
 from app.parsers.matreshka import MatreshkaFeed
+
 from . import fetch_items  # noqa
 
 MATRESHKA_FEED_DATA = {

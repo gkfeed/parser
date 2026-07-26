@@ -1,13 +1,13 @@
 from pathlib import Path
 
 from selenium import webdriver
-from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.remote.webdriver import WebDriver
 
-from app.utils.is_in_docker import IS_IN_DOCKER
 from app.configs.env import SELENIUM_DOCKER_URL
+from app.utils.is_in_docker import IS_IN_DOCKER
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
 IS_HEADLESS = True

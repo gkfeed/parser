@@ -1,12 +1,13 @@
-from typing import Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from selenium.webdriver.remote.webdriver import WebDriver
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.services.container import Container
-from .selenium import get_driver
+
 from .db import session_factory
+from .selenium import get_driver
 
 
 @dataclass

@@ -1,6 +1,8 @@
 import pytest
-from app.parsers.twitch import TwitchFeed
+
 from app.configs.env import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
+from app.parsers.twitch import TwitchFeed
+
 from . import fetch_items  # noqa
 
 TWITCH_FEED_DATA = {

@@ -1,20 +1,20 @@
 import json
-from datetime import datetime
-from typing import override
+from datetime import UTC, datetime
+from typing import ClassVar, override
 from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.http import HttpParserExtension
-from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
 class LiquidpediaFeed(
     PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
 ):
-    _headers = {
+    _headers: ClassVar[dict[str, str]] = {
         **HttpParserExtension._headers,
         "User-Agent": "gkfeed-parser/0.1 (https://github.com/gkfeed/parser)",
     }
@@ -27,11 +27,15 @@ class LiquidpediaFeed(
         if isinstance(upcoming_matches_heading, Tag):
             heading_container = upcoming_matches_heading.parent
             if not isinstance(heading_container, Tag):
-                raise ValueError("Upcoming matches heading container not found")
+                raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                    "Upcoming matches heading container not found"
+                )
 
             matches_container = heading_container.find_next_sibling()
             if not isinstance(matches_container, Tag):
-                raise ValueError("Upcoming matches container not found")
+                raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                    "Upcoming matches container not found"
+                )
 
             matches = matches_container.select(".match-info")
         else:
@@ -48,7 +52,9 @@ class LiquidpediaFeed(
         for opponent in post.select(".match-info-opponent-row"):
             name_tag = opponent.select_one(".name")
             if not isinstance(name_tag, Tag):
-                raise ValueError("Team name not found")
+                raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                    "Team name not found"
+                )
             team_names.append(name_tag.get_text(" ", strip=True))
 
         if not team_names:
@@ -88,13 +94,17 @@ class LiquidpediaFeed(
     async def _get_post_datetime(self, post: Tag) -> datetime:
         timer_span = post.select_one(".timer-object[data-timestamp]")
         if not isinstance(timer_span, Tag):
-            raise ValueError("Timer span not found")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Timer span not found"
+            )
 
         timestamp_str = timer_span.get("data-timestamp")
         if not isinstance(timestamp_str, str):
-            raise ValueError("data-timestamp not found")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "data-timestamp not found"
+            )
 
-        return datetime.fromtimestamp(int(timestamp_str))
+        return datetime.fromtimestamp(int(timestamp_str), UTC)
 
     async def _get_page_soup(self) -> BeautifulSoup:
         response = json.loads(await self.get_html(self._get_api_url()))
@@ -104,7 +114,9 @@ class LiquidpediaFeed(
             raise ValueError("Unexpected Liquipedia API response") from error
 
         if not isinstance(html, str):
-            raise ValueError("Liquipedia API response does not contain HTML")
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Liquipedia API response does not contain HTML"
+            )
 
         return BeautifulSoup(html, "html.parser")
 

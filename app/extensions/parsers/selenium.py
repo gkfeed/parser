@@ -1,11 +1,12 @@
-from datetime import timedelta
 from abc import ABC
+from datetime import timedelta
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.core.worker_kind import WorkerKind
 from app.services.cache.use_temporary import async_store_in_cache_for
-from app.services.selenium import SeleniumService, SeleniumGetHtmlArgs
+from app.services.selenium import SeleniumGetHtmlArgs, SeleniumService
+
 from .http import HttpParserExtension
 
 

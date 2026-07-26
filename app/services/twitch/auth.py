@@ -1,4 +1,5 @@
-from app.services.http import HttpService, HttpRequestError
+from app.services.http import HttpRequestError, HttpService
+
 from .exceptions import TwitchAuthenticationFailed
 
 
