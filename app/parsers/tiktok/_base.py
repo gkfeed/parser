@@ -17,15 +17,19 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
     @property
     async def items(self) -> list[Item]:
-        tasks = []
-        async with asyncio.TaskGroup() as tg:
-            for link in await self._video_links:
-                tasks.append(tg.create_task(self._create_video_item(link)))
+        links = await self._video_links
+        results = await asyncio.gather(
+            *(self._create_video_item(link) for link in links),
+            return_exceptions=True,
+        )
 
         items = []
-        for task in tasks:
-            result = task.result()
-            if result is not None and isinstance(result, Item):
+        for link, result in zip(links, results, strict=True):
+            if isinstance(result, BaseException):
+                if not isinstance(result, Exception):
+                    raise result
+                print(f"Failed to extract TikTok video {link}: {result}")
+            elif result is not None:
                 items.append(result)
         return items
 
