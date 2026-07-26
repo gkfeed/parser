@@ -43,7 +43,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations
+.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations docker-restart-workers
 
 migrate:
 	$(ALEMBIC) upgrade head
@@ -80,3 +80,6 @@ docker-update:
 	docker compose stop && docker compose rm -f
 	docker compose build
 	docker compose up -d
+
+docker-restart-workers:
+	docker compose up -d --build --force-recreate --no-deps worker_light worker_heavy
