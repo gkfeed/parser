@@ -21,7 +21,7 @@ from app.workers.http import get_html
 
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
-    _cache_storage_time_if_success = timedelta(days=1)
+    _cache_storage_time_if_success = timedelta(weeks=1)
     _selenium_wait_time = 10
     _should_delete_cookies = True
     _service_url = "https://anonyig.com/en/"
