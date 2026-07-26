@@ -61,7 +61,12 @@ lock:
 	uv export --no-hashes --format requirements-txt > requirements.txt
 
 lint:
-	uvx ruff check . && uvx typos && uv run mypy app/ && uv run pyright app/
+	uvx ruff check . 
+	uvx typos
+	uv run mypy app/
+	uv run pyright app/
+	uvx pyrefly check . 
+	uvx ty check
 
 format:
 ifdef FILE
