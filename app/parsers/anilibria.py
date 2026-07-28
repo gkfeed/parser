@@ -13,7 +13,7 @@ from app.utils.datetime import constant_datetime
 class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time_if_success = timedelta(days=1)
     _cache_storage_time = timedelta(seconds=5)
-    _api_base_url = "https://aniliberty.top/api/v1/"
+    _api_base_url = "https://anilibria.top/api/v1/"
     _cdn_base_url = "https://cdn.anilibria.top/"
 
     @property
