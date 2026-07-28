@@ -12,3 +12,4 @@ class SeleniumGetHtmlArgs:
     should_save_cookies: bool
     make_actions_function: Callable[[WebDriver], None] | None
     selenium_wait_timeout_seconds: int
+    page_load_timeout_seconds: int | None = None

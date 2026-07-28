@@ -17,6 +17,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
     _should_delete_cookies = False
     _should_load_cookies = False
     _should_save_cookies = False
+    _page_load_timeout_seconds: int | None = None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -33,6 +34,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
                 should_save_cookies=self._should_save_cookies,
                 make_actions_function=self.make_actions,
                 selenium_wait_timeout_seconds=self._selenium_wait_time,
+                page_load_timeout_seconds=self._page_load_timeout_seconds,
             )
         )
         return html.encode()

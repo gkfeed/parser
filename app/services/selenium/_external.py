@@ -18,7 +18,7 @@ class ExternalSelenium:
         broker = BrokerService(BROKER_URL)
 
         data = asdict(args)
-        if "make_actions_function" in data:
+        if data.pop("make_actions_function") is not None:
             raise ExternalSeleniumError(
                 "make_actions_function is not supported in external selenium"
             )

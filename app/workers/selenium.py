@@ -1,9 +1,11 @@
 import asyncio
+import contextlib
 import os
 import pickle
 from collections.abc import Callable
 from dataclasses import asdict
 
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
 import app.configs  # noqa: F401
@@ -25,8 +27,12 @@ async def _get_html(
     should_save_cookies: bool,
     make_actions_function: Callable[[WebDriver], None] | None,
     selenium_wait_timeout_seconds: int,
+    page_load_timeout_seconds: int | None,
 ) -> str:
     try:
+        if page_load_timeout_seconds is not None:
+            driver.set_page_load_timeout(page_load_timeout_seconds)
+
         if should_delete_cookies:
             driver.delete_all_cookies()
 
@@ -36,7 +42,11 @@ async def _get_html(
             for cookie in _load_cookies():
                 driver.add_cookie(cookie)
 
-        driver.get(url)
+        try:
+            driver.get(url)
+        except TimeoutException:
+            if page_load_timeout_seconds is None:
+                raise
         await asyncio.sleep(selenium_wait_timeout_seconds)
 
         if make_actions_function:
@@ -47,13 +57,16 @@ async def _get_html(
         if should_save_cookies:
             await asyncio.to_thread(_save_cookies, driver.get_cookies())
 
-        driver.close()
-        driver.quit()
-        return html
-    except Exception:
-        driver.close()
-        driver.quit()
+    except BaseException:
+        # Preserve the original parsing/cancellation error if session cleanup also
+        # fails. Calling close() first can prevent quit() from ever reaching the
+        # remote Selenium server, leaving its temporary Chrome profile behind.
+        with contextlib.suppress(Exception):
+            driver.quit()
         raise
+
+    driver.quit()
+    return html
 
 
 def _load_cookies():

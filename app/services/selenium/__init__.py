@@ -17,7 +17,11 @@ class SeleniumService:
         try:
             html = await WorkerSelenium.get_html(args)
         except Exception:
-            if fallback_to_external_selenium:
+            # The external worker receives serialized arguments and cannot run a
+            # parser's browser callback. Let action-based parsers keep the actual
+            # local Selenium error instead of replacing it with a misleading
+            # external-worker error.
+            if fallback_to_external_selenium and args.make_actions_function is None:
                 html = await ExternalSelenium.get_html(
                     args, timeout=args.selenium_wait_timeout_seconds + 60
                 )

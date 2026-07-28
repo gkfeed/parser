@@ -12,4 +12,4 @@ class CatboxUploader:
             "url": url,
         }
         response = await HttpService.post(cls.host_url, body=params)
-        return response.decode("utf-8")
+        return response.decode("utf-8").strip()
