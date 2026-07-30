@@ -1,5 +1,8 @@
+import html
+import re
 from datetime import UTC, datetime, timedelta
 from typing import override
+from urllib.parse import urlparse
 
 from bs4 import Tag
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -73,15 +76,52 @@ class VkFeed(
 
     @override
     async def _get_post_text(self, post: Tag) -> str:
+        text = ""
         show_more_text = post.select_one('[data-testid^="showmoretext-in"]')
         if show_more_text:
-            return show_more_text.get_text("\n", strip=True)
+            text = show_more_text.get_text("\n", strip=True)
+        else:
+            wall_text = post.find(class_="wall_post_text")
+            if isinstance(wall_text, Tag):
+                text = wall_text.get_text("\n", strip=True)
 
-        wall_text = post.find(class_="wall_post_text")
-        if isinstance(wall_text, Tag):
-            return wall_text.get_text("\n", strip=True)
+        image_url = self._get_post_image_url(post)
+        if not image_url:
+            return text
 
-        return ""
+        image = f'<img src="{html.escape(image_url, quote=True)}" alt="VK post">'
+        return f"{image}<br>{html.escape(text)}" if text else image
+
+    def _get_post_image_url(self, post: Tag) -> str | None:
+        image = post.select_one(
+            'a[href*="/photo"] img[src], '
+            'a[href*="photo-"] img[src], '
+            '[data-testid*="photo" i] img[src], '
+            '[class*="PhotoPrimaryAttachment"] img[src], '
+            '[class*="MediaGrid"] img[src]'
+        )
+        if isinstance(image, Tag):
+            source = image.get("src")
+            if isinstance(source, str) and self._is_http_url(source):
+                return source
+
+        thumbnail = post.select_one(
+            'a[href*="/photo"][style*="background-image"], '
+            'a[href*="photo-"][style*="background-image"], '
+            '.page_post_thumb_wrap[style*="background-image"]'
+        )
+        if isinstance(thumbnail, Tag):
+            style = thumbnail.get("style")
+            if isinstance(style, str):
+                match = re.search(r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style)
+                if match and self._is_http_url(match.group(2)):
+                    return match.group(2)
+
+        return None
+
+    @staticmethod
+    def _is_http_url(value: str) -> bool:
+        return urlparse(value).scheme in {"http", "https"}
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
