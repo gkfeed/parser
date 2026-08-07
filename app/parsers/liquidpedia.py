@@ -1,7 +1,15 @@
 import json
 from datetime import UTC, datetime
 from typing import ClassVar, override
-from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import (
+    SplitResult,
+    parse_qs,
+    unquote,
+    urlencode,
+    urljoin,
+    urlsplit,
+    urlunsplit,
+)
 
 from bs4 import BeautifulSoup, Tag
 
@@ -23,28 +31,27 @@ class LiquidpediaFeed(
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self._get_page_soup()
-        upcoming_matches_heading = soup.find(id="Upcoming_Matches")
-        if isinstance(upcoming_matches_heading, Tag):
-            heading_container = upcoming_matches_heading.parent
-            if not isinstance(heading_container, Tag):
-                raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                    "Upcoming matches heading container not found"
-                )
+        matches = self._get_upcoming_matches(soup)
+        if matches:
+            return matches
 
-            matches_container = heading_container.find_next_sibling()
-            if not isinstance(matches_container, Tag):
-                raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                    "Upcoming matches container not found"
-                )
+        # Team pages without scheduled matches omit the Upcoming Matches
+        # heading. Their recent matches are rendered using table2 markup. The
+        # rows are not guaranteed to be ``tr`` elements, so select the row
+        # class independently of the element name.
+        return list(soup.select(".match-table-wrapper .table2__row--body"))
 
-            matches = matches_container.select(".match-info")
-        else:
-            # Team pages without scheduled matches omit the Upcoming Matches
-            # heading. Their recent matches are rendered using the new table2
-            # markup instead.
-            matches = soup.select(".match-table-wrapper tr.table2__row--body")
+    @staticmethod
+    def _get_upcoming_matches(soup: BeautifulSoup) -> list[Tag]:
+        heading = soup.find(id="Upcoming_Matches")
+        if not isinstance(heading, Tag) or not isinstance(heading.parent, Tag):
+            return []
 
-        return [match for match in matches if isinstance(match, Tag)]
+        container = heading.parent.find_next_sibling()
+        if not isinstance(container, Tag):
+            return []
+
+        return list(container.select(".match-info"))
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -92,22 +99,56 @@ class LiquidpediaFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        timer_span = post.select_one(".timer-object[data-timestamp]")
-        if not isinstance(timer_span, Tag):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Timer span not found"
-            )
+        timestamp_value: object = post.get("data-timestamp")
+        if not isinstance(timestamp_value, (str, int)):
+            timestamp_tag = post.select_one("[data-timestamp]")
+            timestamp_value = timestamp_tag.get("data-timestamp") if timestamp_tag else None
 
-        timestamp_str = timer_span.get("data-timestamp")
-        if not isinstance(timestamp_str, str):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "data-timestamp not found"
-            )
+        if isinstance(timestamp_value, (str, int)):
+            return self._parse_timestamp(timestamp_value)
 
-        return datetime.fromtimestamp(int(timestamp_str), UTC)
+        time_tag = post.select_one("time[datetime]")
+        datetime_value = time_tag.get("datetime") if time_tag else None
+        if isinstance(datetime_value, str):
+            return self._parse_iso_datetime(datetime_value)
+
+        raise ValueError("Match timestamp not found")
+
+    @staticmethod
+    def _parse_timestamp(value: str | int) -> datetime:
+        """Parse Unix timestamps represented in seconds or milliseconds."""
+
+        try:
+            timestamp = int(value)
+        except ValueError as error:
+            raise ValueError("Invalid match timestamp") from error
+
+        # Some table variants expose Unix time in milliseconds.
+        if abs(timestamp) >= 100_000_000_000:
+            timestamp //= 1_000
+
+        try:
+            return datetime.fromtimestamp(timestamp, UTC)
+        except (OverflowError, OSError, ValueError) as error:
+            raise ValueError("Invalid match timestamp") from error
+
+    @staticmethod
+    def _parse_iso_datetime(value: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as error:
+            raise ValueError("Invalid datetime attribute") from error
+
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
 
     async def _get_page_soup(self) -> BeautifulSoup:
-        response = json.loads(await self.get_html(self._get_api_url()))
+        try:
+            response = json.loads(await self.get_html(self._get_api_url()))
+        except (json.JSONDecodeError, TypeError) as error:
+            raise ValueError("Invalid Liquipedia API response") from error
+
         try:
             html = response["parse"]["text"]["*"]
         except (KeyError, TypeError) as error:
@@ -127,6 +168,10 @@ class LiquidpediaFeed(
             raise ValueError("Invalid Liquipedia page URL")
 
         wiki, page = path_parts
+        page = self._get_page_title(url, page)
+        if not page:
+            raise ValueError("Invalid Liquipedia page URL")
+
         query = urlencode(
             {
                 "action": "parse",
@@ -138,8 +183,16 @@ class LiquidpediaFeed(
         return urlunsplit((url.scheme, url.netloc, f"/{wiki}/api.php", query, ""))
 
     def _get_team_name_from_url(self) -> str:
-        page = unquote(urlsplit(self.feed.url).path.rstrip("/").rsplit("/", 1)[-1])
+        url = urlsplit(self.feed.url)
+        page = url.path.rstrip("/").rsplit("/", 1)[-1]
+        page = self._get_page_title(url, page)
         team_name = page.replace("_", " ").strip()
         if not team_name:
             raise ValueError("Could not extract team name from Liquipedia URL")
         return team_name
+
+    @staticmethod
+    def _get_page_title(url: SplitResult, path_page: str) -> str:
+        if path_page.casefold() == "index.php":
+            path_page = parse_qs(url.query).get("title", [""])[0]
+        return unquote(path_page)
