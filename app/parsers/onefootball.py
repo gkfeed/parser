@@ -23,7 +23,7 @@ class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
         matches = []
 
         for link in soup.find_all("a", href=self.__match_path):
-            if isinstance(link, Tag) and link.find("time"):
+            if isinstance(link, Tag):
                 matches.append(link)
 
         return matches[:2]
