@@ -24,7 +24,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
     _cache_storage_time_if_success = timedelta(weeks=1)
     _selenium_wait_time = 10
     _should_delete_cookies = True
-    _service_url = "https://anonyig.com/en/"
+    _service_url = "https://anonyig.com/en/iganony/"
 
     @override
     async def _generate_hash(self, item: Item) -> str:
