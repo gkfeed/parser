@@ -11,7 +11,7 @@ from app.utils.is_in_docker import IS_IN_DOCKER
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
 IS_HEADLESS = True
-FALLBACK_TO_EXTERNAL_SELENIUM = True
+FALLBACK_TO_EXTERNAL_SELENIUM = False
 _CHROME_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
