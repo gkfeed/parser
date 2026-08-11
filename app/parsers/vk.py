@@ -64,15 +64,10 @@ class VkFeed(
     @override
     async def _get_post_title(self, post: Tag) -> str:
         # Try to find author name in the same page or use feed title
-        try:
-            author = post.select_one(
-                '.PostHeaderTitle__authorName, [data-testid="post-header-title"]'
-            )
-            if author:
-                return author.get_text(strip=True)
-            return self.feed.title or "VK Post"
-        except (IndexError, AttributeError):
-            return "VK Post"
+        author = post.select_one(
+            '.PostHeaderTitle__authorName, [data-testid="post-header-title"]'
+        )
+        return author.get_text(strip=True) if author else self.feed.title or "VK Post"
 
     @override
     async def _get_post_text(self, post: Tag) -> str:
@@ -113,7 +108,9 @@ class VkFeed(
         if isinstance(thumbnail, Tag):
             style = thumbnail.get("style")
             if isinstance(style, str):
-                match = re.search(r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style)
+                match = re.search(
+                    r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style
+                )
                 if match and self._is_http_url(match.group(2)):
                     return match.group(2)
 

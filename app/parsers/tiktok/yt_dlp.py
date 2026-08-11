@@ -1,9 +1,6 @@
-from datetime import UTC, datetime
-
 from app.core.worker_kind import WorkerKind
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.services.ytdlp.modes import BaseExtractionMode
-from app.utils.datetime import convert_datetime
 
 from ._base import BaseTikTokFeed
 
@@ -27,7 +24,3 @@ class TikTokFeed(BaseTikTokFeed):
                 continue
             videos.append(v["url"])
         return videos
-
-    async def _get_video_publish_date(self, timestamp: float) -> datetime:
-        date_str = datetime.fromtimestamp(timestamp, UTC).strftime("%Y%m%d %H:%M:%S")
-        return convert_datetime(date_str)

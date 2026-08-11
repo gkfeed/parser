@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import override
 
 from bs4 import Tag
@@ -69,6 +69,5 @@ class RanobeMeFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
             timestamp_str = uptodate_tag.get("data-time")
             if isinstance(timestamp_str, str):
                 timestamp = int(timestamp_str)
-                tz = timezone(offset=timedelta(hours=0))
-                return datetime.fromtimestamp(timestamp, tz)
+                return datetime.fromtimestamp(timestamp, UTC)
         raise ValueError("Could not determine update time.")

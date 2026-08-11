@@ -16,9 +16,7 @@ class SasflixFeed(ItemsHashExtension, HttpParserExtension):
 
     @property
     async def items(self) -> list[Item]:
-        rss_url = self.feed.url.rstrip("/")
-        if not rss_url.endswith("/rss.xml"):
-            rss_url += "/rss.xml"
+        rss_url = f"{self.feed.url.rstrip('/').removesuffix('/rss.xml')}/rss.xml"
 
         html = await self.get_html(rss_url)
         soup = BeautifulSoup(html, "xml")
@@ -32,11 +30,10 @@ class SasflixFeed(ItemsHashExtension, HttpParserExtension):
             link = getattr(item_tag.find("link"), "text", "")
             pub_date = getattr(item_tag.find("pubDate"), "text", "")
 
-            content_encoded = item_tag.find(
-                "encoded"
-            )  # BeautifulSoup with 'xml' parser often maps 'content:encoded' to 'encoded'
-            if not content_encoded:
-                content_encoded = item_tag.find("content:encoded")
+            # The XML parser often maps content:encoded to encoded.
+            content_encoded = item_tag.find("encoded") or item_tag.find(
+                "content:encoded"
+            )
 
             description = content_encoded.text if content_encoded else ""
 

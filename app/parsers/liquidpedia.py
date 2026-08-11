@@ -76,7 +76,7 @@ class LiquidpediaFeed(
         if len(team_names) != 2 or not all(team_names):
             raise ValueError("Expected two team names")
 
-        return f"{team_names[0]} vs {team_names[1]}"
+        return " vs ".join(team_names)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
@@ -102,7 +102,9 @@ class LiquidpediaFeed(
         timestamp_value: object = post.get("data-timestamp")
         if not isinstance(timestamp_value, (str, int)):
             timestamp_tag = post.select_one("[data-timestamp]")
-            timestamp_value = timestamp_tag.get("data-timestamp") if timestamp_tag else None
+            timestamp_value = (
+                timestamp_tag.get("data-timestamp") if timestamp_tag else None
+            )
 
         if isinstance(timestamp_value, (str, int)):
             return self._parse_timestamp(timestamp_value)

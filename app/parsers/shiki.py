@@ -32,7 +32,7 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
 
         return [
             n
-            for n in reversed(list(menu_link.find_all(class_="entry")))
+            for n in reversed(menu_link.find_all(class_="entry"))
             if isinstance(n, Tag)
         ]
 

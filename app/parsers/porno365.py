@@ -28,13 +28,11 @@ class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
                 "Video list not found"
             )
 
-        posts = []
-        for post in container.find_all("li", class_="video_block"):
-            if not isinstance(post, Tag):
-                continue
-
-            posts.append(post)
-        return posts
+        return [
+            post
+            for post in container.find_all("li", class_="video_block")
+            if isinstance(post, Tag)
+        ]
 
     @override
     async def _get_post_title(self, post: Tag) -> str:

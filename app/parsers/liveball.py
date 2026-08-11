@@ -19,14 +19,10 @@ class LiveballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
         soup = await self.get_soup(self._base_url)
 
         top_match_container = soup.find("section", class_="top_match_section")
-        if not top_match_container or not isinstance(top_match_container, Tag):
+        if not isinstance(top_match_container, Tag):
             return []
 
-        return [
-            m
-            for m in top_match_container.select("div.top_match div.league_block")
-            if isinstance(m, Tag)
-        ]
+        return top_match_container.select("div.top_match div.league_block")
 
     @override
     async def _get_post_title(self, post: Tag) -> str:

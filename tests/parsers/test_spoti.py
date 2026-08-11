@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from bs4 import BeautifulSoup
 
@@ -81,3 +83,33 @@ def test_spoti_playlist_requires_track_link():
 
     with pytest.raises(ValueError, match="first track"):
         parser._get_first_track_element(soup)
+
+
+async def test_spoti_artist_parses_discography_items():
+    soup = BeautifulSoup(
+        """
+        <meta property="og:title" content="Artist name">
+        <a href="/album/album-id">Album name</a>
+        """,
+        "html.parser",
+    )
+    parser = SpotifyFeed(
+        Feed(
+            id=1,
+            title="Artist",
+            url="https://open.spotify.com/artist/artist-id",
+            type="spoti",
+        ),
+        {},
+    )
+
+    with patch.object(parser, "get_soup", AsyncMock(return_value=soup)):
+        items = await parser.items
+
+    assert [(item.title, item.text, item.link) for item in items] == [
+        (
+            "Artist name - Album name",
+            "Album name",
+            "https://open.spotify.com/album/album-id",
+        )
+    ]

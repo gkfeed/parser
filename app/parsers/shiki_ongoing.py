@@ -27,14 +27,14 @@ class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension
     @override
     async def _get_post_title(self, post: Tag) -> str:
         title_tag = post.find("span", class_="name-en")
-        if title_tag and isinstance(title_tag, Tag):
+        if isinstance(title_tag, Tag):
             return title_tag.text
         raise ValueError("Title not found")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
         link_tag = post.find("a")
-        if link_tag and isinstance(link_tag, Tag):
+        if isinstance(link_tag, Tag):
             href = link_tag.get("href")
             if isinstance(href, str):
                 return href
@@ -43,11 +43,8 @@ class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         date_meta = post.find("meta", itemprop="dateCreated")
-        if (
-            date_meta
-            and isinstance(date_meta, Tag)
-            and (date_content := date_meta.get("content"))
-            and isinstance(date_content, str)
-        ):
-            return datetime.fromisoformat(date_content)
+        if isinstance(date_meta, Tag):
+            date_content = date_meta.get("content")
+            if isinstance(date_content, str) and date_content:
+                return datetime.fromisoformat(date_content)
         return constant_datetime

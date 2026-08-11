@@ -40,9 +40,7 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
             if isinstance(episode, Mapping)
         ]
 
-    def _episode_to_item(
-        self, show_title: str, episode: Mapping[str, Any]
-    ) -> Item:
+    def _episode_to_item(self, show_title: str, episode: Mapping[str, Any]) -> Item:
         episode_id = self._required_string(episode, "id")
         ordinal = episode.get("ordinal")
         if not isinstance(ordinal, int):
@@ -70,10 +68,10 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
             release_index = parts.index("release")
             alias = parts[release_index + 1]
         except (ValueError, IndexError):
-            raise ValueError(f"Could not extract release alias from URL: {self.feed.url}")
+            raise ValueError(
+                f"Could not extract release alias from URL: {self.feed.url}"
+            )
 
-        if not alias:
-            raise ValueError(f"Could not extract release alias from URL: {self.feed.url}")
         return alias
 
     def _site_base_url(self) -> str:
