@@ -1,13 +1,17 @@
+import asyncio
 import base64
 import re
-import time
 from datetime import timedelta
 from typing import override
+from urllib.parse import urlparse
 
 from bs4.element import Tag
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -22,7 +26,12 @@ from app.workers.http import get_html
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
     _cache_storage_time_if_success = timedelta(weeks=1)
-    _selenium_wait_time = 10
+    _selenium_wait_time = 0
+    _results_wait_time = 30
+    _load_more_wait_time = 5
+    _max_media_items = 30
+    _image_download_concurrency = 6
+    _page_load_timeout_seconds = 30
     _should_delete_cookies = True
     _service_url = "https://anonyig.com/en/iganony/"
 
@@ -43,16 +52,15 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
         media_list_items = soup.find_all(class_="profile-media-list__item")
 
-        items = []
-        for i in media_list_items:
-            if not isinstance(i, Tag):
-                continue
+        media = [item for item in media_list_items if isinstance(item, Tag)]
+        semaphore = asyncio.Semaphore(self._image_download_concurrency)
 
-            item = await self._create_item_from_media(i)
-            if item:
-                items.append(item)
+        async def create_item(item: Tag) -> Item | None:
+            async with semaphore:
+                return await self._create_item_from_media(item)
 
-        return items
+        items = await asyncio.gather(*(create_item(item) for item in media))
+        return [item for item in items if item is not None]
 
     @staticmethod
     def _get_mime_type(data: bytes) -> str:
@@ -141,11 +149,10 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
     @override
     def make_actions(self, driver: WebDriver):
         try:
-            button = driver.find_element(
-                By.XPATH,
-                "/html/body/div/div[2]/div[2]/div[3]/div[2]/button[1]",
+            reject_consent = driver.find_element(
+                By.CSS_SELECTOR, ".fc-cta-do-not-consent"
             )
-            driver.execute_script("arguments[0].click();", button)
+            self._click(driver, reject_consent)
         except NoSuchElementException:
             pass
 
@@ -154,20 +161,80 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             By.CSS_SELECTOR, "form.search-form input.search-form__input"
         )
         link.send_keys(self._user_name)
-        time.sleep(1)
 
         # Click search button
         button = driver.find_element(
             By.CSS_SELECTOR,
             ".search-form__button",
         )
-        driver.execute_script("arguments[0].click();", button)
+        self._click(driver, button)
 
-        time.sleep(self._selenium_wait_time)
-        for _ in range(10):
-            driver.execute_script("window.scrollBy(0, 500);")
-            time.sleep(1)
+        result = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.any_of(
+                expected_conditions.presence_of_element_located(
+                    (By.CSS_SELECTOR, ".profile-media-list__item")
+                ),
+                expected_conditions.presence_of_element_located(
+                    (By.CSS_SELECTOR, ".error-message")
+                ),
+            )
+        )
+        if "error-message" in (result.get_attribute("class") or "").split():
+            return
+
+        search_result = driver.find_element(By.CSS_SELECTOR, ".search-result")
+        if not search_result.is_displayed():
+            # The landing-page experiment hides the populated result in headless
+            # browsers, preventing its load-more IntersectionObserver from firing.
+            driver.execute_script(
+                "arguments[0].style.setProperty('display', 'block', 'important');"
+                "arguments[0].style.setProperty('visibility', 'visible', 'important');",
+                search_result,
+            )
+
+        self._load_more_media(driver)
+
+    def _load_more_media(self, driver: WebDriver) -> None:
+        media_selector = ".profile-media-list__item"
+        trigger_selector = ".profile-media-list > .trigger"
+        media_count = len(driver.find_elements(By.CSS_SELECTOR, media_selector))
+
+        while media_count < self._max_media_items:
+            try:
+                trigger = driver.find_element(By.CSS_SELECTOR, trigger_selector)
+            except NoSuchElementException:
+                break
+
+            driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});", trigger
+            )
+
+            def media_count_increased(
+                current_driver: WebDriver, previous_count: int = media_count
+            ) -> bool:
+                return (
+                    len(current_driver.find_elements(By.CSS_SELECTOR, media_selector))
+                    > previous_count
+                )
+
+            try:
+                WebDriverWait(driver, self._load_more_wait_time).until(
+                    media_count_increased
+                )
+            except TimeoutException:
+                break
+
+            media_count = len(driver.find_elements(By.CSS_SELECTOR, media_selector))
+
+    @staticmethod
+    def _click(driver: WebDriver, element: WebElement) -> None:
+        try:
+            driver.execute_script("arguments[0].click();", element)
+        except TimeoutException:
+            # Background requests can outlive an otherwise usable result page.
+            pass
 
     @property
     def _user_name(self) -> str:
-        return self.feed.url.split("/")[-1]
+        path = urlparse(self.feed.url).path.rstrip("/")
+        return path.rsplit("/", 1)[-1].removeprefix("@")
