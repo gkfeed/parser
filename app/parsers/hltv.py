@@ -46,7 +46,15 @@ class HltvFeed(
         if upcoming_matches_headline_tag is None:
             raise ValueError("Upcoming matches headline not found.")
 
-        match_table = upcoming_matches_headline_tag.find_next_sibling(
+        headline_container = upcoming_matches_headline_tag
+        if (
+            isinstance(upcoming_matches_headline_tag.parent, Tag)
+            and "headline-with-action"
+            in (upcoming_matches_headline_tag.parent.get("class") or [])
+        ):
+            headline_container = upcoming_matches_headline_tag.parent
+
+        match_table = headline_container.find_next_sibling(
             "table", class_="table-container match-table"
         )
 
@@ -135,10 +143,10 @@ class HltvFeed(
         if not isinstance(team1_div, Tag) or not isinstance(team2_div, Tag):
             return None
 
-        team1_name_tag = team1_div.find("a", class_="team-name")
-        team2_name_tag = team2_div.find("a", class_="team-name")
+        team1_name_tag = team1_div.find(class_="team-name")
+        team2_name_tag = team2_div.find(class_="team-name")
 
         if not isinstance(team1_name_tag, Tag) or not isinstance(team2_name_tag, Tag):
             return None
 
-        return team1_name_tag.text, team2_name_tag.text
+        return team1_name_tag.get_text(strip=True), team2_name_tag.get_text(strip=True)
