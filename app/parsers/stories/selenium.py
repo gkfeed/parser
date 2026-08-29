@@ -15,8 +15,8 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
-from app.services.catbox import CatboxUploader
 from app.services.hash import HashService
+from app.services.media_upload import FallbackUploader
 from app.utils.datetime import constant_datetime
 
 
@@ -58,10 +58,7 @@ class InstagramStoriesFeed(
 
     @staticmethod
     async def _upload_media(url: str) -> str | None:
-        try:
-            return await CatboxUploader.upload_with_url(url)
-        except Exception:  # noqa: BLE001 - keep one unavailable story from aborting all
-            return None
+        return await FallbackUploader.upload_with_url(url)
 
     @staticmethod
     def _extract_media_links(soup: Tag) -> list[str]:
