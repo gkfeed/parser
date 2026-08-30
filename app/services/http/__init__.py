@@ -19,17 +19,22 @@ class HttpService:
 
     @classmethod
     async def get(cls, url: str, headers: dict = headers) -> bytes:
+        _, content = await cls.get_with_status(url, headers=headers)
+        return content
+
+    @classmethod
+    async def get_with_status(
+        cls, url: str, headers: dict = headers
+    ) -> tuple[int, bytes]:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
                 async with session.get(url, headers=headers) as response:
-                    return await response.content.read()
+                    return response.status, await response.content.read()
             except ClientError:
                 raise HttpRequestError
 
     @classmethod
-    async def post(
-        cls, url: str, body: dict, headers: dict | None = headers
-    ) -> bytes:
+    async def post(cls, url: str, body: dict, headers: dict | None = headers) -> bytes:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
                 async with session.post(url, data=body, headers=headers) as response:
