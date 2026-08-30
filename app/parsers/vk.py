@@ -12,6 +12,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import UnavailableFeed
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -28,19 +29,28 @@ class VkFeed(
 ):
     _cache_storage_time = timedelta(hours=1)
     _selenium_wait_time = 5
+    _post_selector = '[data-testid="post"][data-post-id]'
+    _challenge_attempts = 3
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        posts = soup.select('[data-testid="post"][data-post-id]')
+        posts = soup.select(self._post_selector)
         if posts:
             return posts
-        return [
+        legacy_posts = [
             post
             for post in soup.find_all(class_="wall_post_cont")
             if isinstance(post, Tag)
         ]
+        if legacy_posts:
+            return legacy_posts
+
+        if soup.select_one("button.start"):
+            raise UnavailableFeed(self.feed.url)
+
+        return []
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -48,18 +58,32 @@ class VkFeed(
 
     @override
     def make_actions(self, driver: WebDriver):
-        # Bypass robot check if present
         try:
-            buttons = driver.find_elements(By.CLASS_NAME, "start")
-            if buttons:
-                buttons[0].click()
-                WebDriverWait(driver, 15).until(
+            for _ in range(self._challenge_attempts):
+                if driver.find_elements(By.CSS_SELECTOR, self._post_selector):
+                    return
+
+                buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
+                if not buttons:
+                    return
+
+                button = buttons[0]
+                button.click()
+                wait = WebDriverWait(driver, 30)
+                wait.until(ec.staleness_of(button))
+                wait.until(
                     ec.presence_of_element_located(
-                        (By.CSS_SELECTOR, '[data-testid="post"][data-post-id]')
+                        (
+                            By.CSS_SELECTOR,
+                            f"{self._post_selector}, .wall_post_cont, button.start",
+                        )
                     )
                 )
-        except (TimeoutException, WebDriverException):
-            return
+
+            if driver.find_elements(By.CSS_SELECTOR, "button.start"):
+                raise UnavailableFeed(self.feed.url)
+        except (TimeoutException, WebDriverException) as error:
+            raise UnavailableFeed(self.feed.url) from error
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -113,7 +137,9 @@ class VkFeed(
         if isinstance(thumbnail, Tag):
             style = thumbnail.get("style")
             if isinstance(style, str):
-                match = re.search(r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style)
+                match = re.search(
+                    r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style
+                )
                 if match and self._is_http_url(match.group(2)):
                     return match.group(2)
 
