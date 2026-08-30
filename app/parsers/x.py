@@ -21,7 +21,7 @@ class XFeed(PostToItemsMixin, HttpParserExtension):
     @override
     async def _get_post_title(self, post: Tag) -> str:
         media_body = post.find(class_="media-body")
-        if media_body and isinstance(media_body, Tag):
+        if isinstance(media_body, Tag):
             return media_body.text.strip()
         raise ValueError
 
@@ -35,7 +35,7 @@ class XFeed(PostToItemsMixin, HttpParserExtension):
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         date_tag = post.find(class_="tweet-date")
-        if date_tag and isinstance(date_tag, Tag):
+        if isinstance(date_tag, Tag):
             date_str = date_tag.a.text if date_tag.a else ""
             if date_str:
                 return convert_datetime(date_str)
@@ -43,7 +43,6 @@ class XFeed(PostToItemsMixin, HttpParserExtension):
 
     @property
     def feed_url(self) -> str:
-        href = self.feed.url.split("/")[-1]
-        if self.feed.url.endswith("/"):
-            href = self.feed.url.split("/")[-2]
+        url_parts = self.feed.url.split("/")
+        href = url_parts[-2] if self.feed.url.endswith("/") else url_parts[-1]
         return self._base_url + href

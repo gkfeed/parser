@@ -26,18 +26,20 @@ class RezkaCollectionFeed(SeleniumParserExtension):
         ]
 
     def _extract_item_title(self, title_tag: Tag) -> str:
-        if not (title_tag.a and isinstance(title_tag.a, Tag)):
+        anchor = title_tag.find("a")
+        if not (anchor and isinstance(anchor, Tag)):
             raise ValueError(
                 "Could not extract item title: <a> tag not found or not a Tag instance."
             )
-        return title_tag.a.text
+        return anchor.text
 
     def _extract_item_text(self, title_tag: Tag) -> str:
-        if not (title_tag.a and isinstance(title_tag.a, Tag)):
+        anchor = title_tag.find("a")
+        if not (anchor and isinstance(anchor, Tag)):
             raise ValueError(
                 "Could not extract item text: <a> tag not found or not a Tag instance."
             )
-        return title_tag.a.text
+        return anchor.text
 
     def _extract_collection_titles(self, soup: Tag) -> list[Tag]:
         titles = [
@@ -50,13 +52,12 @@ class RezkaCollectionFeed(SeleniumParserExtension):
         return titles
 
     def _extract_item_link(self, title_tag: Tag) -> str:
-        if not (title_tag.a and "href" in title_tag.a.attrs):
+        anchor = title_tag.find("a")
+        if not isinstance(anchor, Tag) or "href" not in anchor.attrs:
             raise ValueError(
                 "Could not extract item link: <a> tag or href attribute not found."
             )
-        return self._normalize_href(str(title_tag.a["href"]))
+        return self._normalize_href(str(anchor["href"]))
 
     def _normalize_href(self, href: str) -> str:
-        if href.startswith("/"):
-            return self._base_url + href
-        return href
+        return self._base_url + href if href.startswith("/") else href

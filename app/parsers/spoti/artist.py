@@ -15,7 +15,8 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
 
     @property
     async def items(self) -> list[Item]:
-        artist_name = await self._artist_name
+        soup = await self._get_discography_soup()
+        artist_name = await self._parse_artist_name(soup)
         return [
             Item(
                 title=self._extract_title(link, artist_name),
@@ -23,29 +24,19 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
                 date=constant_datetime,
                 link=self._extract_link(link),
             )
-            for link in await self._releases_links
-            if isinstance(link, Tag)
+            for link in await self._parse_releases_links(soup)
         ]
 
     async def _get_discography_soup(self):
-        _url = self.feed.url
-        _url = _url.removesuffix("/")
+        url = self.feed.url.removesuffix("/")
 
-        soup = await self.get_soup(_url + "/discography")
+        soup = await self.get_soup(url + "/discography")
         if soup.title and "Page not found" in soup.title.text:
-            return await self.get_soup(_url)
+            return await self.get_soup(url)
         return soup
 
     async def _parse_releases_links(self, soup) -> list[Tag]:
-        links = soup.find_all("a")
-
-        releases_links = []
-        for link in links:
-            if isinstance(link, Tag) and "href" in link.attrs:
-                href = link["href"]
-                if isinstance(href, str) and href.startswith("/album"):
-                    releases_links.append(link)
-        return releases_links
+        return list(soup.select('a[href^="/album"]'))
 
     @property
     async def _releases_links(self) -> list[Tag]:

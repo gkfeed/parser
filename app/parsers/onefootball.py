@@ -20,13 +20,11 @@ class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
-        matches = []
-
-        for link in soup.find_all("a", href=self.__match_path):
-            if isinstance(link, Tag):
-                matches.append(link)
-
-        return matches[:2]
+        return [
+            link
+            for link in soup.find_all("a", href=self.__match_path, limit=2)
+            if isinstance(link, Tag)
+        ]
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -39,10 +37,9 @@ class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         time_tag = post.find("time")
-        if time_tag and isinstance(time_tag, Tag) and "datetime" in time_tag.attrs:
-            datetime_attr = time_tag["datetime"]
-            if isinstance(datetime_attr, str):
-                return convert_datetime(datetime_attr)
+        datetime_attr = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
+        if isinstance(datetime_attr, str):
+            return convert_datetime(datetime_attr)
         return constant_datetime
 
     @override

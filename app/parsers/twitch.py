@@ -14,14 +14,12 @@ class TwitchFeed(CacheFeedExtension, _BaseFeed):
 
     @property
     async def items(self) -> list[Item]:
-        items = []
-        if stream := await Twitch.get_stream(self._streamer_name):
-            items = [self._get_stream_item(stream)]
-        return items
+        stream = await Twitch.get_stream(self._streamer_name)
+        return [self._get_stream_item(stream)] if stream else []
 
     def _get_stream_item(self, stream: Stream) -> Item:
         return Item(
-            title=stream.channel_name + ": " + stream.title,
+            title=f"{stream.channel_name}: {stream.title}",
             text=stream.title,
             date=stream.started_at,
             link=self.feed.url,

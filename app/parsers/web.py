@@ -25,7 +25,8 @@ class WebFeed(ItemsHashExtension, HttpParserExtension):
     async def _get_items_from_web(self, url: str) -> list[Item]:
         return [self._convert_item(item) for item in await RSSParser.parse_feed(url)]
 
-    def _convert_item(self, item_data: dict) -> Item:
+    @staticmethod
+    def _convert_item(item_data: dict) -> Item:
         return Item(
             title=item_data.get("title", ""),
             link=item_data.get("link", ""),

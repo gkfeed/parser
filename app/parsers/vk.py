@@ -88,15 +88,10 @@ class VkFeed(
     @override
     async def _get_post_title(self, post: Tag) -> str:
         # Try to find author name in the same page or use feed title
-        try:
-            author = post.select_one(
-                '.PostHeaderTitle__authorName, [data-testid="post-header-title"]'
-            )
-            if author:
-                return author.get_text(strip=True)
-            return self.feed.title or "VK Post"
-        except (IndexError, AttributeError):
-            return "VK Post"
+        author = post.select_one(
+            '.PostHeaderTitle__authorName, [data-testid="post-header-title"]'
+        )
+        return author.get_text(strip=True) if author else self.feed.title or "VK Post"
 
     @override
     async def _get_post_text(self, post: Tag) -> str:
