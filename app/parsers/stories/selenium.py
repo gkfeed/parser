@@ -78,7 +78,7 @@ class InstagramStoriesFeed(
         return links
 
     @override
-    def make_actions(self, driver: WebDriver):
+    def make_actions(self, driver: WebDriver) -> None:
         # The results page keeps some requests open in Docker, so a synchronous
         # click can otherwise wait for Selenium's five-minute default timeout.
         driver.set_page_load_timeout(30)

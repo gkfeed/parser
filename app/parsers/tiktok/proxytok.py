@@ -1,13 +1,12 @@
 from datetime import timedelta
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.serializers.feed import Item
 
 from ..web import WebFeed
 from ._base import BaseTikTokFeed
 
 
-class TikTokFeed(BaseTikTokFeed, WebFeed, CacheFeedExtension):
+class TikTokFeed(BaseTikTokFeed, WebFeed):
     __base_url = "https://tok.adminforge.de"
     _cache_storage_time_if_success = timedelta(hours=2)
 

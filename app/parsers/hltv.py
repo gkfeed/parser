@@ -23,25 +23,14 @@ class HltvFeed(
         soup = await self.get_soup(self.feed.url)
 
         def is_upcoming_matches_headline(tag: Tag) -> bool:
-            if tag.name != "h2":
-                return False
+            return (
+                tag.name == "h2"
+                and "standard-headline" in (tag.get("class") or [])
+                and isinstance(tag.string, NavigableString)
+                and tag.string.strip().startswith("Upcoming matches for")
+            )
 
-            classes = tag.get("class")
-            if not classes or "standard-headline" not in classes:
-                return False
-
-            return isinstance(
-                tag.string, NavigableString
-            ) and tag.string.strip().startswith("Upcoming matches for")
-
-        upcoming_matches_headlines = soup.find_all(
-            is_upcoming_matches_headline, limit=1
-        )
-        upcoming_matches_headline_tag = (
-            upcoming_matches_headlines[0]
-            if len(upcoming_matches_headlines) > 0
-            else None
-        )
+        upcoming_matches_headline_tag = soup.find(is_upcoming_matches_headline)
 
         if upcoming_matches_headline_tag is None:
             raise ValueError("Upcoming matches headline not found.")
@@ -72,9 +61,7 @@ class HltvFeed(
     @property
     @override
     async def items(self) -> list[Item]:
-        # Hltv has try-except logic per row in old implementation, we can override items to replicate it
-        # or just implement _get_post methods and let mixin handle it.
-        # The old implementation skipped rows that failed to parse.
+        # One malformed match should not abort the entire feed.
         items = []
         for p in await self._posts:
             try:
@@ -108,8 +95,10 @@ class HltvFeed(
         match_link_tag = post.select_one(
             "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
         )
-        if not isinstance(match_link_tag, Tag) or not match_link_tag.has_attr("href"):
-            raise ValueError("Link tag not found")
+        if not isinstance(match_link_tag, Tag):
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Link tag not found"
+            )
 
         return urljoin("https://www.hltv.org", str(match_link_tag["href"]))
 

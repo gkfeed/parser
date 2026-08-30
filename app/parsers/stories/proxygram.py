@@ -27,7 +27,7 @@ class InstagramStoriesFeed(HttpParserExtension, CacheFeedExtension):
         ]
 
     @property
-    async def _videos_links(self) -> AsyncGenerator[str, str]:
+    async def _videos_links(self) -> AsyncGenerator[str, None]:
         url = f"{self.__base_url}/{self._user_name}/stories"
         soup = await self.get_soup(url)
         for video in soup.find_all("video"):

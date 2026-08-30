@@ -21,7 +21,8 @@ class _BaseYoutubeFeed(BaseFeed):
 
     def _get_target_url(self) -> str:
         target_url = self.feed.url
-        if target_url.split("/")[-2] == "channel" or len(target_url.split("@")) == 2:
+        url_parts = target_url.split("/")
+        if url_parts[-2] == "channel" or len(target_url.split("@")) == 2:
             target_url += "/videos"
         return target_url
 
@@ -56,14 +57,12 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
             published_at = YoutubePublishDateService.resolve(
                 video_info, channel_publish_dates
             )
-            if published_at is None:
-                published_at = constant_datetime
 
             items.append(
                 Item(
                     title="YT: " + channel_name,
                     text=title,
-                    date=published_at,
+                    date=published_at or constant_datetime,
                     link=video_url,
                 )
             )

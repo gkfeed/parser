@@ -34,13 +34,13 @@ class KinogoFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
         return self.feed.url
 
     async def _show_status(self, soup: Tag) -> str:
-        try:
-            return soup.find_all(class_="status7")[0].text
-        except IndexError:
-            raise ValueError
+        status = soup.find(class_="status7")
+        if isinstance(status, Tag):
+            return status.text
+        raise ValueError
 
     async def _show_title(self, soup: Tag) -> str:
-        try:
-            return soup.find_all("h1")[0].text
-        except IndexError:
-            raise ValueError("Couldn'n find status of show: " + self.feed.url)
+        title = soup.find("h1")
+        if isinstance(title, Tag):
+            return title.text
+        raise ValueError("Couldn'n find status of show: " + self.feed.url)

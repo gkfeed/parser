@@ -23,23 +23,23 @@ class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):
             if not isinstance(last_h2, Tag):
                 raise ValueError("Last h2 is not a Tag")
             return [last_h2]
-        else:
-            active_season = soup.select_one(".b-simple_season__item.active")
-            tab_id = active_season.get("data-tab_id") if active_season else "1"
-            tab_id = str(tab_id) if tab_id else "1"
-            return self._extract_episodes(soup, tab_id)
+
+        active_season = soup.select_one(".b-simple_season__item.active")
+        tab_id = active_season.get("data-tab_id") if active_season else "1"
+        tab_id = str(tab_id) if tab_id else "1"
+        return self._extract_episodes(soup, tab_id)
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
         show_url = self.feed.url
         if "/films/" in show_url:
             return post.text
-        else:
-            soup = await self._show_soup
-            title = self._extract_title(soup)
-            active_season = soup.select_one(".b-simple_season__item.active")
-            season_text = active_season.text if active_season else "1 Сезон"
-            return f"{title} {season_text} {post.text}"
+
+        soup = await self._show_soup
+        title = self._extract_title(soup)
+        active_season = soup.select_one(".b-simple_season__item.active")
+        season_text = active_season.text if active_season else "1 Сезон"
+        return f"{title} {season_text} {post.text}"
 
     @override
     async def _get_post_text(self, post: Tag) -> str:
@@ -51,11 +51,11 @@ class RezkaFeed(PostToItemsMixin, SeleniumParserExtension):
 
     @property
     async def _show_soup(self) -> Tag:
-        _url = self.feed.url
-        soup = await self.get_soup(_url)
+        url = self.feed.url
+        soup = await self.get_soup(url)
 
-        if not _url.endswith("-latest.html") and not self._has_show_content(soup):
-            latest_url = _url.replace(".html", "-latest.html")
+        if not url.endswith("-latest.html") and not self._has_show_content(soup):
+            latest_url = url.replace(".html", "-latest.html")
             soup = await self.get_soup(latest_url)
 
         return soup

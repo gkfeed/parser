@@ -79,23 +79,12 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         if not isinstance(img, Tag):
             return None
 
-        # Check if it's a video
-        is_video = False
-        video_tag_indicator = media.find(class_="tags__item--video")
-        if video_tag_indicator:
-            is_video = True
+        is_video = media.find(class_="tags__item--video") is not None
 
         link_tag = media.find("a")
-        media_url = None
-        if isinstance(link_tag, Tag):
-            media_url = link_tag.get("href")
+        media_url = link_tag.get("href") if isinstance(link_tag, Tag) else None
 
-        if (
-            is_video
-            and media_url
-            and isinstance(media_url, str)
-            and ".mp4" in media_url
-        ):
+        if is_video and isinstance(media_url, str) and ".mp4" in media_url:
             print(
                 f"warning: Instagram video is tmp unavailable because media links expire: {media_url}"
             )
