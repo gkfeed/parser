@@ -7,7 +7,7 @@ from app.utils.datetime import constant_datetime
 
 class RezkaCollectionFeed(SeleniumParserExtension):
     _base_url = "https://hdrezka.me"
-    _max_items = 5
+    _max_items = 30
     _selenium_wait_time = 5
 
     @property
