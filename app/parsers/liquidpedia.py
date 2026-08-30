@@ -150,9 +150,14 @@ class LiquidpediaFeed(
             raise ValueError("Invalid Liquipedia API response") from error
 
         try:
-            html = response["parse"]["text"]["*"]
+            html = response["parse"]["text"]
         except (KeyError, TypeError) as error:
             raise ValueError("Unexpected Liquipedia API response") from error
+
+        # MediaWiki's legacy response wraps the rendered HTML in a ``*`` key.
+        # Keep accepting that shape for cached responses and older wikis.
+        if isinstance(html, dict):
+            html = html.get("*")
 
         if not isinstance(html, str):
             raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
@@ -178,6 +183,7 @@ class LiquidpediaFeed(
                 "page": unquote(page),
                 "prop": "text",
                 "format": "json",
+                "formatversion": 2,
             }
         )
         return urlunsplit((url.scheme, url.netloc, f"/{wiki}/api.php", query, ""))
