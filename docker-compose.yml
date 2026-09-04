@@ -65,5 +65,15 @@ services:
   chrome:
     image: selenium/standalone-chrome:latest
     restart: always
+    environment:
+      # Clean up browser processes left behind by interrupted Selenium sessions.
+      - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true
+      - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=300
+      - SE_BROWSER_LEFTOVERS_PROCESSES_SECS=900
+      - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=0
+    tmpfs:
+      # Chrome profiles are disposable. Keep them out of Docker's writable layer
+      # and cap their aggregate size if an interrupted session leaks a profile.
+      - /tmp:size=4g,mode=1777
     volumes:
       - /dev/shm:/dev/shm
