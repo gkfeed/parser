@@ -1,11 +1,12 @@
 from bs4 import Tag
 
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class RezkaCollectionFeed(SeleniumParserExtension):
+class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
     _base_url = "https://hdrezka.me"
     _max_items = 30
     _selenium_wait_time = 5
