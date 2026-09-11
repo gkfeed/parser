@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.item import Item as _Item
+from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
 
 from ._base import BaseRepository
@@ -17,11 +18,43 @@ class ItemsRepository(BaseRepository):
             return [cls._serialize_item(i) for i in result.scalars().all()]
 
     @classmethod
-    async def add_items_to_feed(cls, feed: Feed, items: list[Item]):
+    async def add_items_to_feed(cls, feed: Feed, items: list[Item]) -> list[Item]:
+        unseen_items = []
         async with cls._session_factory() as session, session.begin():
             for item in items:
+                if item.hash and await cls._contains_hash(session, item.hash, feed.id):
+                    continue
+
                 if not await cls._check_if_exists(session, feed, item):
                     await cls._create_item(session, feed, item)
+
+                if item.hash:
+                    session.add(ItemHash(hash=item.hash, feed_id=feed.id))
+                unseen_items.append(item)
+
+        return unseen_items
+
+    @staticmethod
+    async def _contains_hash(
+        session: AsyncSession, hash: str, feed_id: int
+    ) -> bool:
+        stmt = select(ItemHash).where(
+            ItemHash.hash == hash, ItemHash.feed_id == feed_id
+        )
+        result = await session.execute(stmt)
+        if result.scalars().first() is not None:
+            return True
+
+        legacy_stmt = select(ItemHash).where(
+            ItemHash.hash == hash, ItemHash.feed_id.is_(None)
+        )
+        legacy_result = await session.execute(legacy_stmt)
+        legacy_hash = legacy_result.scalars().first()
+        if legacy_hash is None:
+            return False
+
+        legacy_hash.feed_id = feed_id
+        return True
 
     @classmethod
     async def _check_if_exists(

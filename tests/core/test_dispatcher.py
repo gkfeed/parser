@@ -15,14 +15,9 @@ def dispatcher():
         get_by_feed_id = AsyncMock(return_value=None)
         upsert = AsyncMock()
 
-    class FakeItemHashRepository:
-        contains = AsyncMock(return_value=False)
-        save = AsyncMock()
-
     return Dispatcher(
         broker=AsyncMock(),
         feed_parser_repository=FakeFeedParserRepository,
-        item_hash_repository=FakeItemHashRepository,
         parsers={},
     )
 
@@ -67,41 +62,6 @@ async def test_should_process_feed_valid_in_future(dispatcher):
     dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
 
     assert await dispatcher._should_process_feed(feed) is False
-
-
-@pytest.mark.asyncio
-async def test_filter_seen_items(dispatcher):
-    items = [
-        Item(
-            title="Item 1",
-            text="Text 1",
-            date=datetime.now(UTC),
-            link="http://item1.com",
-            hash="hash1",
-        ),
-        Item(
-            title="Item 2",
-            text="Text 2",
-            date=datetime.now(UTC),
-            link="http://item2.com",
-            hash="hash2",
-        ),
-        Item(
-            title="Item 3",
-            text="Text 3",
-            date=datetime.now(UTC),
-            link="http://item3.com",
-            hash=None,
-        ),
-    ]
-    dispatcher.item_hash_repository.contains.side_effect = lambda h, f: h == "hash1"
-
-    filtered = await dispatcher._filter_seen_items(feed_id=1, items=items)
-
-    assert len(filtered) == 2
-    assert filtered[0].title == "Item 2"
-    assert filtered[1].title == "Item 3"
-    dispatcher.item_hash_repository.save.assert_called_once_with("hash2", 1)
 
 
 @pytest.mark.asyncio
@@ -169,17 +129,13 @@ async def test_fetch_feed_items_success(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(
-            dispatcher, "_filter_seen_items", new_callable=AsyncMock
-        ) as mock_filter,
         patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
     ):
         mock_request.return_value = items
-        mock_filter.return_value = items
+        mock_save.return_value = items
 
         await dispatcher._fetch_feed_items(feed)
 
-        mock_filter.assert_awaited_once_with(feed.id, items)
         mock_save.assert_called_once_with(feed, items)
         dispatcher.feed_parser_repository.upsert.assert_called_once()
         # Verify that the expiration date is roughly current time + 2 hours

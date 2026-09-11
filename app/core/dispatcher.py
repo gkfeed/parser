@@ -12,7 +12,6 @@ from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
 from app.services.broker import BrokerError, BrokerService
 from app.services.repositories.feed_parser import FeedParserRepository
-from app.services.repositories.item_hash import ItemsHashRepository
 
 from .storage import FeedStorage, ItemsStorage
 
@@ -21,12 +20,6 @@ class FeedParserRepositoryProtocol(Protocol):
     async def get_by_feed_id(self, feed_id: int) -> FeedParser | None: ...
 
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
-
-
-class ItemsHashRepositoryProtocol(Protocol):
-    async def contains(self, hash: str, feed_id: int) -> bool: ...
-
-    async def save(self, hash: str, feed_id: int) -> None: ...
 
 
 class Dispatcher(ItemsStorage, FeedStorage):
@@ -41,12 +34,10 @@ class Dispatcher(ItemsStorage, FeedStorage):
         self,
         broker: BrokerService,
         feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
-        item_hash_repository: ItemsHashRepositoryProtocol = ItemsHashRepository,
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
-        self.item_hash_repository = item_hash_repository
         self.parsers = parsers
         self._failure_counts: dict[int, int] = {}
 
@@ -90,8 +81,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
-            items = await self._filter_seen_items(feed.id, items)
-            await self._save_items(feed, items)
+            items = await self._save_items(feed, items)
             print(f"Saved {len(items)} items for feed: {feed.url}")
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
@@ -122,18 +112,3 @@ class Dispatcher(ItemsStorage, FeedStorage):
         items = adapter.validate_json(items_json)
 
         return items
-
-    async def _filter_seen_items(self, feed_id: int, items: list[Item]) -> list[Item]:
-        filtered_items = []
-        for item in items:
-            if not item.hash:
-                print(f"warning: item has no hash, skipping seen check {item.link}")
-                filtered_items.append(item)
-                continue
-
-            if await self.item_hash_repository.contains(item.hash, feed_id):
-                continue
-
-            await self.item_hash_repository.save(item.hash, feed_id)
-            filtered_items.append(item)
-        return filtered_items

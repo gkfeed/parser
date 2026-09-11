@@ -4,8 +4,8 @@ from app.services.repositories.item import ItemsRepository
 
 
 class ItemsStorage:
-    async def _save_items(self, feed: Feed, items: list[Item]):
-        await ItemsRepository.add_items_to_feed(feed, items)
+    async def _save_items(self, feed: Feed, items: list[Item]) -> list[Item]:
+        return await ItemsRepository.add_items_to_feed(feed, items)
 
 
 class FeedStorage:
