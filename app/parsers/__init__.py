@@ -5,6 +5,7 @@ from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
 
 from .anilibria import AnilibriaFeed
+from .author_today import AuthorTodayFeed
 from .hltv import HltvFeed
 from .insolarance import InsolaranceFeed
 from .instagram import InstagramFeed
@@ -73,6 +74,7 @@ class Parser(Enum):
     LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed)
     SASFLIX = ParserConfig("sasflix", SasflixFeed)
     PORNO365 = ParserConfig("porno365", Porno365Feed)
+    AUTHOR_TODAY = ParserConfig("author.today", AuthorTodayFeed)
 
 
 # NOTE: inconsistent api
