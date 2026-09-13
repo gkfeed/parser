@@ -1,5 +1,6 @@
 PYTHON = .venv/bin/python
 ALEMBIC = .venv/bin/alembic
+PRODUCTION_COMPOSE = docker compose -f docker-compose.yml -f docker-compose.production.yml
 
 merge-to-master:
 	git checkout master
@@ -43,7 +44,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations docker-restart-workers
+.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
 
 migrate:
 	$(ALEMBIC) upgrade head
@@ -77,9 +78,15 @@ endif
 
 docker-update:
 	git fetch && git pull
-	docker compose stop && docker compose rm -f
-	docker compose build
-	docker compose up -d
+	$(PRODUCTION_COMPOSE) --profile heavy stop && $(PRODUCTION_COMPOSE) --profile heavy rm -f
+	$(PRODUCTION_COMPOSE) build
+	$(PRODUCTION_COMPOSE) up -d
+
+docker-heavy-start:
+	$(PRODUCTION_COMPOSE) --profile heavy up -d worker_heavy
+
+docker-heavy-stop:
+	$(PRODUCTION_COMPOSE) --profile heavy stop worker_heavy chrome
 
 docker-restart-workers:
 	docker compose up -d --build --force-recreate --no-deps worker_light worker_heavy

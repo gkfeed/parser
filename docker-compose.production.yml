@@ -1,0 +1,24 @@
+services:
+  dispatcher:
+    networks:
+      - default
+      - gkfeed-db
+  worker_light:
+    networks:
+      - default
+      - gkfeed-db
+  worker_heavy:
+    profiles:
+      - heavy
+    networks:
+      - default
+      - gkfeed-db
+  chrome:
+    image: seleniarm/standalone-chromium:latest
+    profiles:
+      - heavy
+
+networks:
+  gkfeed-db:
+    external: true
+    name: gkfeed-infra_default

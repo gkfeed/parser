@@ -41,6 +41,24 @@ before starting Docker Compose to store the files in a different directory:
 WORKER_LOG_DIR=/path/to/logs docker compose up -d
 ```
 
+## Production Docker deployment
+
+Production combines `docker-compose.yml` with
+`docker-compose.production.yml`. The production overlay connects the parser to
+the external `gkfeed-infra_default` network and uses an ARM64 Chromium image.
+
+`make docker-update` pulls the current branch, recreates the Compose project,
+and starts the dispatcher, light worker, and Redis. The heavy worker and Chrome
+belong to the optional `heavy` profile and remain stopped during a normal
+deployment.
+
+Start or stop the heavy worker and Chrome with:
+
+```bash
+make docker-heavy-start
+make docker-heavy-stop
+```
+
 ### Database Configuration
 
 `DB_URL` must use an asynchronous driver.
