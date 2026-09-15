@@ -5,6 +5,7 @@ from typing import Any, cast, override
 from urllib.parse import quote, urljoin, urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import UnavailableFeed
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
@@ -13,20 +14,31 @@ from app.utils.datetime import constant_datetime
 class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time_if_success = timedelta(days=1)
     _cache_storage_time = timedelta(seconds=5)
-    _api_base_url = "https://anilibria.top/api/v1/"
+    _api_base_urls = (
+        "https://aniliberty.top/api/v1/",
+        "https://anilibria.top/api/v1/",
+        "https://api.anilibria.app/api/v1/",
+    )
     _cdn_base_url = "https://cdn.anilibria.top/"
 
     @property
     @override
     async def items(self) -> list[Item]:
-        release = self._parse_release(
-            await self.get_html(
-                urljoin(
-                    self._api_base_url,
-                    f"anime/releases/{quote(self._get_alias_from_url(), safe='')}",
+        path = f"anime/releases/{quote(self._get_alias_from_url(), safe='')}"
+        last_error: ValueError | UnavailableFeed | None = None
+
+        for base_url in self._api_base_urls:
+            try:
+                release = self._parse_release(
+                    await self.get_html(urljoin(base_url, path))
                 )
-            )
-        )
+                return self._release_to_items(release)
+            except (ValueError, UnavailableFeed) as error:
+                last_error = error
+
+        raise ValueError("AniLibria API mirrors returned invalid data") from last_error
+
+    def _release_to_items(self, release: Mapping[str, Any]) -> list[Item]:
         show_title = self._required_string(release, "name", "main")
         episodes = release.get("episodes")
         if not isinstance(episodes, list):
@@ -34,11 +46,18 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
                 "Could not extract episodes from AniLibria API response"
             )
 
-        return [
-            self._episode_to_item(show_title, cast("Mapping[str, Any]", episode))
-            for episode in reversed(episodes)
-            if isinstance(episode, Mapping)
-        ]
+        items = []
+        for episode in reversed(episodes):
+            if not isinstance(episode, Mapping):
+                raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                    "Could not extract episode from AniLibria API response"
+                )
+            items.append(
+                self._episode_to_item(
+                    show_title, cast("Mapping[str, Any]", episode)
+                )
+            )
+        return items
 
     def _episode_to_item(self, show_title: str, episode: Mapping[str, Any]) -> Item:
         episode_id = self._required_string(episode, "id")
