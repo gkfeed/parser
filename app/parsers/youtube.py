@@ -59,8 +59,11 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
 
         items = []
         for video_info in entries:
+            if video_info is None:
+                continue
+
             title = video_info["title"]
-            video_url = video_info["url"]
+            video_url = video_info.get("url") or video_info["webpage_url"]
 
             published_at = YoutubePublishDateService.resolve(
                 video_info, channel_publish_dates
