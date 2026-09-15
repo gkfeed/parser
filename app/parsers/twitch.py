@@ -14,7 +14,7 @@ class TwitchFeed(CacheFeedExtension, _BaseFeed):
 
     @property
     async def items(self) -> list[Item]:
-        stream = await Twitch.get_stream(self._streamer_name)
+        stream = await Twitch.get_stream(self.http, self._streamer_name)
         return [self._get_stream_item(stream)] if stream else []
 
     def _get_stream_item(self, stream: Stream) -> Item:

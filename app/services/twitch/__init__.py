@@ -1,7 +1,7 @@
-import aiohttp
 from dateutil.parser import parse
 
 from app.configs.env import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
+from app.services.http import HttpClient
 
 from .auth import TwitchAuthenticator
 from .types import Stream
@@ -17,14 +17,14 @@ class Twitch:
         return {"Client-ID": client_id, "Authorization": "Bearer " + access_token}
 
     @classmethod
-    async def get_stream(cls, streamer_name: str) -> Stream | None:
+    async def get_stream(cls, http: HttpClient, streamer_name: str) -> Stream | None:
         access_token = await TwitchAuthenticator.get_access_token(
-            cls.__client_id, cls.__client_secret
+            http, cls.__client_id, cls.__client_secret
         )
         headers = cls.__get_headers(cls.__client_id, access_token)
 
         url = cls.__base_url + streamer_name
-        response = await cls.get_html(url, headers)
+        response = await cls.get_html(http, url, headers)
 
         if "data" not in response:
             return None
@@ -43,9 +43,7 @@ class Twitch:
         )
 
     @classmethod
-    async def get_html(cls, url: str, headers: dict) -> dict:
-        async with (
-            aiohttp.ClientSession(conn_timeout=None) as session,
-            session.get(url, headers=headers) as response,
-        ):
-            return await response.json()
+    async def get_html(
+        cls, http: HttpClient, url: str, headers: dict[str, str]
+    ) -> dict:
+        return (await http.request_json("GET", url, headers=headers)).data

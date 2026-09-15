@@ -29,7 +29,9 @@ class InstagramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension)
 
     @property
     async def items(self) -> list[Item]:
-        media = await InstagramService(self._user_name, self.cache).get_media()
+        media = await InstagramService(
+            self._user_name, self.cache, self.http
+        ).get_media()
 
         items: list[Item] = []
         for media_item in media:
@@ -40,7 +42,7 @@ class InstagramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension)
 
     async def _create_image_item(self, src: str, link: str) -> Item | None:
         try:
-            img_bytes = await get_html(src)
+            img_bytes = await get_html(self.http, src)
         except HttpRequestError:
             return None
 

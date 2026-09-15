@@ -27,6 +27,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
 
     async def get_html(self, url: str) -> bytes:
         html = await SeleniumService.get_html(
+            self.http,
             SeleniumGetHtmlArgs(
                 url=url,
                 should_delete_cookies=self._should_delete_cookies,
@@ -35,7 +36,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
                 make_actions_function=self.make_actions,
                 selenium_wait_timeout_seconds=self._selenium_wait_time,
                 page_load_timeout_seconds=self._page_load_timeout_seconds,
-            )
+            ),
         )
         return html.encode()
 
