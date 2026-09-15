@@ -11,9 +11,8 @@ class TikTokFeed(BaseTikTokFeed):
 
     @property
     async def _video_links(self) -> list[str]:
-        # NOTE: it s actually max videos fetched by ytdlp extractor
         info = await YtdlpInfoExtractor.extract_channel_videos_info(
-            self.feed.url, BaseExtractionMode(), 0
+            self.feed.url, BaseExtractionMode(), self._max_videos
         )
 
         videos: list[str] = []
