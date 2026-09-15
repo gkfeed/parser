@@ -1,4 +1,5 @@
 from app.configs.selenium import FALLBACK_TO_EXTERNAL_SELENIUM
+from app.services.http import HttpClient
 
 from ._external import ExternalSelenium
 from ._worker import WorkerSelenium
@@ -8,6 +9,7 @@ from .schemas import SeleniumGetHtmlArgs
 class SeleniumService:
     @staticmethod
     async def get_html(
+        http: HttpClient,
         args: SeleniumGetHtmlArgs,
         fallback_to_external_selenium: bool | None = None,
     ) -> str:
@@ -23,7 +25,7 @@ class SeleniumService:
             # external-worker error.
             if fallback_to_external_selenium and args.make_actions_function is None:
                 html = await ExternalSelenium.get_html(
-                    args, timeout=args.selenium_wait_timeout_seconds + 60
+                    http, args, timeout=args.selenium_wait_timeout_seconds + 60
                 )
             else:
                 raise

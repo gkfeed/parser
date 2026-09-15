@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta, timezone
 
 from dateutil.parser import ParserError, parse
 
@@ -9,11 +9,11 @@ constant_datetime = datetime.combine(
 
 def convert_datetime(date: str) -> datetime:
     try:
-        return datetime.combine(
-            parse(date).date(),
-            parse(date).time(),
-            timezone(offset=timedelta(hours=0)),
-        )
+        parsed_date = parse(date)
+        if parsed_date.tzinfo is None:
+            # Feed dates without an offset are assumed to already be in UTC.
+            return parsed_date.replace(tzinfo=UTC)
+        return parsed_date.astimezone(UTC)
     except ParserError:
         # FIXME:
         return constant_datetime

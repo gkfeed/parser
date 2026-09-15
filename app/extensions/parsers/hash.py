@@ -3,6 +3,7 @@ from typing import override
 
 from app.serializers.feed import Feed, Item
 from app.services.hash import HashService
+from app.services.http import HttpClient
 
 from .base import BaseFeed as _BaseFeed
 
@@ -11,10 +12,16 @@ class ItemsHashExtension(_BaseFeed):
     _should_hash_items = True
 
     @override
-    def __init__(self, feed: Feed, data: dict) -> None:
+    def __init__(
+        self,
+        feed: Feed,
+        data: dict,
+        *,
+        http: HttpClient | None = None,
+    ) -> None:
         data["should_hash_items"] = self._should_hash_items
         data["hash_function"] = self._generate_hash
-        super().__init__(feed, data)
+        super().__init__(feed, data, http=http)
 
     async def _generate_hash(self, item: Item) -> str:
         model_dict = item.model_dump()

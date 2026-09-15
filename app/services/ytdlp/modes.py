@@ -10,16 +10,20 @@ class BaseExtractionMode:
         "extract_flat": True,
     }
 
+    def options(self, max_videos: int | None = None) -> dict[str, Any]:
+        options = self.opts.copy()
+        if max_videos is not None:
+            options["playlist_items"] = f"1-{max_videos}"
+        return options
+
 
 class ChannelExtractionMode(BaseExtractionMode):
-    max_videos = 5
     opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
         "quiet": True,
         "lazy_playlist": False,
         "extract_flat": True,
-        "playlist_items": f"1-{max_videos}",
         "extractor_args": {
             "youtubetab": {
                 "approximate_date": "upload_date",

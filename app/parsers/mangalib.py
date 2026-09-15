@@ -1,42 +1,91 @@
-from datetime import timedelta
-from typing import override
-
-from bs4 import Tag
+import json
+from collections.abc import Mapping
+from datetime import datetime, timedelta
+from typing import Any, cast, override
+from urllib.parse import urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.http import HttpParserExtension
+from app.serializers.feed import Item
 
 
-class MangaLibFeed(PostToItemsMixin, SeleniumParserExtension, CacheFeedExtension):
+class MangaLibFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
-    _selenium_wait_time = 5
-    _base_url = "https://mangalib.org"
+    _api_base_url = "https://api.cdnlibs.org/api/manga/"
     _max_posts = 5
 
     @property
     @override
-    async def _posts(self) -> list[Tag]:
-        soup = await self.get_soup(self.feed.url + "?section=chapters")
-        chapter_tags = [
-            tag
-            for tag in soup.find_all(attrs={"data-chapter-id": True})
-            if isinstance(tag, Tag)
+    async def items(self) -> list[Item]:
+        chapters = self._parse_chapters(
+            await self.get_html(f"{self._api_base_url}{self._get_slug()}/chapters")
+        )
+        return [
+            self._chapter_to_item(cast("Mapping[str, Any]", chapter))
+            for chapter in reversed(chapters[-self._max_posts :])
         ]
-        return chapter_tags[: self._max_posts]
 
-    @override
-    async def _get_post_title(self, post: Tag) -> str:
-        a_tag = post.find("a")
-        if a_tag and isinstance(a_tag, Tag):
-            return a_tag.text.strip()
-        raise ValueError("Could not extract post title")
+    def _chapter_to_item(self, chapter: Mapping[str, Any]) -> Item:
+        volume = self._required_string(chapter, "volume")
+        number = self._required_string(chapter, "number")
+        name = chapter.get("name")
+        title = f"Том {volume}, Глава {number}"
+        if isinstance(name, str) and name:
+            title += f" — {name}"
 
-    @override
-    async def _get_post_link(self, post: Tag) -> str:
-        a_tag = post.find("a")
-        if a_tag and isinstance(a_tag, Tag) and "href" in a_tag.attrs:
-            href = a_tag["href"]
-            if isinstance(href, str):
-                return self._base_url + href
-        raise ValueError("Could not extract post link")
+        return Item(
+            title=title,
+            text=title,
+            date=self._get_created_at(chapter),
+            link=f"{self._site_base_url()}/ru/{self._get_slug()}/read/v{volume}/c{number}",
+        )
+
+    def _get_slug(self) -> str:
+        parts = [part for part in urlsplit(self.feed.url).path.split("/") if part]
+        if "manga" in parts:
+            manga_index = parts.index("manga")
+            if manga_index + 1 < len(parts):
+                return parts[manga_index + 1]
+        raise ValueError(f"Could not extract manga slug from URL: {self.feed.url}")
+
+    def _site_base_url(self) -> str:
+        parsed_url = urlsplit(self.feed.url)
+        return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+    @staticmethod
+    def _parse_chapters(response: bytes) -> list[Any]:
+        try:
+            payload = json.loads(response)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise ValueError("MangaLib API returned invalid JSON") from error
+
+        chapters = payload.get("data") if isinstance(payload, Mapping) else None
+        if not isinstance(chapters, list):
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "MangaLib API returned invalid chapter data"
+            )
+        return chapters
+
+    @staticmethod
+    def _required_string(chapter: Mapping[str, Any], key: str) -> str:
+        value = chapter.get(key)
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"Could not extract chapter {key}")
+        return value
+
+    @staticmethod
+    def _get_created_at(chapter: Mapping[str, Any]) -> datetime:
+        branches = chapter.get("branches")
+        if not isinstance(branches, list) or not branches:
+            raise ValueError("Could not extract chapter branch")
+        branch = branches[0]
+        if not isinstance(branch, Mapping):
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Could not extract chapter branch"
+            )
+        created_at = branch.get("created_at")
+        if not isinstance(created_at, str):
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Could not extract chapter creation date"
+            )
+        return datetime.fromisoformat(created_at)

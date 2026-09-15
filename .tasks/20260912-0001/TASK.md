@@ -9,6 +9,19 @@
 Keep distinct events when a parser returns the same title, link, and text with a
 different publication time.
 
+## Reproduction from the 2026-09-14 review
+
+[ItemsRepository](../../app/services/repositories/item.py) identifies existing
+items by feed, title, link, and text without comparing their dates.
+[TwitchFeed](../../app/parsers/twitch.py) uses the channel URL for every broadcast
+and does not generate a hash, so different broadcasts with the same title match
+that identity.
+
+Return two streams titled `Daily stream` for the same channel, starting at
+`2026-09-13T18:00:00+00:00` and `2026-09-14T18:00:00+00:00`. Parse and save each
+through the public parser and repository methods. Only the first broadcast is
+stored; both should be present.
+
 ## Plan
 
 - [ ] Define the fallback identity used for items without a parser-generated

@@ -27,19 +27,32 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
         return VideoInfo(info["title"], info["upload_date"], info["uploader"])
 
     @classmethod
-    @async_store_in_cache_for(_channel_info_storage_time)
     async def extract_channel_videos_info(
         cls, videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int
     ) -> dict:
-        return await cls.get_info(videos_url, extraction_mode)
+        """Return at most ``max_videos`` entries and limit yt-dlp to that count."""
+        if max_videos <= 0:
+            raise ValueError("max_videos must be greater than zero")
+
+        cache_id = f"{videos_url}::{type(extraction_mode).__qualname__}::{max_videos}"
+        if cls.cache.has_valid_cache(cache_id):
+            return cls.cache.get(cache_id)
+
+        info = await cls.get_info(videos_url, extraction_mode, max_videos=max_videos)
+        limited_info = {**info, "entries": info.get("entries", [])[:max_videos]}
+        cls.cache.set_with_expiry(
+            cache_id, limited_info, cls._channel_info_storage_time
+        )
+        return limited_info
 
     @classmethod
-    @async_store_in_cache_for(_channel_info_storage_time)
     async def extract_video_urls(
         cls, videos_url: str, extraction_mode: BaseExtractionMode, max_videos: int
     ) -> list[str]:
-        info = await cls.get_info(videos_url, extraction_mode)
-        return [v["url"] for v in info["entries"][-max_videos:]]
+        info = await cls.extract_channel_videos_info(
+            videos_url, extraction_mode, max_videos
+        )
+        return [v["url"] for v in info["entries"]]
 
     @classmethod
     async def get_info(
@@ -47,7 +60,8 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
         url: str,
         mode: BaseExtractionMode | None = None,
         keys: list[str] | None = None,
+        max_videos: int | None = None,
     ) -> dict:
         if mode is None:
             mode = BaseExtractionMode()
-        return await extract_info(url, mode.opts, keys)
+        return await extract_info(url, mode.options(max_videos), keys)

@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit, urlunsplit
+
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -21,10 +23,16 @@ class _BaseYoutubeFeed(BaseFeed):
 
     def _get_target_url(self) -> str:
         target_url = self.feed.url
-        url_parts = target_url.split("/")
-        if url_parts[-2] == "channel" or len(target_url.split("@")) == 2:
-            target_url += "/videos"
-        return target_url
+        parsed_url = urlsplit(target_url)
+        path_parts = [part for part in parsed_url.path.split("/") if part]
+        is_handle_root = len(path_parts) == 1 and path_parts[0].startswith("@")
+        is_channel_id_root = len(path_parts) == 2 and path_parts[0] == "channel"
+
+        if not (is_handle_root or is_channel_id_root):
+            return target_url
+
+        videos_path = parsed_url.path.rstrip("/") + "/videos"
+        return urlunsplit(parsed_url._replace(path=videos_path))
 
 
 class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
@@ -44,15 +52,20 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
         entries = channel_info["entries"]
         channel_id = channel_info.get("channel_id")
         channel_publish_dates = (
-            await YoutubePublishDateService.get_channel_publish_dates(channel_id)
+            await YoutubePublishDateService.get_channel_publish_dates(
+                self.http, channel_id
+            )
             if channel_id
             else {}
         )
 
         items = []
         for video_info in entries:
+            if video_info is None:
+                continue
+
             title = video_info["title"]
-            video_url = video_info["url"]
+            video_url = video_info.get("url") or video_info["webpage_url"]
 
             published_at = YoutubePublishDateService.resolve(
                 video_info, channel_publish_dates

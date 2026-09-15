@@ -9,7 +9,6 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
 
 
 class HltvFeed(
@@ -57,25 +56,6 @@ class HltvFeed(
             for row in match_table.find_all("tr", class_="team-row")
             if isinstance(row, Tag)
         ]
-
-    @property
-    @override
-    async def items(self) -> list[Item]:
-        # One malformed match should not abort the entire feed.
-        items = []
-        for p in await self._posts:
-            try:
-                items.append(
-                    Item(
-                        title=await self._get_post_title(p),
-                        text=await self._get_post_text(p),
-                        date=await self._get_post_datetime(p),
-                        link=await self._get_post_link(p),
-                    )
-                )
-            except (ValueError, IndexError):
-                continue
-        return items
 
     @override
     async def _get_post_title(self, post: Tag) -> str:

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from xml.etree import ElementTree
 
-from app.services.http import HttpService
+from app.services.http import HttpClient, HttpRequestError
 
 
 class YoutubePublishDateService:
@@ -9,10 +9,17 @@ class YoutubePublishDateService:
 
     @classmethod
     async def get_channel_publish_dates(
-        cls, channel_id: str
+        cls, http: HttpClient, channel_id: str
     ) -> dict[str, datetime]:
-        xml = await HttpService.get(cls._channel_feed_url.format(channel_id))
-        root = ElementTree.fromstring(xml)
+        try:
+            xml = (
+                await http.request_bytes(
+                    "GET", cls._channel_feed_url.format(channel_id)
+                )
+            ).data
+            root = ElementTree.fromstring(xml)
+        except (ElementTree.ParseError, HttpRequestError):
+            return {}
         namespaces = {
             "atom": "http://www.w3.org/2005/Atom",
             "yt": "http://www.youtube.com/xml/schemas/2015",

@@ -23,7 +23,11 @@ class WebFeed(ItemsHashExtension, HttpParserExtension):
         return await self._get_items_from_web(self.feed.url)
 
     async def _get_items_from_web(self, url: str) -> list[Item]:
-        return [self._convert_item(item) for item in await RSSParser.parse_feed(url)]
+        if self._http is None:
+            feed_items = await RSSParser.parse_feed(url)
+        else:
+            feed_items = await RSSParser.parse_feed(url, http=self.http)
+        return [self._convert_item(item) for item in feed_items]
 
     @staticmethod
     def _convert_item(item_data: dict) -> Item:
