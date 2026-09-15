@@ -60,6 +60,7 @@ class ItemsRepository(BaseRepository):
     async def _check_if_exists(
         cls, session: AsyncSession, feed: Feed, item: Item
     ) -> bool:
+        # Omitting date from the fallback identity is intentional.
         stmt = select(_Item).where(
             _Item.feed_id == feed.id,
             _Item.title == item.title,
