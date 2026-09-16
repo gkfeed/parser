@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.configs import Data
@@ -17,6 +18,13 @@ TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 async def setup_db():
     # Re-initialize engine and session_factory for each test loop
     engine = create_async_engine(TEST_DB_URL)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def enable_foreign_keys(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     session_factory = async_sessionmaker(
         engine, expire_on_commit=False, class_=AsyncSession
     )
