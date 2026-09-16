@@ -42,24 +42,13 @@ class ItemsRepository(BaseRepository):
             ItemHash.hash == hash, ItemHash.feed_id == feed_id
         )
         result = await session.execute(stmt)
-        if result.scalars().first() is not None:
-            return True
-
-        legacy_stmt = select(ItemHash).where(
-            ItemHash.hash == hash, ItemHash.feed_id.is_(None)
-        )
-        legacy_result = await session.execute(legacy_stmt)
-        legacy_hash = legacy_result.scalars().first()
-        if legacy_hash is None:
-            return False
-
-        legacy_hash.feed_id = feed_id
-        return True
+        return result.scalars().first() is not None
 
     @classmethod
     async def _check_if_exists(
         cls, session: AsyncSession, feed: Feed, item: Item
     ) -> bool:
+        # Omitting date from the fallback identity is intentional.
         stmt = select(_Item).where(
             _Item.feed_id == feed.id,
             _Item.title == item.title,
