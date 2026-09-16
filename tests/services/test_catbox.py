@@ -4,7 +4,7 @@ import aiohttp
 import pytest
 
 from app.services.catbox import CatboxUploader
-from app.services.http import HttpService
+from app.services.http import DEFAULT_HEADERS
 
 
 @pytest.mark.integration
@@ -30,7 +30,7 @@ async def test_catbox_file_upload(tmp_path: Path):
             session.post(
                 CatboxUploader.host_url,
                 data=form,
-                headers=HttpService.headers,
+                headers=DEFAULT_HEADERS,
             ) as response,
         ):
             response_body = (await response.content.read()).decode().strip()

@@ -142,9 +142,3 @@ class HttpClient:
                 "HttpClient must be used inside an async context manager"
             )
         return self._session
-
-
-class HttpService:
-    """Deprecated header namespace kept for the existing integration test."""
-
-    headers = DEFAULT_HEADERS
