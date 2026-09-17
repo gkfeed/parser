@@ -7,7 +7,6 @@ from bs4 import Tag
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
-from app.services.http import DEFAULT_HEADERS
 from app.utils.datetime import constant_datetime
 
 
@@ -48,7 +47,6 @@ class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
                 "sort": {"field": "published_at", "direction": "desc"},
             },
             headers={
-                **DEFAULT_HEADERS,
                 "Accept": "application/json, text/plain, */*",
                 "Origin": self._get_origin(),
                 "Referer": self.feed.url,

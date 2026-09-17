@@ -8,24 +8,16 @@ from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
     async_store_in_cache_for,
 )
-from app.services.http import DEFAULT_HEADERS, HttpClient, HttpRequestError
+from app.services.http import HttpRequestError
 
 from .base import BaseFeed as _BaseFeed
 from .exceptions import UnavailableFeed
 
 
-async def http_get_in_queue(
-    http: HttpClient, url: str, headers: dict[str, str]
-) -> bytes:
-    return (await http.request_bytes("GET", url, headers=headers)).data
-
-
 # NOTE: do not inherit of BaseFeed
 class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], ABC):
     _http_response_storage_time = timedelta(minutes=5)
-    _headers: ClassVar[dict[str, str]] = dict(DEFAULT_HEADERS)
-    # NOTE: deprecated use heavy worker instead
-    _http_run_in_queue = False
+    _headers: ClassVar[dict[str, str]] = {}
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -37,8 +29,6 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
 
     async def get_html(self, url: str) -> bytes:
         try:
-            if self._http_run_in_queue:
-                return await http_get_in_queue(self.http, url, self._headers)
             return (
                 await self.http.request_bytes("GET", url, headers=self._headers)
             ).data

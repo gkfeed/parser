@@ -24,7 +24,7 @@ class Twitch:
         headers = cls.__get_headers(cls.__client_id, access_token)
 
         url = cls.__base_url + streamer_name
-        response = await cls.get_html(http, url, headers)
+        response = (await http.request_json("GET", url, headers=headers)).data
 
         if "data" not in response:
             return None
@@ -41,9 +41,3 @@ class Twitch:
             title=current_stream_data["title"],
             started_at=parse(current_stream_data["started_at"]),
         )
-
-    @classmethod
-    async def get_html(
-        cls, http: HttpClient, url: str, headers: dict[str, str]
-    ) -> dict:
-        return (await http.request_json("GET", url, headers=headers)).data
