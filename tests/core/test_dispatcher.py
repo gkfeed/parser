@@ -18,6 +18,8 @@ def dispatcher():
     return Dispatcher(
         broker=AsyncMock(),
         feed_parser_repository=FakeFeedParserRepository,
+        feed_repository=AsyncMock(),
+        items_repository=AsyncMock(),
         parsers={},
     )
 
