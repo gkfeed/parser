@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +8,8 @@ from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
 
 from ._base import BaseRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ItemsRepository(BaseRepository):
@@ -20,24 +24,41 @@ class ItemsRepository(BaseRepository):
     @classmethod
     async def add_items_to_feed(cls, feed: Feed, items: list[Item]) -> list[Item]:
         unseen_items = []
+        received = len(items)
+        inserted = 0
+        known_hash_skipped = 0
+        existing_item_skipped = 0
         async with cls._session_factory() as session, session.begin():
             for item in items:
                 if item.hash and await cls._contains_hash(session, item.hash, feed.id):
+                    known_hash_skipped += 1
+                    logger.debug("Skipped duplicate with known hash")
                     continue
 
                 if not await cls._check_if_exists(session, feed, item):
                     await cls._create_item(session, feed, item)
+                    inserted += 1
+                else:
+                    existing_item_skipped += 1
+                    logger.debug("Skipped insertion of existing item")
 
                 if item.hash:
                     session.add(ItemHash(hash=item.hash, feed_id=feed.id))
                 unseen_items.append(item)
 
+        logger.info(
+            "Items received=%d inserted=%d known_hash_skipped=%d "
+            "existing_item_skipped=%d returned=%d",
+            received,
+            inserted,
+            known_hash_skipped,
+            existing_item_skipped,
+            len(unseen_items),
+        )
         return unseen_items
 
     @staticmethod
-    async def _contains_hash(
-        session: AsyncSession, hash: str, feed_id: int
-    ) -> bool:
+    async def _contains_hash(session: AsyncSession, hash: str, feed_id: int) -> bool:
         stmt = select(ItemHash).where(
             ItemHash.hash == hash, ItemHash.feed_id == feed_id
         )

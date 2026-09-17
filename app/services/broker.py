@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from app.services.http import HttpRequestError, HttpService
+from app.utils.logging import log_context
+
+logger = logging.getLogger(__name__)
 
 
 class BrokerError(Exception):
@@ -28,21 +32,23 @@ class BrokerService:
     ) -> Any:
         task_id = await self.enqueue(func, args)
 
-        start_time = asyncio.get_event_loop().time()
-        while True:
-            if asyncio.get_event_loop().time() - start_time > timeout:
-                await self.cancel_task(task_id)
-                raise BrokerError("Timeout waiting for result")
+        with log_context(task_id=task_id):
+            logger.info("Queued task")
+            start_time = asyncio.get_event_loop().time()
+            while True:
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    await self.cancel_task(task_id)
+                    raise BrokerError(f"Timeout waiting for result: task_id={task_id}")
 
-            result_data = await self.get_task_data(task_id)
-            status = result_data.get("status")
+                result_data = await self.get_task_data(task_id)
+                status = result_data.get("status")
 
-            if status == "completed":
-                return result_data.get("result")
-            if status == "failed":
-                raise BrokerError("Task failed: ")
+                if status == "completed":
+                    return result_data.get("result")
+                if status == "failed":
+                    raise BrokerError(f"Task failed: task_id={task_id}")
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
     async def cancel_task(self, task_id: str) -> None:
         try:

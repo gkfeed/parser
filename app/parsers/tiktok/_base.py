@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import override
@@ -10,6 +11,9 @@ from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.utils.datetime import convert_datetime
+from app.utils.logging import log_context, log_url
+
+logger = logging.getLogger(__name__)
 
 
 class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
@@ -17,21 +21,39 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
     @property
     async def items(self) -> list[Item]:
-        links = await self._video_links
-        results = await asyncio.gather(
-            *(self._create_video_item(link) for link in links),
-            return_exceptions=True,
-        )
+        with log_context(feed_id=self.feed.id, parser=type(self).__name__):
+            links = await self._video_links
+            results = await asyncio.gather(
+                *(self._create_video_item(link) for link in links),
+                return_exceptions=True,
+            )
 
-        items = []
-        for link, result in zip(links, results, strict=True):
-            if isinstance(result, BaseException):
-                if not isinstance(result, Exception):
-                    raise result
-                print(f"Failed to extract TikTok video {link}: {result}")
-            elif result is not None:
-                items.append(result)
-        return items
+            items = []
+            failed = 0
+            skipped = 0
+            for link, result in zip(links, results, strict=True):
+                if isinstance(result, BaseException):
+                    if not isinstance(result, Exception):
+                        raise result
+                    failed += 1
+                    logger.error(
+                        "TikTok video failed video_url=%s reason=extraction_error",
+                        log_url(link),
+                        exc_info=(type(result), result, result.__traceback__),
+                    )
+                elif result is not None:
+                    items.append(result)
+                else:
+                    skipped += 1
+            logger.log(
+                logging.WARNING if failed or skipped else logging.INFO,
+                "TikTok extraction completed links=%d items=%d failed=%d skipped=%d",
+                len(links),
+                len(items),
+                failed,
+                skipped,
+            )
+            return items
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -47,6 +69,11 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
                 link=link,
             )
         except (TypeError, ValueError):
+            logger.warning(
+                "TikTok video skipped video_url=%s reason=invalid_video_data",
+                log_url(link),
+                exc_info=True,
+            )
             return None
 
     @property
