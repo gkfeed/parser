@@ -1,3 +1,5 @@
+from http import HTTPMethod
+
 from app.services.http import HttpClient
 
 
@@ -12,7 +14,7 @@ class TempFileUploader:
     @classmethod
     async def upload_with_url(cls, http: HttpClient, url: str) -> str:
         response = await http.request_json(
-            "POST",
+            HTTPMethod.POST,
             cls.host_url,
             json={
                 "url": url,

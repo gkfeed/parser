@@ -1,3 +1,5 @@
+from http import HTTPMethod
+
 from dateutil.parser import parse
 
 from app.configs.env import TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
@@ -24,7 +26,7 @@ class Twitch:
         headers = cls.__get_headers(cls.__client_id, access_token)
 
         url = cls.__base_url + streamer_name
-        response = (await http.request_json("GET", url, headers=headers)).data
+        response = (await http.request_json(HTTPMethod.GET, url, headers=headers)).data
 
         if "data" not in response:
             return None

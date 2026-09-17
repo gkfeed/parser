@@ -2,6 +2,7 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from http import HTTPMethod
 from typing import ClassVar
 
 from bs4 import BeautifulSoup
@@ -79,7 +80,7 @@ class InstagramService:
         try:
             html = (
                 await self._http.request_bytes(
-                    "GET",
+                    HTTPMethod.GET,
                     f"{self._base_url}/{self._username}/",
                     headers=self._crawler_headers,
                 )
@@ -129,7 +130,7 @@ class InstagramService:
 
         try:
             response = await self._http.request_bytes(
-                "GET", url, headers=headers, raise_for_status=False
+                HTTPMethod.GET, url, headers=headers, raise_for_status=False
             )
             if response.status == 429:
                 self._cache.set_with_expiry(
@@ -168,7 +169,7 @@ class InstagramService:
 
         try:
             response = await self._http.request_bytes(
-                "GET", url, headers=headers, raise_for_status=False
+                HTTPMethod.GET, url, headers=headers, raise_for_status=False
             )
             if response.status >= 400:
                 return []
@@ -183,7 +184,9 @@ class InstagramService:
         url = f"{self._base_url}/p/{shortcode}/embed/captioned/"
         try:
             html = (
-                await self._http.request_bytes("GET", url, headers=self._headers)
+                await self._http.request_bytes(
+                    HTTPMethod.GET, url, headers=self._headers
+                )
             ).data
         except HttpRequestError:
             return None

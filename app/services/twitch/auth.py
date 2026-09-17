@@ -1,3 +1,5 @@
+from http import HTTPMethod
+
 from app.services.http import HttpClient, HttpRequestError
 
 from .exceptions import TwitchAuthenticationFailed
@@ -17,7 +19,9 @@ class TwitchAuthenticator:
         }
 
         try:
-            response = await http.request_json("POST", cls.__base_url, data=body)
+            response = await http.request_json(
+                HTTPMethod.POST, cls.__base_url, data=body
+            )
             return response.data["access_token"]
         except HttpRequestError as error:
             raise TwitchAuthenticationFailed from error

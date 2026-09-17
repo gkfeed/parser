@@ -1,6 +1,7 @@
 import json as json_module
 from collections.abc import Mapping
 from dataclasses import dataclass
+from http import HTTPMethod
 from types import MappingProxyType
 from typing import Any, Self
 
@@ -68,7 +69,7 @@ class HttpClient:
 
     async def request_bytes(
         self,
-        method: str,
+        method: HTTPMethod,
         url: str,
         *,
         data: Any = None,
@@ -110,7 +111,7 @@ class HttpClient:
 
     async def request_json(
         self,
-        method: str,
+        method: HTTPMethod,
         url: str,
         *,
         data: Any = None,

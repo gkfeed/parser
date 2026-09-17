@@ -1,3 +1,5 @@
+from http import HTTPMethod
+
 from bs4 import BeautifulSoup, Tag
 
 from app.services.http import HttpClient
@@ -13,7 +15,7 @@ class RSSParser:
                 async with HttpClient() as owned_http:
                     return await RSSParser.parse_feed(url, http=owned_http)
 
-            html = (await http.request_bytes("GET", url)).data
+            html = (await http.request_bytes(HTTPMethod.GET, url)).data
             soup = BeautifulSoup(html, "xml")
             items = []
 

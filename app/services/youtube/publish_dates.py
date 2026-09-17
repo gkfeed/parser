@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from http import HTTPMethod
 from xml.etree import ElementTree
 
 from app.services.http import HttpClient, HttpRequestError
@@ -14,7 +15,7 @@ class YoutubePublishDateService:
         try:
             xml = (
                 await http.request_bytes(
-                    "GET", cls._channel_feed_url.format(channel_id)
+                    HTTPMethod.GET, cls._channel_feed_url.format(channel_id)
                 )
             ).data
             root = ElementTree.fromstring(xml)

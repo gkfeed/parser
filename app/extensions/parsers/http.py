@@ -1,5 +1,6 @@
 from abc import ABC
 from datetime import timedelta
+from http import HTTPMethod
 from typing import ClassVar
 
 from bs4 import BeautifulSoup
@@ -30,7 +31,9 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
     async def get_html(self, url: str) -> bytes:
         try:
             return (
-                await self.http.request_bytes("GET", url, headers=self._headers)
+                await self.http.request_bytes(
+                    HTTPMethod.GET, url, headers=self._headers
+                )
             ).data
         except HttpRequestError as error:
             raise UnavailableFeed(self.feed.url) from error

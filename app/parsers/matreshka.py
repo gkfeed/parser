@@ -1,4 +1,5 @@
 from datetime import timedelta
+from http import HTTPMethod
 from typing import Any, override
 from urllib.parse import urljoin, urlparse
 
@@ -36,7 +37,7 @@ class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
         channel_id = self._extract_channel_id()
         api_url = urljoin(self.feed.url, "/api/v2/video")
         response = await self.http.request_json(
-            "POST",
+            HTTPMethod.POST,
             api_url,
             json={
                 "field_mask": ["id", "name"],

@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
+from http import HTTPMethod
 from typing import Any
 
 from app.services.http import HttpClient, HttpRequestError
@@ -47,7 +48,7 @@ class BrokerService:
     async def cancel_task(self, task_id: str) -> None:
         try:
             await self.http.request_bytes(
-                "DELETE", f"{self.broker_url}/cancel/{task_id}"
+                HTTPMethod.DELETE, f"{self.broker_url}/cancel/{task_id}"
             )
         except HttpRequestError as error:
             raise BrokerError("Failed to cancel task in broker") from error
@@ -55,7 +56,7 @@ class BrokerService:
     async def get_task_data(self, task_id: str) -> dict:
         try:
             response = await self.http.request_json(
-                "GET", f"{self.broker_url}/result/{task_id}"
+                HTTPMethod.GET, f"{self.broker_url}/result/{task_id}"
             )
             return response.data
         except HttpRequestError as error:
@@ -64,7 +65,7 @@ class BrokerService:
     async def enqueue(self, func: str, args: Sequence[Any]) -> str:
         try:
             response = await self.http.request_json(
-                "POST",
+                HTTPMethod.POST,
                 f"{self.broker_url}/enqueue",
                 json={"function": func, "data": args},
             )
@@ -76,7 +77,7 @@ class BrokerService:
         try:
             resp = (
                 await self.http.request_json(
-                    "GET", f"{self.broker_url}/get_task?function={func}"
+                    HTTPMethod.GET, f"{self.broker_url}/get_task?function={func}"
                 )
             ).data
 
@@ -94,7 +95,7 @@ class BrokerService:
     async def submit_result(self, task_id: str, result: Any) -> None:
         try:
             await self.http.request_json(
-                "POST",
+                HTTPMethod.POST,
                 f"{self.broker_url}/submit_result",
                 json={"task_id": task_id, "result": result},
             )
@@ -104,7 +105,7 @@ class BrokerService:
     async def submit_error(self, task_id: str, error_message: str) -> None:
         try:
             await self.http.request_json(
-                "POST",
+                HTTPMethod.POST,
                 f"{self.broker_url}/submit_error",
                 json={"task_id": task_id, "error_message": error_message},
             )
