@@ -11,7 +11,8 @@ from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
 from app.services.broker import BrokerError, BrokerService
-from app.services.repositories.feed_parser import FeedParserRepository
+from app.services.repositories.feed import FeedRepository
+from app.services.repositories.item import ItemsRepository
 
 from .storage import FeedStorage, ItemsStorage
 
@@ -33,10 +34,14 @@ class Dispatcher(ItemsStorage, FeedStorage):
     def __init__(
         self,
         broker: BrokerService,
-        feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
+        feed_parser_repository: FeedParserRepositoryProtocol,
+        feed_repository: FeedRepository,
+        items_repository: ItemsRepository,
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
     ):
         self.broker = broker
+        self.feed_repository = feed_repository
+        self.items_repository = items_repository
         self.feed_parser_repository = feed_parser_repository
         self.parsers = parsers
         self._failure_counts: dict[int, int] = {}

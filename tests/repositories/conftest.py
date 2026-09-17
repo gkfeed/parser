@@ -4,18 +4,17 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.configs import Data
-from app.configs.selenium import get_driver
 from app.models import Base
 from app.serializers.feed import Feed
-from app.services.container import Container
 from app.services.repositories.feed import FeedRepository
+from app.services.repositories.feed_parser import FeedParserRepository
+from app.services.repositories.item import ItemsRepository
 
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest.fixture(autouse=True)
-async def setup_db():
+@pytest.fixture
+async def session_factory():
     # Re-initialize engine and session_factory for each test loop
     engine = create_async_engine(TEST_DB_URL)
 
@@ -32,10 +31,7 @@ async def setup_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    # Update container with the new session_factory bound to the current loop
-    Container.setup(Data(selenium_web_driver=get_driver, db_session=session_factory))
-
-    yield
+    yield session_factory
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
@@ -44,7 +40,22 @@ async def setup_db():
 
 
 @pytest.fixture
-async def create_feed():
+def feed_repository(session_factory):
+    return FeedRepository(session_factory)
+
+
+@pytest.fixture
+def items_repository(session_factory):
+    return ItemsRepository(session_factory)
+
+
+@pytest.fixture
+def feed_parser_repository(session_factory):
+    return FeedParserRepository(session_factory)
+
+
+@pytest.fixture
+async def create_feed(feed_repository):
     feeds = []
     async def _create(title="Test Feed"):
         feed_data = Feed(
@@ -53,7 +64,7 @@ async def create_feed():
             url=f"https://test.com/{datetime.now(UTC).timestamp()}-{title}",
             type="test",
         )
-        feed = await FeedRepository.create(feed_data)
+        feed = await feed_repository.create(feed_data)
         feeds.append(feed)
         return feed
     
@@ -61,4 +72,4 @@ async def create_feed():
     
     # Cleanup
     for feed in feeds:
-        await FeedRepository.delete_by_id(feed.id)
+        await feed_repository.delete_by_id(feed.id)
