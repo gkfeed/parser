@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta
 from http import HTTPMethod
 from typing import ClassVar, override
@@ -29,10 +28,9 @@ class RedditFeed(
         if self.__base_urls_cache:
             return self.__base_urls_cache
 
-        response = (
-            await self.http.request_bytes(HTTPMethod.GET, self.__instances_url)
+        instances_data = (
+            await self.http.request_json(HTTPMethod.GET, self.__instances_url)
         ).data
-        instances_data = json.loads(response)
         all_urls = [
             instance["url"]
             for instance in instances_data["instances"]

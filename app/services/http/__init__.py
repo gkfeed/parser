@@ -100,8 +100,6 @@ class HttpClient:
                         body,
                     )
                 return HttpResponse(status=response.status, data=body)
-        except HttpRequestError:
-            raise
         except (aiohttp.ClientError, TimeoutError) as error:
             raise HttpTransportError(
                 normalized_method,

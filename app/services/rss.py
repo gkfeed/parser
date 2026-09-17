@@ -10,11 +10,11 @@ class RSSParser:
     async def parse_feed(
         url: str, *, http: HttpClient | None = None
     ) -> list[dict[str, str]]:
-        try:
-            if http is None:
-                async with HttpClient() as owned_http:
-                    return await RSSParser.parse_feed(url, http=owned_http)
+        if http is None:
+            async with HttpClient() as owned_http:
+                return await RSSParser.parse_feed(url, http=owned_http)
 
+        try:
             html = (await http.request_bytes(HTTPMethod.GET, url)).data
             soup = BeautifulSoup(html, "xml")
             items = []
