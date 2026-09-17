@@ -118,7 +118,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         else:
             # Handle remote URL
             try:
-                img_bytes = await get_html(src)
+                img_bytes = await get_html(self.http, src)
                 encoded = base64.b64encode(img_bytes).decode("utf-8")
                 mime_type = self._get_mime_type(img_bytes)
             except HttpRequestError:

@@ -52,7 +52,9 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
         entries = channel_info["entries"]
         channel_id = channel_info.get("channel_id")
         channel_publish_dates = (
-            await YoutubePublishDateService.get_channel_publish_dates(channel_id)
+            await YoutubePublishDateService.get_channel_publish_dates(
+                self.http, channel_id
+            )
             if channel_id
             else {}
         )

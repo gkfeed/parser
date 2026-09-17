@@ -1,6 +1,6 @@
-
 from app.extensions.parsers.base import BaseFeed
 from app.serializers.feed import Feed, Item
+from app.services.http import HttpClient
 
 
 class FeedParsingContext:
@@ -16,4 +16,5 @@ class FeedParsingContext:
 
     async def execute_parser(self, feed: Feed, data: dict) -> list[Item]:
         parser = self._parsers[feed.type]
-        return await parser(feed, data).items
+        async with HttpClient() as http:
+            return await parser(feed, data, http=http).items

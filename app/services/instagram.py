@@ -2,13 +2,14 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import timedelta
+from http import HTTPMethod
 from typing import ClassVar
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from app.services.cache.temporary import TemporaryCacheService
-from app.services.http import HttpRequestError, HttpService
+from app.services.http import HttpClient, HttpRequestError
 
 
 @dataclass(frozen=True)
@@ -38,10 +39,14 @@ class InstagramService:
     }
 
     def __init__(
-        self, username: str, cache: TemporaryCacheService[bytes]
+        self,
+        username: str,
+        cache: TemporaryCacheService[bytes],
+        http: HttpClient,
     ) -> None:
         self._username = username
         self._cache = cache
+        self._http = http
 
     async def get_media(self) -> list[InstagramMedia]:
         nodes = await self._get_crawler_profile_nodes()
@@ -73,10 +78,13 @@ class InstagramService:
 
     async def _get_crawler_profile_nodes(self) -> list[dict]:
         try:
-            html = await HttpService.get(
-                f"{self._base_url}/{self._username}/",
-                headers=self._crawler_headers,
-            )
+            html = (
+                await self._http.request_bytes(
+                    HTTPMethod.GET,
+                    f"{self._base_url}/{self._username}/",
+                    headers=self._crawler_headers,
+                )
+            ).data
         except HttpRequestError:
             return []
 
@@ -116,14 +124,15 @@ class InstagramService:
             return []
 
         url = (
-            f"{self._base_url}/api/v1/users/web_profile_info/"
-            f"?username={self._username}"
+            f"{self._base_url}/api/v1/users/web_profile_info/?username={self._username}"
         )
         headers = {**self._headers, "X-IG-App-ID": self._app_id}
 
         try:
-            status, response = await HttpService.get_with_status(url, headers=headers)
-            if status == 429:
+            response = await self._http.request_bytes(
+                HTTPMethod.GET, url, headers=headers, raise_for_status=False
+            )
+            if response.status == 429:
                 self._cache.set_with_expiry(
                     self._profile_api_rate_limit_cache_key,
                     b"1",
@@ -134,9 +143,9 @@ class InstagramService:
                     f"pausing requests for {self._profile_api_rate_limit_cooldown}"
                 )
                 return []
-            if status >= 400:
+            if response.status >= 400:
                 return []
-            profile = json.loads(response)
+            profile = json.loads(response.data)
             edges = profile["data"]["user"]["edge_owner_to_timeline_media"]["edges"]
         except (HttpRequestError, json.JSONDecodeError, KeyError, TypeError):
             return []
@@ -159,10 +168,12 @@ class InstagramService:
         }
 
         try:
-            status, response = await HttpService.get_with_status(url, headers=headers)
-            if status >= 400:
+            response = await self._http.request_bytes(
+                HTTPMethod.GET, url, headers=headers, raise_for_status=False
+            )
+            if response.status >= 400:
                 return []
-            items = json.loads(response).get("items")
+            items = json.loads(response.data).get("items")
         except (HttpRequestError, json.JSONDecodeError, AttributeError, TypeError):
             return []
         if not isinstance(items, list):
@@ -172,7 +183,11 @@ class InstagramService:
     async def _get_embed_node(self, shortcode: str) -> dict | None:
         url = f"{self._base_url}/p/{shortcode}/embed/captioned/"
         try:
-            html = await HttpService.get(url, headers=self._headers)
+            html = (
+                await self._http.request_bytes(
+                    HTTPMethod.GET, url, headers=self._headers
+                )
+            ).data
         except HttpRequestError:
             return None
         return self._find_media_node(BeautifulSoup(html, "html.parser"))

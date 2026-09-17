@@ -1,5 +1,5 @@
-import json
 from datetime import datetime, timedelta
+from http import HTTPMethod
 from typing import ClassVar, override
 from urllib.parse import urljoin
 
@@ -11,7 +11,6 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
 from app.utils.datetime import convert_datetime
 
@@ -29,8 +28,9 @@ class RedditFeed(
         if self.__base_urls_cache:
             return self.__base_urls_cache
 
-        response = await HttpService.get(self.__instances_url)
-        instances_data = json.loads(response)
+        instances_data = (
+            await self.http.request_json(HTTPMethod.GET, self.__instances_url)
+        ).data
         all_urls = [
             instance["url"]
             for instance in instances_data["instances"]

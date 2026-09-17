@@ -1,4 +1,5 @@
 from datetime import timedelta
+from http import HTTPMethod
 from typing import Any, override
 from urllib.parse import urljoin, urlparse
 
@@ -7,7 +8,6 @@ from bs4 import Tag
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
-from app.services.http import HttpService
 from app.utils.datetime import constant_datetime
 
 
@@ -36,9 +36,10 @@ class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
     async def _get_videos(self) -> list[dict[str, Any]]:
         channel_id = self._extract_channel_id()
         api_url = urljoin(self.feed.url, "/api/v2/video")
-        response = await HttpService.post_json(
+        response = await self.http.request_json(
+            HTTPMethod.POST,
             api_url,
-            {
+            json={
                 "field_mask": ["id", "name"],
                 "filter": [{"field": "channel_id", "is": "=", "value": channel_id}],
                 "scope": ["public"],
@@ -47,14 +48,13 @@ class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
                 "sort": {"field": "published_at", "direction": "desc"},
             },
             headers={
-                **HttpService.headers,
                 "Accept": "application/json, text/plain, */*",
                 "Origin": self._get_origin(),
                 "Referer": self.feed.url,
                 "X-Request-Context": "default",
             },
         )
-        videos = response.get("data", [])
+        videos = response.data.get("data", [])
         return videos if isinstance(videos, list) else []
 
     def _get_origin(self) -> str:

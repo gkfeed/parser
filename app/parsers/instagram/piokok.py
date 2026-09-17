@@ -12,7 +12,6 @@ from app.utils.datetime import constant_datetime
 class InstagramFeed(SeleniumParserExtension, CacheFeedExtension):
     __base_url = "https://www.piokok.com"
     _cache_storage_time_if_success = timedelta(days=1)
-    _http_run_in_queue = True
     _selenium_wait_time = 60
 
     @property

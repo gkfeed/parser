@@ -1,6 +1,7 @@
 import logging
 
 from app.services.catbox import CatboxUploader
+from app.services.http import HttpClient
 from app.services.tempfile import TempFileUploader
 
 logger = logging.getLogger(__name__)
@@ -10,10 +11,10 @@ class FallbackUploader:
     uploaders = (CatboxUploader, TempFileUploader)
 
     @classmethod
-    async def upload_with_url(cls, url: str) -> str | None:
+    async def upload_with_url(cls, http: HttpClient, url: str) -> str | None:
         for uploader in cls.uploaders:
             try:
-                return await uploader.upload_with_url(url)
+                return await uploader.upload_with_url(http, url)
             except Exception:  # noqa: BLE001 - try the next uploader
                 logger.warning("Uploader %s failed for %s", uploader.__name__, url)
 

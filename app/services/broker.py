@@ -1,9 +1,10 @@
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
+from http import HTTPMethod
 from typing import Any
 
-from app.services.http import HttpRequestError, HttpService
+from app.services.http import HttpClient, HttpRequestError
 
 
 class BrokerError(Exception):
@@ -18,7 +19,7 @@ class Task:
 
 
 class BrokerService:
-    def __init__(self, broker_url: str, http: type[HttpService] = HttpService):
+    def __init__(self, broker_url: str, http: HttpClient):
         self.broker_url = broker_url.rstrip("/")
         self.http = http
 
@@ -46,31 +47,39 @@ class BrokerService:
 
     async def cancel_task(self, task_id: str) -> None:
         try:
-            await self.http.delete(f"{self.broker_url}/cancel/{task_id}")
-        except HttpRequestError:
-            raise BrokerError("Failed to cancel task in broker")
+            await self.http.request_bytes(
+                HTTPMethod.DELETE, f"{self.broker_url}/cancel/{task_id}"
+            )
+        except HttpRequestError as error:
+            raise BrokerError("Failed to cancel task in broker") from error
 
     async def get_task_data(self, task_id: str) -> dict:
         try:
-            return await self.http.get_json(f"{self.broker_url}/result/{task_id}")
-        except HttpRequestError:
-            raise BrokerError("Failed to get task data from broker")
+            response = await self.http.request_json(
+                HTTPMethod.GET, f"{self.broker_url}/result/{task_id}"
+            )
+            return response.data
+        except HttpRequestError as error:
+            raise BrokerError("Failed to get task data from broker") from error
 
     async def enqueue(self, func: str, args: Sequence[Any]) -> str:
         try:
-            response = await self.http.post_json(
+            response = await self.http.request_json(
+                HTTPMethod.POST,
                 f"{self.broker_url}/enqueue",
-                {"function": func, "data": args},
+                json={"function": func, "data": args},
             )
-            return response["task_id"]
-        except (HttpRequestError, KeyError):
-            raise BrokerError("Failed to enqueue task to broker")
+            return response.data["task_id"]
+        except (HttpRequestError, KeyError) as error:
+            raise BrokerError("Failed to enqueue task to broker") from error
 
     async def get_task(self, func: str) -> Task | None:
         try:
-            resp = await self.http.get_json(
-                f"{self.broker_url}/get_task?function={func}"
-            )
+            resp = (
+                await self.http.request_json(
+                    HTTPMethod.GET, f"{self.broker_url}/get_task?function={func}"
+                )
+            ).data
 
             if not resp.get("task_id"):
                 return None
@@ -80,23 +89,25 @@ class BrokerService:
                 function=resp.get("function", ""),
                 args=resp.get("data", []),
             )
-        except HttpRequestError:
-            raise BrokerError("Failed to get task from broker")
+        except HttpRequestError as error:
+            raise BrokerError("Failed to get task from broker") from error
 
     async def submit_result(self, task_id: str, result: Any) -> None:
         try:
-            await self.http.post_json(
+            await self.http.request_json(
+                HTTPMethod.POST,
                 f"{self.broker_url}/submit_result",
-                {"task_id": task_id, "result": result},
+                json={"task_id": task_id, "result": result},
             )
-        except HttpRequestError:
-            raise BrokerError("Failed to submit result to broker")
+        except HttpRequestError as error:
+            raise BrokerError("Failed to submit result to broker") from error
 
     async def submit_error(self, task_id: str, error_message: str) -> None:
         try:
-            await self.http.post_json(
+            await self.http.request_json(
+                HTTPMethod.POST,
                 f"{self.broker_url}/submit_error",
                 json={"task_id": task_id, "error_message": error_message},
             )
-        except HttpRequestError:
-            raise BrokerError("Failed to submit error to broker")
+        except HttpRequestError as error:
+            raise BrokerError("Failed to submit error to broker") from error

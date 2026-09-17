@@ -56,9 +56,8 @@ class InstagramStoriesFeed(
             if link is not None
         ]
 
-    @staticmethod
-    async def _upload_media(url: str) -> str | None:
-        return await FallbackUploader.upload_with_url(url)
+    async def _upload_media(self, url: str) -> str | None:
+        return await FallbackUploader.upload_with_url(self.http, url)
 
     @staticmethod
     def _extract_media_links(soup: Tag) -> list[str]:
