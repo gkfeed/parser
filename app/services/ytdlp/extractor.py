@@ -1,6 +1,7 @@
-import logging
 from datetime import timedelta
 from typing import NamedTuple
+
+import structlog
 
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
@@ -10,7 +11,7 @@ from app.workers.youtube import extract_info
 
 from .modes import BaseExtractionMode, VideoExtractionMode
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class VideoInfo(NamedTuple):
@@ -41,19 +42,21 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
         if cls.cache.has_valid_cache(cache_id):
             cached_info = cls.cache.get(cache_id)
             logger.info(
-                "Channel discovery source=cache requested_limit=%d entries=%d",
-                max_videos,
-                len(cached_info.get("entries", [])),
+                "channel_discovery_completed",
+                source="cache",
+                requested_limit=max_videos,
+                entries=len(cached_info.get("entries", [])),
             )
             return cached_info
 
         info = await cls.get_info(videos_url, extraction_mode, max_videos=max_videos)
         limited_info = {**info, "entries": info.get("entries", [])[:max_videos]}
         logger.info(
-            "Channel discovery source=yt_dlp requested_limit=%d entries=%d selected=%d",
-            max_videos,
-            len(info.get("entries", [])),
-            len(limited_info["entries"]),
+            "channel_discovery_completed",
+            source="yt_dlp",
+            requested_limit=max_videos,
+            entries=len(info.get("entries", [])),
+            selected=len(limited_info["entries"]),
         )
         cls.cache.set_with_expiry(
             cache_id, limited_info, cls._channel_info_storage_time

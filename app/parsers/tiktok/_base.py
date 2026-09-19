@@ -1,8 +1,10 @@
 import asyncio
-import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
 from typing import override
+
+import structlog
+from structlog.contextvars import bound_contextvars
 
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -11,9 +13,9 @@ from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.utils.datetime import convert_datetime
-from app.utils.logging import log_context, log_url
+from app.utils.logging import url_log_fields
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
@@ -21,7 +23,7 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
     @property
     async def items(self) -> list[Item]:
-        with log_context(feed_id=self.feed.id, parser=type(self).__name__):
+        with bound_contextvars(feed_id=self.feed.id, parser=self.feed.type):
             links = await self._video_links
             results = await asyncio.gather(
                 *(self._create_video_item(link) for link in links),
@@ -37,21 +39,22 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
                         raise result
                     failed += 1
                     logger.error(
-                        "TikTok video failed video_url=%s reason=extraction_error",
-                        log_url(link),
-                        exc_info=(type(result), result, result.__traceback__),
+                        "tiktok_video_failed",
+                        reason="extraction_error",
+                        exc_info=result,
+                        **url_log_fields(link, field="video_url"),
                     )
                 elif result is not None:
                     items.append(result)
                 else:
                     skipped += 1
-            logger.log(
-                logging.WARNING if failed or skipped else logging.INFO,
-                "TikTok extraction completed links=%d items=%d failed=%d skipped=%d",
-                len(links),
-                len(items),
-                failed,
-                skipped,
+            log = logger.warning if failed or skipped else logger.info
+            log(
+                "tiktok_extraction_completed",
+                links=len(links),
+                items=len(items),
+                failed=failed,
+                skipped=skipped,
             )
             return items
 
@@ -68,11 +71,12 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
                 date=await self._get_video_publish_date(info["timestamp"]),
                 link=link,
             )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
             logger.warning(
-                "TikTok video skipped video_url=%s reason=invalid_video_data",
-                log_url(link),
-                exc_info=True,
+                "tiktok_video_skipped",
+                reason="invalid_video_data",
+                error_type=type(exc).__name__,
+                **url_log_fields(link, field="video_url"),
             )
             return None
 

@@ -1,4 +1,4 @@
-import logging
+import structlog
 
 from app.core.worker_kind import WorkerKind
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
@@ -6,7 +6,7 @@ from app.services.ytdlp.modes import BaseExtractionMode
 
 from ._base import BaseTikTokFeed
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TikTokFeed(BaseTikTokFeed):
@@ -28,17 +28,16 @@ class TikTokFeed(BaseTikTokFeed):
             if "url" not in v:
                 skipped += 1
                 logger.warning(
-                    "TikTok entry skipped entry_index=%d reason=missing_url", index
+                    "tiktok_entry_skipped", entry_index=index, reason="missing_url"
                 )
                 continue
             videos.append(v["url"])
         logger.info(
-            "TikTok discovery completed requested_limit=%d entries=%d links=%d "
-            "skipped=%d below_limit=%s",
-            self._max_videos,
-            len(entries),
-            len(videos),
-            skipped,
-            len(videos) < self._max_videos,
+            "tiktok_discovery_completed",
+            requested_limit=self._max_videos,
+            entries=len(entries),
+            links=len(videos),
+            skipped=skipped,
+            below_limit=len(videos) < self._max_videos,
         )
         return videos

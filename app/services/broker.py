@@ -1,13 +1,14 @@
 import asyncio
-import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.services.http import HttpRequestError, HttpService
-from app.utils.logging import log_context
+import structlog
+from structlog.contextvars import bound_contextvars
 
-logger = logging.getLogger(__name__)
+from app.services.http import HttpRequestError, HttpService
+
+logger = structlog.get_logger(__name__)
 
 
 class BrokerError(Exception):
@@ -32,8 +33,8 @@ class BrokerService:
     ) -> Any:
         task_id = await self.enqueue(func, args)
 
-        with log_context(task_id=task_id):
-            logger.info("Queued task")
+        with bound_contextvars(task_id=task_id):
+            logger.info("broker_task_queued")
             start_time = asyncio.get_event_loop().time()
             while True:
                 if asyncio.get_event_loop().time() - start_time > timeout:

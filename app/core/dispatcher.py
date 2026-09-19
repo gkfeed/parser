@@ -1,11 +1,12 @@
 import asyncio
-import logging
 import random
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
+import structlog
 from pydantic import TypeAdapter
+from structlog.contextvars import bound_contextvars
 
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
@@ -13,11 +14,10 @@ from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
 from app.services.broker import BrokerError, BrokerService
 from app.services.repositories.feed_parser import FeedParserRepository
-from app.utils.logging import log_context
 
 from .storage import FeedStorage, ItemsStorage
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class FeedParserRepositoryProtocol(Protocol):
@@ -67,7 +67,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         return valid_for < datetime.now(UTC)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
-        with log_context(feed_id=feed.id, parser=feed.type):
+        with bound_contextvars(feed_id=feed.id, parser=feed.type):
             await self._fetch_feed_items_with_context(feed)
 
     async def _fetch_feed_items_with_context(self, feed: Feed) -> None:
@@ -78,7 +78,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         try:
             items = await self._request_items_from_broker(feed)
         except BrokerError:
-            logger.exception("Failed to process feed")
+            logger.exception("feed_dispatch_failed")
             await self._schedule_failure(feed.id)
             return
 
@@ -95,7 +95,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
 
         new_valid_for = datetime.now(UTC) + delta
         await self.feed_parser_repository.upsert(feed.id, new_valid_for)
-        logger.info("Feed items received=%d returned=%d", received, len(items))
+        logger.info("feed_items_received", received=received, returned=len(items))
 
     async def _schedule_failure(self, feed_id: int) -> None:
         failure_count = self._failure_counts.get(feed_id, 0) + 1
@@ -107,9 +107,9 @@ class Dispatcher(ItemsStorage, FeedStorage):
         next_retry = datetime.now(UTC) + jittered_backoff
         await self.feed_parser_repository.upsert(feed_id, next_retry)
         logger.warning(
-            "Feed failure_count=%d next_retry=%s",
-            failure_count,
-            next_retry.isoformat(),
+            "feed_retry_scheduled",
+            failure_count=failure_count,
+            next_retry=next_retry.isoformat(),
         )
 
     async def _request_items_from_broker(self, feed: Feed) -> list[Item]:
