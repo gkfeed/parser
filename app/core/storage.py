@@ -1,3 +1,5 @@
+from collections.abc import Collection
+
 from app.serializers.feed import Feed, Item
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.item import ItemsRepository
@@ -9,5 +11,5 @@ class ItemsStorage:
 
 
 class FeedStorage:
-    async def _get_all_feeds(self) -> list[Feed]:
-        return await FeedRepository.get_all()
+    async def _get_eligible_feeds(self, parser_types: Collection[str]) -> list[Feed]:
+        return await FeedRepository.get_eligible(parser_types)

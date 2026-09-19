@@ -21,8 +21,6 @@ logger = structlog.get_logger(__name__)
 
 
 class FeedParserRepositoryProtocol(Protocol):
-    async def get_by_feed_id(self, feed_id: int) -> FeedParser | None: ...
-
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
 
 
@@ -46,25 +44,11 @@ class Dispatcher(ItemsStorage, FeedStorage):
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
-        feeds = await self._get_all_feeds()
+        feeds = await self._get_eligible_feeds(self.parsers.keys())
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
-                if not await self._should_process_feed(feed):
-                    continue
-
                 tg.create_task(self._fetch_feed_items(feed))
                 await asyncio.sleep(1)
-
-    async def _should_process_feed(self, feed: Feed) -> bool:
-        feed_parser = await self.feed_parser_repository.get_by_feed_id(feed.id)
-        if not feed_parser:
-            return True
-
-        valid_for = feed_parser.valid_for
-        if valid_for.tzinfo is None:
-            valid_for = valid_for.replace(tzinfo=UTC)
-
-        return valid_for < datetime.now(UTC)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
         with bound_contextvars(feed_id=feed.id, parser=feed.type):
