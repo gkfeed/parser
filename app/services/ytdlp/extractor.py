@@ -1,6 +1,8 @@
 from datetime import timedelta
 from typing import NamedTuple
 
+import structlog
+
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
     async_store_in_cache_for,
@@ -8,6 +10,8 @@ from app.services.cache.use_temporary import (
 from app.workers.youtube import extract_info
 
 from .modes import BaseExtractionMode, VideoExtractionMode
+
+logger = structlog.get_logger(__name__)
 
 
 class VideoInfo(NamedTuple):
@@ -36,10 +40,24 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
 
         cache_id = f"{videos_url}::{type(extraction_mode).__qualname__}::{max_videos}"
         if cls.cache.has_valid_cache(cache_id):
-            return cls.cache.get(cache_id)
+            cached_info = cls.cache.get(cache_id)
+            logger.info(
+                "channel_discovery_completed",
+                source="cache",
+                requested_limit=max_videos,
+                entries=len(cached_info.get("entries", [])),
+            )
+            return cached_info
 
         info = await cls.get_info(videos_url, extraction_mode, max_videos=max_videos)
         limited_info = {**info, "entries": info.get("entries", [])[:max_videos]}
+        logger.info(
+            "channel_discovery_completed",
+            source="yt_dlp",
+            requested_limit=max_videos,
+            entries=len(info.get("entries", [])),
+            selected=len(limited_info["entries"]),
+        )
         cls.cache.set_with_expiry(
             cache_id, limited_info, cls._channel_info_storage_time
         )

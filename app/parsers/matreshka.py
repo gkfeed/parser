@@ -15,9 +15,8 @@ class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(days=1)
     _page_size = 12
 
-    @property
     @override
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         channel_title = self._extract_channel_title(soup)
         videos = await self._get_videos()

@@ -14,9 +14,8 @@ class MangaLibFeed(HttpParserExtension, CacheFeedExtension):
     _api_base_url = "https://api.cdnlibs.org/api/manga/"
     _max_posts = 5
 
-    @property
     @override
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         chapters = self._parse_chapters(
             await self.get_html(f"{self._api_base_url}{self._get_slug()}/chapters")
         )

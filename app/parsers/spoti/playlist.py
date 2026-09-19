@@ -8,8 +8,7 @@ from app.utils.datetime import constant_datetime
 class SpotifyPlaylistFeed(SeleniumParserExtension):
     _selenium_wait_time = 10
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         first_track = self._get_first_track_element(soup)
         anchor_tag = self._get_track_anchor_tag(first_track)

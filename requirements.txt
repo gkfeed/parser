@@ -122,6 +122,8 @@ sqlalchemy==2.0.45
     # via
     #   alembic
     #   parser
+structlog==26.1.0
+    # via parser
 trio==0.30.0
     # via
     #   selenium

@@ -3,7 +3,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
+from structlog.contextvars import bound_contextvars
+
 from app.services.http import HttpRequestError, HttpService
+
+logger = structlog.get_logger(__name__)
 
 
 class BrokerError(Exception):
@@ -28,21 +33,23 @@ class BrokerService:
     ) -> Any:
         task_id = await self.enqueue(func, args)
 
-        start_time = asyncio.get_event_loop().time()
-        while True:
-            if asyncio.get_event_loop().time() - start_time > timeout:
-                await self.cancel_task(task_id)
-                raise BrokerError("Timeout waiting for result")
+        with bound_contextvars(task_id=task_id):
+            logger.info("broker_task_queued")
+            start_time = asyncio.get_event_loop().time()
+            while True:
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    await self.cancel_task(task_id)
+                    raise BrokerError(f"Timeout waiting for result: task_id={task_id}")
 
-            result_data = await self.get_task_data(task_id)
-            status = result_data.get("status")
+                result_data = await self.get_task_data(task_id)
+                status = result_data.get("status")
 
-            if status == "completed":
-                return result_data.get("result")
-            if status == "failed":
-                raise BrokerError("Task failed: ")
+                if status == "completed":
+                    return result_data.get("result")
+                if status == "failed":
+                    raise BrokerError(f"Task failed: task_id={task_id}")
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
     async def cancel_task(self, task_id: str) -> None:
         try:

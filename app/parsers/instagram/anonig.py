@@ -46,8 +46,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             return HashService.hash_str(match.group(1))
         return HashService.hash_str(item.text)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
 
         media_list_items = soup.find_all(class_="profile-media-list__item")

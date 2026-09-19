@@ -17,6 +17,16 @@ This command executes `.venv/bin/alembic upgrade head`.
 
 The application requires several environment variables to be set (typically in a `.env` file).
 
+Logging is configured with two optional variables:
+
+- `LOG_LEVEL` controls application verbosity and defaults to `INFO`. Supported
+  values are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`.
+- `LOG_FORMAT` controls the output renderer and defaults to `logfmt`. Supported
+  values are `logfmt` and `json`.
+
+Invalid values stop the application during startup rather than silently falling
+back to a different logging configuration.
+
 ## Worker Parser Configuration
 
 Worker parser types are configured in `app/configs/workers.py`.

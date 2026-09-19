@@ -1,13 +1,13 @@
-import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+import structlog
 from bs4 import Tag
 
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PostToItemsMixin(ABC):
@@ -46,8 +46,7 @@ class PostToItemsMixin(ABC):
             link=await self._get_post_link(post),
         )
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         items: list[Item] = []
         for post in await self._posts:
             try:
@@ -55,5 +54,5 @@ class PostToItemsMixin(ABC):
             except self.skip_post_exceptions as exc:
                 if not self.skip_invalid_posts:
                     raise
-                logger.warning("Skipping malformed post: %s", exc)
+                logger.warning("malformed_post_skipped", error_type=type(exc).__name__)
         return items

@@ -27,8 +27,7 @@ class InstagramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension)
             return HashService.hash_str(match.group(1))
         return HashService.hash_str(item.text)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         media = await InstagramService(self._user_name, self.cache).get_media()
 
         items: list[Item] = []
