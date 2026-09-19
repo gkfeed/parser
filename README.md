@@ -69,17 +69,15 @@ make docker-heavy-start
 make docker-heavy-stop
 ```
 
-### Database Configuration
+### Database configuration
 
-`DB_URL` must use an asynchronous driver.
+`DB_URL` must point to PostgreSQL. The parser normalizes the standard PostgreSQL
+schemes to use the asyncpg driver.
 
-#### PostgreSQL
-You can use either:
+Accepted formats:
+
+- `postgres://user:password@host:port/dbname`
+- `postgresql://user:password@host:port/dbname`
 - `postgresql+asyncpg://user:password@host:port/dbname`
-- `postgres://user:password@host:port/dbname` (automatically converted to `asyncpg`)
 
-#### SQLite
-For SQLite, you **must** use `sqlite+aiosqlite:///` followed by the path to the database file (note the three slashes for a relative path):
-- `sqlite+aiosqlite:///data/db.sqlite`
-
-*Note: `sqlite://data/db.sqlite` will not work as it lacks the required async driver and correct URI format.*
+SQLite URLs are rejected.

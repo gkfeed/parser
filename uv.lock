@@ -514,7 +514,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
-    { name = "aiosqlite" },
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "bs4" },
@@ -532,6 +531,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "aiosqlite" },
     { name = "fakeredis", extra = ["lua"] },
     { name = "mypy" },
     { name = "pyright" },
@@ -544,7 +544,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.16" },
-    { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "alembic", specifier = ">=1.17.2" },
     { name = "asyncpg", specifier = ">=0.30.0" },
     { name = "bs4", specifier = ">=0.0.2" },
@@ -562,6 +561,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "fakeredis", extras = ["lua"], specifier = ">=2.32.1" },
     { name = "mypy", specifier = ">=1.16.1" },
     { name = "pyright", specifier = ">=1.1.402" },

@@ -59,7 +59,7 @@ lock-dev:
 	uv pip freeze > requirements-dev.txt
 
 lock:
-	uv export --no-hashes --format requirements-txt > requirements.txt
+	uv export --no-dev --no-hashes --format requirements-txt > requirements.txt
 
 lint:
 	uvx ruff check . 

@@ -8,7 +8,6 @@ from dataclasses import asdict
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
-import app.configs  # noqa: F401
 from app.configs.selenium import SELENIUM_COOKIES_PATH
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
 from app.utils.inject import inject
