@@ -23,19 +23,24 @@ class AuthorTodayFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension)
             if isinstance(chapter, Tag)
         ]
 
+    def _get_chapter_anchor(self, post: Tag) -> Tag:
+        anchor = post.select_one("a[href^='/reader/']")
+        if not isinstance(anchor, Tag):
+            raise ValueError("Could not find chapter link")  # noqa: TRY004 - missing page data is a value error
+        return anchor
+
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        chapter_link = post.select_one("a[href^='/reader/']")
-        if isinstance(chapter_link, Tag):
-            title = chapter_link.get_text(" ", strip=True)
-            if title:
-                return title
+        chapter_link = self._get_chapter_anchor(post)
+        title = chapter_link.get_text(" ", strip=True)
+        if title:
+            return title
         raise ValueError("Could not find chapter title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        chapter_link = post.select_one("a[href^='/reader/']")
-        href = chapter_link.get("href") if isinstance(chapter_link, Tag) else None
+        chapter_link = self._get_chapter_anchor(post)
+        href = chapter_link.get("href")
         if isinstance(href, str):
             return urljoin(self._base_url, href)
         raise ValueError("Could not find chapter link")
