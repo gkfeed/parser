@@ -24,39 +24,47 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
     @property
     async def items(self) -> list[Item]:
         with bound_contextvars(feed_id=self.feed.id, parser=self.feed.type):
-            links = await self._video_links
-            results = await asyncio.gather(
-                *(self._create_video_item(link) for link in links),
-                return_exceptions=True,
-            )
+            return await self._extract_items()
 
-            items = []
-            failed = 0
-            skipped = 0
-            for link, result in zip(links, results, strict=True):
-                if isinstance(result, BaseException):
-                    if not isinstance(result, Exception):
-                        raise result
-                    failed += 1
-                    logger.error(
-                        "tiktok_video_failed",
-                        reason="extraction_error",
-                        exc_info=result,
-                        **url_log_fields(link, field="video_url"),
-                    )
-                elif result is not None:
-                    items.append(result)
-                else:
-                    skipped += 1
-            log = logger.warning if failed or skipped else logger.info
-            log(
-                "tiktok_extraction_completed",
-                links=len(links),
-                items=len(items),
-                failed=failed,
-                skipped=skipped,
-            )
-            return items
+    async def _extract_items(self) -> list[Item]:
+        links = await self._video_links
+        results = await asyncio.gather(
+            *(self._create_video_item(link) for link in links),
+            return_exceptions=True,
+        )
+
+        items = []
+        failed = 0
+        skipped = 0
+        for link, result in zip(links, results, strict=True):
+            if result is None:
+                skipped += 1
+                continue
+
+            if isinstance(result, Exception):
+                failed += 1
+                logger.error(
+                    "tiktok_video_failed",
+                    reason="extraction_error",
+                    exc_info=result,
+                    **url_log_fields(link, field="video_url"),
+                )
+                continue
+
+            if isinstance(result, BaseException):
+                raise result
+
+            items.append(result)
+
+        log = logger.warning if failed or skipped else logger.info
+        log(
+            "tiktok_extraction_completed",
+            links=len(links),
+            items=len(items),
+            failed=failed,
+            skipped=skipped,
+        )
+        return items
 
     @override
     async def _generate_hash(self, item: Item) -> str:
