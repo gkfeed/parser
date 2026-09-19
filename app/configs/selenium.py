@@ -2,8 +2,6 @@ from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.configs.env import SELENIUM_DOCKER_URL
@@ -63,20 +61,3 @@ def _get_chrome_options() -> webdriver.ChromeOptions:
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     return options
-
-
-def _get_local_firefox_driver() -> WebDriver:
-    options = FirefoxOptions()
-    return webdriver.Firefox(
-        service=FirefoxService(executable_path="/usr/bin/geckodriver"),
-        options=options,
-    )
-
-
-def _get_local_headless_firefox_driver() -> WebDriver:
-    options = FirefoxOptions()
-    options.add_argument("--headless")
-    return webdriver.Firefox(
-        service=FirefoxService(executable_path="/usr/bin/geckodriver"),
-        options=options,
-    )
