@@ -13,6 +13,7 @@ from app.services.hash import HashService
 from app.services.http import HttpRequestError
 from app.services.instagram import InstagramService
 from app.utils.datetime import constant_datetime
+from app.utils.media import detect_mime_type
 from app.workers.http import get_html
 
 
@@ -44,7 +45,7 @@ class InstagramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension)
             return None
 
         encoded = base64.b64encode(img_bytes).decode("utf-8")
-        mime_type = self._get_mime_type(img_bytes)
+        mime_type = detect_mime_type(img_bytes)
         img_tag = (
             f'<img src="data:{mime_type};base64,{encoded}" alt="{self._user_name}" />'
         )
@@ -54,18 +55,6 @@ class InstagramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension)
             date=constant_datetime,
             link=link,
         )
-
-    @staticmethod
-    def _get_mime_type(data: bytes) -> str:
-        if data.startswith(b"\xff\xd8"):
-            return "image/jpeg"
-        if data.startswith(b"\x89PNG\r\n\x1a\n"):
-            return "image/png"
-        if data.startswith((b"GIF87a", b"GIF89a")):
-            return "image/gif"
-        if data.startswith(b"RIFF") and b"WEBP" in data[:16]:
-            return "image/webp"
-        return "image/jpeg"
 
     @property
     def _user_name(self) -> str:
