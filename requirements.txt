@@ -134,7 +134,6 @@ types-python-dateutil==2.9.0.20250708
 types-requests==2.32.4.20250611
 typing-extensions==4.14.1
     # via
-    #   aiosignal
     #   alembic
     #   beautifulsoup4
     #   mypy

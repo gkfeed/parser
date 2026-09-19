@@ -3,7 +3,7 @@ name = "parser"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = "==3.12.*"
+requires-python = "==3.13.*"
 dependencies = [
     "aiohttp>=3.11.16",
     "aiosqlite>=0.22.1",
@@ -36,6 +36,9 @@ dev = [
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["UP043"]
 
 [tool.mypy]
 ignore_missing_imports = true
