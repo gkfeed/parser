@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 
 import structlog
-from structlog.contextvars import bound_contextvars
 
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -21,12 +20,7 @@ logger = structlog.get_logger(__name__)
 class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
     _cache_storage_time_if_success = timedelta(days=1)
 
-    @property
-    async def items(self) -> list[Item]:
-        with bound_contextvars(feed_id=self.feed.id, parser=self.feed.type):
-            return await self._extract_items()
-
-    async def _extract_items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         links = await self._video_links
         results = await asyncio.gather(
             *(self._create_video_item(link) for link in links),

@@ -38,8 +38,7 @@ class _BaseYoutubeFeed(BaseFeed):
 class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
     worker_kind = WorkerKind.LIGHT
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         videos_url = self._get_target_url()
         extraction_mode = self._choose_extraction_mode(self.feed.url)
         max_items = 5

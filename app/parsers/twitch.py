@@ -12,8 +12,7 @@ class TwitchFeed(CacheFeedExtension, _BaseFeed):
     worker_kind = WorkerKind.LIGHT
     _cache_storage_time_if_success = timedelta(hours=1)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         stream = await Twitch.get_stream(self._streamer_name)
         return [self._get_stream_item(stream)] if stream else []
 

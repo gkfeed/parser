@@ -46,8 +46,7 @@ class PostToItemsMixin(ABC):
             link=await self._get_post_link(post),
         )
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         items: list[Item] = []
         for post in await self._posts:
             try:

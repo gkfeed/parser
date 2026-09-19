@@ -18,8 +18,7 @@ class WebFeed(ItemsHashExtension, HttpParserExtension):
             return HashService.hash_str(item.guid)
         return HashService.hash_str(item.title + item.text)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         return await self._get_items_from_web(self.feed.url)
 
     async def _get_items_from_web(self, url: str) -> list[Item]:

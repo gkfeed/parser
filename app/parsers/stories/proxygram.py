@@ -14,8 +14,7 @@ class InstagramStoriesFeed(HttpParserExtension, CacheFeedExtension):
     __base_url = "https://ig.opnxng.com"
     _cache_storage_time_if_success = timedelta(days=1)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         return [
             Item(
                 title="inst: " + self._user_name,

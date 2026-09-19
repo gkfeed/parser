@@ -13,8 +13,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self._get_discography_soup()
         artist_name = await self._parse_artist_name(soup)
         return [

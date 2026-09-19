@@ -11,8 +11,7 @@ class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
     _max_items = 30
     _selenium_wait_time = 5
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         titles = self._extract_collection_titles(soup)
 

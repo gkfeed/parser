@@ -21,9 +21,8 @@ class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
     )
     _cdn_base_url = "https://cdn.anilibria.top/"
 
-    @property
     @override
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         path = f"anime/releases/{quote(self._get_alias_from_url(), safe='')}"
         last_error: ValueError | UnavailableFeed | None = None
 

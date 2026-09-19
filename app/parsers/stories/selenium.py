@@ -38,8 +38,7 @@ class InstagramStoriesFeed(
         except Exception:  # noqa: BLE001 - persisted media can be temporarily unavailable
             return HashService.hash_str(item.link)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
         links = await asyncio.gather(
             *(self._upload_media(link) for link in self._extract_media_links(soup))
