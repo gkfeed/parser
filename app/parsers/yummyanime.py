@@ -47,4 +47,4 @@ class YummyAnimeFeed(PostToItemsMixin, HttpParserExtension):
 
     @property
     def _show_url(self) -> str:
-        return self.feed.url
+        return self.feed.url.replace("yummyanime.org", "site.yummyani.me")
