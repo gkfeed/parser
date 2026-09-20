@@ -2,6 +2,7 @@ from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.remote.client_config import ClientConfig
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.configs.env import SELENIUM_DOCKER_URL
@@ -15,6 +16,7 @@ _CHROME_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/149.0.0.0 Safari/537.36"
 )
+_REMOTE_COMMAND_TIMEOUT_SECONDS = 60
 
 
 def get_driver() -> WebDriver:
@@ -40,6 +42,10 @@ def _get_docker_driver() -> WebDriver:
     return webdriver.Remote(
         SELENIUM_DOCKER_URL,
         options=_get_chrome_options(),
+        client_config=ClientConfig(
+            remote_server_addr=SELENIUM_DOCKER_URL,
+            timeout=_REMOTE_COMMAND_TIMEOUT_SECONDS,
+        ),
     )
 
 

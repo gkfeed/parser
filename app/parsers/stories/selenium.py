@@ -91,12 +91,25 @@ class InstagramStoriesFeed(
         except NoSuchElementException:
             pass
 
-        link = driver.find_element(
-            By.CSS_SELECTOR, "form.search-form input.search-form__input"
+        links = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.visibility_of_any_elements_located(
+                (By.CSS_SELECTOR, "form.search-form input.search-form__input")
+            )
         )
-        link.send_keys(self._user_name)
+        driver.execute_script(
+            """
+            arguments[0].value = arguments[1];
+            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+            """,
+            links[0],
+            self._user_name,
+        )
 
-        button = driver.find_element(By.CSS_SELECTOR, ".search-form__button")
+        button = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.element_to_be_clickable(
+                (By.CSS_SELECTOR, "form.search-form .search-form__button")
+            )
+        )
         self._click(driver, button)
 
         result = WebDriverWait(driver, self._results_wait_time).until(
