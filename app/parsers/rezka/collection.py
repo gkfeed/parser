@@ -16,30 +16,22 @@ class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
         titles = self._extract_collection_titles(soup)
 
         return [
-            Item(
-                title=self._extract_item_title(title),
-                link=self._extract_item_link(title),
-                text=self._extract_item_text(title),
-                date=constant_datetime,
-            )
+            self._item_from_title(title)
             for title in titles
         ]
 
-    def _extract_item_title(self, title_tag: Tag) -> str:
+    def _item_from_title(self, title_tag: Tag) -> Item:
         anchor = title_tag.find("a")
-        if not (anchor and isinstance(anchor, Tag)):
+        if not isinstance(anchor, Tag) or "href" not in anchor.attrs:
             raise ValueError(
-                "Could not extract item title: <a> tag not found or not a Tag instance."
+                "Could not extract collection item: <a> tag or href attribute not found."
             )
-        return anchor.text
-
-    def _extract_item_text(self, title_tag: Tag) -> str:
-        anchor = title_tag.find("a")
-        if not (anchor and isinstance(anchor, Tag)):
-            raise ValueError(
-                "Could not extract item text: <a> tag not found or not a Tag instance."
-            )
-        return anchor.text
+        return Item(
+            title=anchor.text,
+            link=self._normalize_href(str(anchor["href"])),
+            text=anchor.text,
+            date=constant_datetime,
+        )
 
     def _extract_collection_titles(self, soup: Tag) -> list[Tag]:
         titles = [
@@ -50,14 +42,6 @@ class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
         if not titles:
             raise ValueError("Could not extract collection titles: no titles found.")
         return titles
-
-    def _extract_item_link(self, title_tag: Tag) -> str:
-        anchor = title_tag.find("a")
-        if not isinstance(anchor, Tag) or "href" not in anchor.attrs:
-            raise ValueError(
-                "Could not extract item link: <a> tag or href attribute not found."
-            )
-        return self._normalize_href(str(anchor["href"]))
 
     def _normalize_href(self, href: str) -> str:
         return self._base_url + href if href.startswith("/") else href

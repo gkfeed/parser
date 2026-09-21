@@ -1,3 +1,5 @@
+from enum import Enum, auto
+from functools import cached_property
 from typing import override
 
 from bs4 import Tag
@@ -7,16 +9,26 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
+class RezkaPageMode(Enum):
+    FILM = auto()
+    SERIES = auto()
+
+
 class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
     _selenium_wait_time = 5
+
+    @cached_property
+    def _page_mode(self) -> RezkaPageMode:
+        if "/films/" in self.feed.url:
+            return RezkaPageMode.FILM
+        return RezkaPageMode.SERIES
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        show_url = self.feed.url
         soup = await self._show_soup
 
-        if "/films/" in show_url:
+        if self._page_mode is RezkaPageMode.FILM:
             h2_tags = soup.find_all("h2")
             if not h2_tags:
                 raise ValueError("Could not extract h2 tags: No <h2> tags found")
@@ -32,8 +44,7 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        show_url = self.feed.url
-        if "/films/" in show_url:
+        if self._page_mode is RezkaPageMode.FILM:
             return post.text
 
         soup = await self._show_soup
@@ -62,7 +73,7 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
         return soup
 
     def _has_show_content(self, soup: Tag) -> bool:
-        if "/films/" in self.feed.url:
+        if self._page_mode is RezkaPageMode.FILM:
             return bool(soup.find_all("h2"))
         return soup.select_one(".b-simple_episode__item") is not None
 
