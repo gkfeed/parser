@@ -1,6 +1,6 @@
 import asyncio
 import random
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -13,9 +13,9 @@ from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
 from app.services.broker import BrokerError, BrokerService
+from app.services.repositories.feed import FeedRepository
 from app.services.repositories.feed_parser import FeedParserRepository
-
-from .storage import FeedStorage, ItemsStorage
+from app.services.repositories.item import ItemsRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -24,7 +24,15 @@ class FeedParserRepositoryProtocol(Protocol):
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
 
 
-class Dispatcher(ItemsStorage, FeedStorage):
+class FeedRepositoryProtocol(Protocol):
+    async def get_eligible(self, parser_types: Collection[str]) -> list[Feed]: ...
+
+
+class ItemsRepositoryProtocol(Protocol):
+    async def add_items_to_feed(self, feed: Feed, items: list[Item]) -> list[Item]: ...
+
+
+class Dispatcher:
     _failure_backoffs = (
         timedelta(minutes=15),
         timedelta(hours=1),
@@ -37,14 +45,18 @@ class Dispatcher(ItemsStorage, FeedStorage):
         broker: BrokerService,
         feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
+        feed_repository: FeedRepositoryProtocol = FeedRepository,
+        items_repository: ItemsRepositoryProtocol = ItemsRepository,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
+        self.feed_repository = feed_repository
+        self.items_repository = items_repository
         self.parsers = parsers
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
-        feeds = await self._get_eligible_feeds(self.parsers.keys())
+        feeds = await self.feed_repository.get_eligible(self.parsers.keys())
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
                 tg.create_task(self._fetch_feed_items(feed))
@@ -107,3 +119,6 @@ class Dispatcher(ItemsStorage, FeedStorage):
         items = adapter.validate_json(items_json)
 
         return items
+
+    async def _save_items(self, feed: Feed, items: list[Item]) -> list[Item]:
+        return await self.items_repository.add_items_to_feed(feed, items)
