@@ -9,7 +9,6 @@ from bs4.element import Tag
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -202,14 +201,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 break
 
             media_count = len(driver.find_elements(By.CSS_SELECTOR, media_selector))
-
-    @staticmethod
-    def _click(driver: WebDriver, element: WebElement) -> None:
-        try:
-            driver.execute_script("arguments[0].click();", element)
-        except TimeoutException:
-            # Background requests can outlive an otherwise usable result page.
-            pass
 
     @property
     def _user_name(self) -> str:

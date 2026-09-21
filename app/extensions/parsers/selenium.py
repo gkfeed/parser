@@ -1,7 +1,9 @@
 from abc import ABC
 from datetime import timedelta
 
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 
 from app.core.worker_kind import WorkerKind
 from app.services.selenium import SeleniumGetHtmlArgs, SeleniumService
@@ -34,3 +36,11 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
 
     def make_actions(self, driver: WebDriver):
         pass
+
+    @staticmethod
+    def _click(driver: WebDriver, element: WebElement) -> None:
+        try:
+            driver.execute_script("arguments[0].click();", element)
+        except TimeoutException:
+            # Background requests can outlive an otherwise usable result page.
+            pass

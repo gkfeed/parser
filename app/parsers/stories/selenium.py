@@ -4,10 +4,9 @@ from datetime import timedelta
 from typing import override
 
 from bs4 import Tag
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -154,14 +153,6 @@ class InstagramStoriesFeed(
         for _ in range(3):
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(1)
-
-    @staticmethod
-    def _click(driver: WebDriver, element: WebElement) -> None:
-        try:
-            driver.execute_script("arguments[0].click();", element)
-        except TimeoutException:
-            # The DOM is usable even when background resources never finish.
-            pass
 
     @property
     def _user_name(self) -> str:
