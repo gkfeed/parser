@@ -5,13 +5,14 @@ from urllib.parse import urljoin, urlparse
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.services.http import HttpService
 from app.utils.datetime import constant_datetime
 
 
-class MatreshkaFeed(HttpParserExtension, CacheFeedExtension):
+class MatreshkaFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(days=1)
     _page_size = 12
 
