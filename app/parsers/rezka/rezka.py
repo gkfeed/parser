@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from functools import cached_property
 from typing import override
+from urllib.parse import urlsplit
 
 from bs4 import Tag
 
@@ -63,7 +64,7 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
 
     @property
     async def _show_soup(self) -> Tag:
-        url = self.feed.url
+        url = urlsplit(self.feed.url)._replace(netloc="hdrezka.me").geturl()
         soup = await self.get_soup(url)
 
         if not url.endswith("-latest.html") and not self._has_show_content(soup):
