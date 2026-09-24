@@ -6,7 +6,6 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.rss import RSSParser
-from app.utils.datetime import convert_datetime
 
 
 class WebFeed(ItemsHashExtension, HttpParserExtension):
@@ -19,17 +18,4 @@ class WebFeed(ItemsHashExtension, HttpParserExtension):
         return HashService.hash_str(item.title + item.text)
 
     async def _parse_items(self) -> list[Item]:
-        return await self._get_items_from_web(self.feed.url)
-
-    async def _get_items_from_web(self, url: str) -> list[Item]:
-        return [self._convert_item(item) for item in await RSSParser.parse_feed(url)]
-
-    @staticmethod
-    def _convert_item(item_data: dict) -> Item:
-        return Item(
-            title=item_data.get("title", ""),
-            link=item_data.get("link", ""),
-            text=item_data.get("description", ""),
-            date=convert_datetime(item_data.get("pub_date", "")),
-            guid=item_data.get("guid", ""),
-        )
+        return await RSSParser.parse_items(self.feed.url)
