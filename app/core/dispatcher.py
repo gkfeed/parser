@@ -12,7 +12,7 @@ from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
-from app.services.broker import BrokerError, BrokerService
+from app.services.broker import BrokerError, BrokerNoWorker, BrokerService
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.feed_parser import FeedParserRepository
 from app.services.repositories.item import ItemsRepository
@@ -47,12 +47,14 @@ class Dispatcher:
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
         feed_repository: FeedRepositoryProtocol = FeedRepository,
         items_repository: ItemsRepositoryProtocol = ItemsRepository,
+        broker_wait_timeout: int = 300,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
         self.feed_repository = feed_repository
         self.items_repository = items_repository
         self.parsers = parsers
+        self.broker_wait_timeout = broker_wait_timeout
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
@@ -73,6 +75,18 @@ class Dispatcher:
 
         try:
             items = await self._request_items_from_broker(feed)
+        except BrokerNoWorker as exc:
+            next_retry = datetime.now(UTC) + timedelta(minutes=1)
+            await self.feed_parser_repository.upsert(feed.id, next_retry)
+            logger.warning(
+                "feed_broker_wait_deadline",
+                feed_id=feed.id,
+                broker_task_id=exc.task_id,
+                claim_state="pending",
+                recovery_action="reuse_task_on_retry",
+                next_retry=next_retry.isoformat(),
+            )
+            return
         except BrokerError:
             logger.exception("feed_dispatch_failed")
             await self._schedule_failure(feed.id)
@@ -112,7 +126,8 @@ class Dispatcher:
         items_json = await self.broker.put_and_wait_for_result(
             f"gkfeed.process_feed_{feed.type}",
             (feed.model_dump_json(),),
-            timeout=300,
+            timeout=self.broker_wait_timeout,
+            task_key=f"feed:{feed.id}",
         )
 
         adapter = TypeAdapter(list[Item])
