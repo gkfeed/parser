@@ -1,7 +1,7 @@
 import json
 from collections.abc import Mapping
 from datetime import datetime, timedelta
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 from urllib.parse import urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -10,6 +10,12 @@ from app.serializers.feed import Item
 
 
 class MangaLibFeed(HttpParserExtension, CacheFeedExtension):
+    _headers: ClassVar[dict[str, str]] = {
+        **HttpParserExtension._headers,
+        "Accept": "application/json",
+        "Site-Id": "1",
+        "Referer": "https://mangalib.org/",
+    }
     _cache_storage_time = timedelta(hours=1)
     _api_base_url = "https://api.cdnlibs.org/api/manga/"
     _max_posts = 5
