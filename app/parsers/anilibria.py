@@ -6,12 +6,13 @@ from urllib.parse import quote, urljoin, urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class AnilibriaFeed(HttpParserExtension, CacheFeedExtension):
+class AnilibriaFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time_if_success = timedelta(days=1)
     _cache_storage_time = timedelta(seconds=5)
     _api_base_urls = (

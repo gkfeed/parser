@@ -5,11 +5,14 @@ from urllib.parse import urljoin
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class AuthorTodayFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
+class AuthorTodayFeed(
+    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
+):
     _cache_storage_time = timedelta(hours=1)
     _base_url = "https://author.today"
 

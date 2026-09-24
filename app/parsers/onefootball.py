@@ -6,12 +6,15 @@ from urllib.parse import urljoin
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import constant_datetime, convert_datetime
 
 
-class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
+class OneFootballFeed(
+    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
+):
     __base_url = "https://onefootball.com"
     __match_path = re.compile(r"^/[^/]+/match/\d+/?$")
     _cache_storage_time = timedelta(hours=1)
