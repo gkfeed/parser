@@ -4,10 +4,9 @@ from datetime import timedelta
 from typing import override
 
 from bs4 import Tag
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -38,8 +37,7 @@ class InstagramStoriesFeed(
         except Exception:  # noqa: BLE001 - persisted media can be temporarily unavailable
             return HashService.hash_str(item.link)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
         links = await asyncio.gather(
             *(self._upload_media(link) for link in self._extract_media_links(soup))
@@ -92,12 +90,25 @@ class InstagramStoriesFeed(
         except NoSuchElementException:
             pass
 
-        link = driver.find_element(
-            By.CSS_SELECTOR, "form.search-form input.search-form__input"
+        links = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.visibility_of_any_elements_located(
+                (By.CSS_SELECTOR, "form.search-form input.search-form__input")
+            )
         )
-        link.send_keys(self._user_name)
+        driver.execute_script(
+            """
+            arguments[0].value = arguments[1];
+            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+            """,
+            links[0],
+            self._user_name,
+        )
 
-        button = driver.find_element(By.CSS_SELECTOR, ".search-form__button")
+        button = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.element_to_be_clickable(
+                (By.CSS_SELECTOR, "form.search-form .search-form__button")
+            )
+        )
         self._click(driver, button)
 
         result = WebDriverWait(driver, self._results_wait_time).until(
@@ -142,14 +153,6 @@ class InstagramStoriesFeed(
         for _ in range(3):
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(1)
-
-    @staticmethod
-    def _click(driver: WebDriver, element: WebElement) -> None:
-        try:
-            driver.execute_script("arguments[0].click();", element)
-        except TimeoutException:
-            # The DOM is usable even when background resources never finish.
-            pass
 
     @property
     def _user_name(self) -> str:

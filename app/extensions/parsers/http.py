@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 
 from app.services.cache.use_temporary import (
     UseTemporaryCacheServiceExtension,
-    async_store_in_cache_for,
 )
 from app.services.http import HttpRequestError, HttpService
 
@@ -25,15 +24,15 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
     # NOTE: deprecated use heavy worker instead
     _http_run_in_queue = False
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        # @async_store_in_cache_for(_http_response_storage_time)
-        # async def get_html(self, url: str) -> bytes:
-        cls.get_html = async_store_in_cache_for(cls._http_response_storage_time)(
-            cls.get_html
-        )
-
     async def get_html(self, url: str) -> bytes:
+        if self.cache.has_valid_cache(url):
+            return self.cache.get(url)
+
+        html = await self._fetch_html(url)
+        self.cache.set_with_expiry(url, html, self._http_response_storage_time)
+        return html
+
+    async def _fetch_html(self, url: str) -> bytes:
         try:
             if self._http_run_in_queue:
                 return await http_get_in_queue(url, self._headers)

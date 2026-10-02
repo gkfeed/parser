@@ -9,8 +9,7 @@ from app.utils.datetime import constant_datetime
 class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
     _selenium_wait_time = 10
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
         first_track = self._get_first_track_element(soup)
         anchor_tag = self._get_track_anchor_tag(first_track)
@@ -37,6 +36,9 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
                 "Could not find the first track element."
             )
 
+        return self._get_track_container(track_anchor)
+
+    def _get_track_container(self, track_anchor: Tag) -> Tag:
         track_element = track_anchor.parent
         while isinstance(track_element, Tag):
             artist_anchor = track_element.find(
@@ -68,18 +70,16 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
         return track_name
 
     def _get_track_artist(self, anchor_tag: Tag) -> str:
-        track_element = anchor_tag.parent
-        while isinstance(track_element, Tag):
-            artist_tags = track_element.find_all(
-                "a",
-                href=lambda href: isinstance(href, str)
-                and href.startswith("/artist/"),
-            )
-            artist_names = [tag.get_text(strip=True) for tag in artist_tags]
-            artist_names = [name for name in artist_names if name]
-            if artist_names:
-                return ", ".join(artist_names)
-            track_element = track_element.parent
+        track_container = self._get_track_container(anchor_tag)
+        artist_tags = track_container.find_all(
+            "a",
+            href=lambda href: isinstance(href, str)
+            and href.startswith("/artist/"),
+        )
+        artist_names = [tag.get_text(strip=True) for tag in artist_tags]
+        artist_names = [name for name in artist_names if name]
+        if artist_names:
+            return ", ".join(artist_names)
 
         raise ValueError("Could not find the artist anchor tag.")
 

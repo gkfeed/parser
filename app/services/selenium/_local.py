@@ -8,7 +8,6 @@ from dataclasses import asdict
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
-import app.configs  # noqa: F401
 from app.configs.selenium import SELENIUM_COOKIES_PATH
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
 from app.utils.inject import inject
@@ -56,17 +55,12 @@ async def _get_html(
 
         if should_save_cookies:
             await asyncio.to_thread(_save_cookies, driver.get_cookies())
-
-    except BaseException:
-        # Preserve the original parsing/cancellation error if session cleanup also
-        # fails. Calling close() first can prevent quit() from ever reaching the
-        # remote Selenium server, leaving its temporary Chrome profile behind.
+        return html
+    finally:
+        # A failed quit must not replace a parsing error or discard fetched HTML.
+        # The remote command timeout bounds cleanup when Chrome stops responding.
         with contextlib.suppress(Exception):
             driver.quit()
-        raise
-
-    driver.quit()
-    return html
 
 
 def _load_cookies():

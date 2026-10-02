@@ -3,11 +3,22 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
+from structlog.contextvars import bound_contextvars
+
 from app.services.http import HttpRequestError, HttpService
+
+logger = structlog.get_logger(__name__)
 
 
 class BrokerError(Exception):
     """Broker error"""
+
+
+class BrokerNoWorker(BrokerError):
+    def __init__(self, task_id: str):
+        self.task_id = task_id
+        super().__init__(f"Task has not been claimed: task_id={task_id}")
 
 
 @dataclass
@@ -21,28 +32,42 @@ class BrokerService:
     def __init__(self, broker_url: str, http: type[HttpService] = HttpService):
         self.broker_url = broker_url.rstrip("/")
         self.http = http
+        self._active_tasks: dict[str, str] = {}
 
     # TODO: should have background task and make batch request
     async def put_and_wait_for_result(
-        self, func: str, args: Sequence[Any], timeout: int
+        self, func: str, args: Sequence[Any], timeout: int, task_key: str | None = None
     ) -> Any:
-        task_id = await self.enqueue(func, args)
+        task_id = self._active_tasks.get(task_key) if task_key else None
+        if task_id is None:
+            task_id = await self.enqueue(func, args)
+            if task_key:
+                self._active_tasks[task_key] = task_id
 
-        start_time = asyncio.get_event_loop().time()
-        while True:
-            if asyncio.get_event_loop().time() - start_time > timeout:
-                await self.cancel_task(task_id)
-                raise BrokerError("Timeout waiting for result")
+        with bound_contextvars(task_id=task_id):
+            logger.info("broker_task_queued")
+            start_time = asyncio.get_event_loop().time()
+            while True:
+                result_data = await self.get_task_data(task_id)
+                status = result_data.get("status")
 
-            result_data = await self.get_task_data(task_id)
-            status = result_data.get("status")
+                if status == "completed":
+                    if task_key:
+                        self._active_tasks.pop(task_key, None)
+                    return result_data.get("result")
+                if status == "failed":
+                    if task_key:
+                        self._active_tasks.pop(task_key, None)
+                    raise BrokerError(f"Task failed: task_id={task_id}")
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    if status == "pending":
+                        raise BrokerNoWorker(task_id)
+                    await self.cancel_task(task_id)
+                    if task_key:
+                        self._active_tasks.pop(task_key, None)
+                    raise BrokerError(f"Timeout waiting for result: task_id={task_id}")
 
-            if status == "completed":
-                return result_data.get("result")
-            if status == "failed":
-                raise BrokerError("Task failed: ")
-
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
 
     async def cancel_task(self, task_id: str) -> None:
         try:

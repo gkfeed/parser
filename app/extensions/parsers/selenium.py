@@ -1,10 +1,11 @@
 from abc import ABC
 from datetime import timedelta
 
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 
 from app.core.worker_kind import WorkerKind
-from app.services.cache.use_temporary import async_store_in_cache_for
 from app.services.selenium import SeleniumGetHtmlArgs, SeleniumService
 
 from .http import HttpParserExtension
@@ -19,13 +20,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
     _should_save_cookies = False
     _page_load_timeout_seconds: int | None = None
 
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        cls.get_html = async_store_in_cache_for(cls._http_response_storage_time)(
-            cls.get_html
-        )
-
-    async def get_html(self, url: str) -> bytes:
+    async def _fetch_html(self, url: str) -> bytes:
         html = await SeleniumService.get_html(
             SeleniumGetHtmlArgs(
                 url=url,
@@ -41,3 +36,11 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
 
     def make_actions(self, driver: WebDriver):
         pass
+
+    @staticmethod
+    def _click(driver: WebDriver, element: WebElement) -> None:
+        try:
+            driver.execute_script("arguments[0].click();", element)
+        except TimeoutException:
+            # Background requests can outlive an otherwise usable result page.
+            pass

@@ -7,7 +7,7 @@ from . import fetch_items  # noqa
 YUMMYANIME_FEED_DATA = {
     "type": "yummyanime",
     "parser": YummyAnimeFeed,
-    "url": "https://site.yummyani.me/catalog/item/van-pis-tv",
+    "url": "https://yummyanime.org/catalog/item/van-pis-tv",
 }
 
 

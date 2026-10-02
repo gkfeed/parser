@@ -95,6 +95,11 @@ class LiquidpediaFeed(
             if title.startswith("Match:"):
                 return link
 
+        classes = post.get("class")
+        if isinstance(classes, list) and "table2__row--body" in classes:
+            # Recent-match rows do not always link to a dedicated match page.
+            return self.feed.url
+
         raise ValueError("Match page link not found")
 
     @override

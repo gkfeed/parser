@@ -15,8 +15,7 @@ class InstagramFeed(SeleniumParserExtension, CacheFeedExtension):
     _http_run_in_queue = True
     _selenium_wait_time = 60
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         return [
             Item(
                 title="inst: " + self._user_name,

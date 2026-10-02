@@ -1,6 +1,10 @@
-from sqlalchemy import delete, select
+from collections.abc import Collection
+from datetime import UTC, datetime
+
+from sqlalchemy import delete, or_, select
 
 from app.models.feed import Feed as _Feed
+from app.models.feed_parser import FeedParser
 from app.serializers.feed import Feed
 
 from ._base import BaseRepository
@@ -19,6 +23,23 @@ class FeedRepository(BaseRepository):
     async def get_all(cls) -> list[Feed]:
         async with cls._session_factory() as session:
             result = await session.execute(select(_Feed))
+            return [await cls._unserialize(f) for f in result.scalars().all()]
+
+    @classmethod
+    async def get_eligible(cls, parser_types: Collection[str]) -> list[Feed]:
+        async with cls._session_factory() as session:
+            result = await session.execute(
+                select(_Feed)
+                .outerjoin(FeedParser, FeedParser.feed_id == _Feed.id)
+                .where(
+                    _Feed.type.in_(parser_types),
+                    or_(
+                        FeedParser.feed_id.is_(None),
+                        FeedParser.valid_for < datetime.now(UTC),
+                    ),
+                )
+                .order_by(_Feed.id)
+            )
             return [await cls._unserialize(f) for f in result.scalars().all()]
 
     @classmethod

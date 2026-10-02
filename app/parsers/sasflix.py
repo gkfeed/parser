@@ -14,8 +14,7 @@ class SasflixFeed(ItemsHashExtension, HttpParserExtension):
     async def _generate_hash(self, item: Item) -> str:
         return HashService.hash_str(item.link)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         rss_url = f"{self.feed.url.rstrip('/').removesuffix('/rss.xml')}/rss.xml"
 
         html = await self.get_html(rss_url)

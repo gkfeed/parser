@@ -1,11 +1,7 @@
 from .storage._base import BaseStorage
 
 
-class _CacheServiceMixin[T]:
-    pass
-
-
-class CacheService[T](_CacheServiceMixin[T]):
+class CacheService[T]:
     def __init__(self, storage: BaseStorage) -> None:
         self._storage = storage
 

@@ -9,7 +9,6 @@ from bs4.element import Tag
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -20,6 +19,7 @@ from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.http import HttpRequestError
 from app.utils.datetime import constant_datetime
+from app.utils.media import detect_mime_type
 from app.workers.http import get_html
 
 
@@ -46,8 +46,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             return HashService.hash_str(match.group(1))
         return HashService.hash_str(item.text)
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
 
         media_list_items = soup.find_all(class_="profile-media-list__item")
@@ -61,18 +60,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
         items = await asyncio.gather(*(create_item(item) for item in media))
         return [item for item in items if item is not None]
-
-    @staticmethod
-    def _get_mime_type(data: bytes) -> str:
-        if data.startswith(b"\xff\xd8"):
-            return "image/jpeg"
-        if data.startswith(b"\x89PNG\r\n\x1a\n"):
-            return "image/png"
-        if data.startswith((b"GIF87a", b"GIF89a")):
-            return "image/gif"
-        if data.startswith(b"RIFF") and b"WEBP" in data[:16]:
-            return "image/webp"
-        return "image/jpeg"
 
     async def _create_item_from_media(self, media: Tag) -> Item | None:
         img = media.find("img")
@@ -120,7 +107,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             try:
                 img_bytes = await get_html(src)
                 encoded = base64.b64encode(img_bytes).decode("utf-8")
-                mime_type = self._get_mime_type(img_bytes)
+                mime_type = detect_mime_type(img_bytes)
             except HttpRequestError:
                 return None
 
@@ -214,14 +201,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 break
 
             media_count = len(driver.find_elements(By.CSS_SELECTOR, media_selector))
-
-    @staticmethod
-    def _click(driver: WebDriver, element: WebElement) -> None:
-        try:
-            driver.execute_script("arguments[0].click();", element)
-        except TimeoutException:
-            # Background requests can outlive an otherwise usable result page.
-            pass
 
     @property
     def _user_name(self) -> str:
