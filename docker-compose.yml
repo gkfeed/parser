@@ -40,6 +40,10 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
+      args:
+        INSTALL_PLAYWRIGHT: "true"
+    init: true
+    shm_size: 1gb
     command: ["worker_heavy"]
     tty: True
     restart: on-failure

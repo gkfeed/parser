@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "bs4>=0.0.2",
     "lxml>=5.3.2",
+    "playwright>=1.55,<2",
     "pydantic>=2.11.3",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.0",
@@ -42,6 +43,9 @@ venv = ".venv"
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.typos.default]
+extend-ignore-re = ['https://vkvideo\.ru/@algoritm_101']
 
 [tool.typos.default.extend-identifiers]
 showAllChanelVideos = "showAllChanelVideos"
