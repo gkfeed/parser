@@ -14,8 +14,6 @@ from app.services.broker import BrokerError, BrokerService
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.item import ItemsRepository
 
-from .storage import FeedStorage, ItemsStorage
-
 
 class FeedParserRepositoryProtocol(Protocol):
     async def get_by_feed_id(self, feed_id: int) -> FeedParser | None: ...
@@ -23,7 +21,7 @@ class FeedParserRepositoryProtocol(Protocol):
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
 
 
-class Dispatcher(ItemsStorage, FeedStorage):
+class Dispatcher:
     _failure_backoffs = (
         timedelta(minutes=15),
         timedelta(hours=1),
@@ -47,7 +45,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
-        feeds = await self._get_all_feeds()
+        feeds = await self.feed_repository.get_all()
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
                 if not await self._should_process_feed(feed):
@@ -86,7 +84,7 @@ class Dispatcher(ItemsStorage, FeedStorage):
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
-            items = await self._save_items(feed, items)
+            items = await self.items_repository.add_items_to_feed(feed, items)
             print(f"Saved {len(items)} items for feed: {feed.url}")
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))

@@ -24,7 +24,7 @@ class ItemsRepository(BaseRepository):
                     continue
 
                 if not await self._check_if_exists(session, feed, item):
-                    await self._create_item(session, feed, item)
+                    self._create_item(session, feed, item)
 
                 if item.hash:
                     session.add(ItemHash(hash=item.hash, feed_id=feed.id))
@@ -42,8 +42,9 @@ class ItemsRepository(BaseRepository):
         result = await session.execute(stmt)
         return result.scalars().first() is not None
 
+    @staticmethod
     async def _check_if_exists(
-        self, session: AsyncSession, feed: Feed, item: Item
+        session: AsyncSession, feed: Feed, item: Item
     ) -> bool:
         # Omitting date from the fallback identity is intentional.
         stmt = select(_Item).where(
@@ -55,7 +56,8 @@ class ItemsRepository(BaseRepository):
         existing = (await session.execute(stmt)).scalars().first()
         return existing is not None
 
-    async def _create_item(self, session: AsyncSession, feed: Feed, item: Item) -> None:
+    @staticmethod
+    def _create_item(session: AsyncSession, feed: Feed, item: Item) -> None:
         new_item = _Item(
             feed_id=feed.id,
             title=item.title,
@@ -65,7 +67,8 @@ class ItemsRepository(BaseRepository):
         )
         session.add(new_item)
 
-    def _serialize_item(self, model_item: _Item) -> Item:
+    @staticmethod
+    def _serialize_item(model_item: _Item) -> Item:
         return Item(
             title=model_item.title,
             text=model_item.text,

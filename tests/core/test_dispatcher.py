@@ -131,7 +131,9 @@ async def test_fetch_feed_items_success(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = items
         mock_save.return_value = items
@@ -166,7 +168,9 @@ async def test_fetch_feed_items_no_items(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = []
 
@@ -245,7 +249,7 @@ async def test_dispatch(dispatcher):
 
     with (
         patch.object(
-            dispatcher, "_get_all_feeds", new_callable=AsyncMock
+            dispatcher.feed_repository, "get_all", new_callable=AsyncMock
         ) as mock_get_feeds,
         patch.object(
             dispatcher, "_should_process_feed", new_callable=AsyncMock

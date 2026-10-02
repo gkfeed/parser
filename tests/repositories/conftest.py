@@ -55,8 +55,7 @@ def feed_parser_repository(session_factory):
 
 
 @pytest.fixture
-async def create_feed(feed_repository):
-    feeds = []
+def create_feed(feed_repository):
     async def _create(title="Test Feed"):
         feed_data = Feed(
             id=0,
@@ -64,12 +63,6 @@ async def create_feed(feed_repository):
             url=f"https://test.com/{datetime.now(UTC).timestamp()}-{title}",
             type="test",
         )
-        feed = await feed_repository.create(feed_data)
-        feeds.append(feed)
-        return feed
-    
-    yield _create
-    
-    # Cleanup
-    for feed in feeds:
-        await feed_repository.delete_by_id(feed.id)
+        return await feed_repository.create(feed_data)
+
+    return _create
