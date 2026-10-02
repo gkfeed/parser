@@ -1,17 +1,36 @@
 from datetime import timedelta
 
 from bs4.element import Tag
+from playwright.async_api import async_playwright
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
-from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
+class SpotifyFeed(HttpParserExtension, CacheFeedExtension, ItemsHashExtension):
     _cache_storage_time = timedelta(days=1)
-    _selenium_wait_time = 20
+    _http_response_storage_time = timedelta(hours=1)
+
+    async def _fetch_html(self, url: str) -> bytes:
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch()
+            try:
+                page = await browser.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+                # Discography can be unavailable. Return that page so the existing
+                # fallback can retry the artist URL. Otherwise wait for release data.
+                await page.wait_for_function(
+                    """() => document.title.includes('Page not found') ||
+                        [...document.querySelectorAll('a[href^="/album"]')]
+                            .some(link => link.textContent.trim())""",
+                    timeout=30_000,
+                )
+                return (await page.content()).encode()
+            finally:
+                await browser.close()
 
     async def _parse_items(self) -> list[Item]:
         soup = await self._get_discography_soup()
