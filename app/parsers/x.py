@@ -3,13 +3,13 @@ from typing import override
 
 from bs4 import Tag
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import convert_datetime
 
 
-class XFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
     _base_url = "https://nitter.esmailelbob.xyz/"
     _x_url = "https://x.com"
 

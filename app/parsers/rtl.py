@@ -6,12 +6,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
 
 
-class RTLSeriesFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
+class RTLSeriesFeed(
+    PostToItemsMixin, ItemIdentityHashExtension, SeleniumParserExtension
+):
     _base_url = "https://plus.rtl.de"
 
     @override

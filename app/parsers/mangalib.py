@@ -5,12 +5,12 @@ from typing import Any, cast, override
 from urllib.parse import urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 
 
-class MangaLibFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
     _cache_storage_time = timedelta(hours=1)
     _api_base_url = "https://api.cdnlibs.org/api/manga/"
     _max_posts = 5
