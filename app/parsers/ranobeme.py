@@ -4,11 +4,14 @@ from typing import override
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class RanobeMeFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
+class RanobeMeFeed(
+    PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
+):
     _base_url = "https://ranobe.me"
     _cache_storage_time = timedelta(hours=1)
 
