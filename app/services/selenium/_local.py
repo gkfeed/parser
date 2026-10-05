@@ -27,8 +27,14 @@ async def _get_html(
     make_actions_function: Callable[[WebDriver], None] | None,
     selenium_wait_timeout_seconds: int,
     page_load_timeout_seconds: int | None,
+    blocked_url_patterns: tuple[str, ...],
 ) -> str:
     try:
+        if blocked_url_patterns:
+            driver.execute_cdp_cmd("Network.enable", {})
+            driver.execute_cdp_cmd(
+                "Network.setBlockedURLs", {"urls": list(blocked_url_patterns)}
+            )
         if page_load_timeout_seconds is not None:
             driver.set_page_load_timeout(page_load_timeout_seconds)
 
@@ -58,7 +64,7 @@ async def _get_html(
         return html
     finally:
         # A failed quit must not replace a parsing error or discard fetched HTML.
-        # The remote command timeout bounds cleanup when Chrome stops responding.
+        # GridWebDriver bounds quit and recovers its slot if Chrome stops responding.
         with contextlib.suppress(Exception):
             driver.quit()
 

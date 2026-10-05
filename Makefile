@@ -78,6 +78,7 @@ endif
 
 docker-update:
 	git fetch && git pull
+	$(PRODUCTION_COMPOSE) --profile heavy pull chrome
 	$(PRODUCTION_COMPOSE) --profile heavy stop && $(PRODUCTION_COMPOSE) --profile heavy rm -f
 	$(PRODUCTION_COMPOSE) build
 	$(PRODUCTION_COMPOSE) up -d

@@ -29,6 +29,8 @@ class InstagramStoriesFeed(
     _results_wait_time = 30
     _should_delete_cookies = True
     _service_url = "https://anonyig.com/en/iganony/"
+    # This ad player creates/detaches nested frames that can hang ChromeDriver.
+    _blocked_url_patterns = ("*://player.avplayer.com/*",)
 
     @override
     async def _generate_hash(self, item: Item) -> str:
