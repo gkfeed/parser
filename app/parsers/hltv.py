@@ -1,20 +1,77 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urljoin
 
-from bs4 import Tag
+import structlog
+from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import UnavailableFeed
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
+
+logger = structlog.get_logger(__name__)
 
 
 class HltvFeed(
     PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
 ):
-    _selenium_wait_time = 10
+    @staticmethod
+    def _is_challenge(html: bytes) -> bool:
+        soup = BeautifulSoup(html, "html.parser")
+        title = soup.title.get_text(strip=True).lower() if soup.title else ""
+        return (
+            title.startswith("just a moment")
+            or soup.select_one("#challenge-running, #challenge-form") is not None
+        )
+
+    @override
+    async def get_html(self, url: str) -> bytes:
+        if self.cache.has_valid_cache(url):
+            html = self.cache.get(url)
+            if not self._is_challenge(html):
+                return html
+            # Discard challenges cached by older versions and try a fresh page.
+            self.cache.set_with_expiry(url, html, timedelta(0))
+
+        return await super().get_html(url)
+
+    @override
+    async def _fetch_html(self, url: str) -> bytes:
+        html = await super()._fetch_html(url)
+        if self._is_challenge(html):
+            raise UnavailableFeed(url)
+        return html
+
+    @override
+    def make_actions(self, driver: WebDriver) -> None:
+        try:
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located(
+                    (
+                        By.XPATH,
+                        (
+                            "//h2[contains(@class, 'standard-headline') and "
+                            "starts-with(normalize-space(.), 'Upcoming matches for')]"
+                        ),
+                    )
+                )
+            )
+        except TimeoutException as exc:
+            reason = (
+                "cloudflare_challenge"
+                if self._is_challenge(driver.page_source.encode())
+                else "upcoming_headline_timeout"
+            )
+            logger.warning("hltv_page_unavailable", url=self.feed.url, reason=reason)
+            raise UnavailableFeed(self.feed.url) from exc
 
     @property
     @override
