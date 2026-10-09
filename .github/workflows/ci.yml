@@ -1,12 +1,8 @@
-name: Deploy
+name: CI
 on:
-  push:
-    branches:
-      - master
   pull_request:
     branches:
-      - master
-  workflow_dispatch:
+      - dev
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -25,18 +21,3 @@ jobs:
         run: make lint
       - name: Test
         run: make test
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: checks
-    if: github.event_name != 'pull_request'
-    steps:
-      - name: Deploy with SSH
-        uses: fifsky/ssh-action@58b3c484be9c20cf118fd3b939a6d2cb3c769512 # v0.0.6
-        with:
-          command: |
-            cd github/gkfeed/parser
-            make docker-update
-          host: ${{ secrets.HOST }}
-          user: ${{ secrets.USER_NAME }}
-          key: ${{ secrets.PRIVATE_KEY }}
