@@ -1,4 +1,4 @@
-FROM python:3.13-alpine as builder
+FROM python:3.13-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
 
-FROM python:3.13-alpine
+FROM python:3.13-slim-bookworm
 ENV PYTHONUNBUFFERED 1
 
 COPY --from=builder /app/wheels /wheels

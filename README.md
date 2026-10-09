@@ -29,6 +29,19 @@ back to a different logging configuration.
 
 ## Worker Parser Configuration
 
+Spotify artist feeds use Playwright Chromium in the heavy worker. After installing
+Python dependencies locally, install its browser and system dependencies:
+
+```bash
+uv run playwright install --with-deps --only-shell chromium
+```
+
+The heavy worker Docker build installs Chromium automatically. Spotify waits for
+album links with text before reading the page, with a 30 second timeout. A timeout
+fails the fetch so a page that has not rendered cannot replace the cached feed
+with an empty result. The existing discography fallback, HTML cache, item cache,
+and hashes still apply.
+
 Worker parser types are configured in `app/configs/workers.py`.
 
 To skip parser types in both light and heavy workers, add them to `ignored_parser_types`:
