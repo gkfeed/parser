@@ -19,6 +19,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
     _should_load_cookies = False
     _should_save_cookies = False
     _page_load_timeout_seconds: int | None = None
+    _blocked_url_patterns: tuple[str, ...] = ()
 
     async def _fetch_html(self, url: str) -> bytes:
         html = await SeleniumService.get_html(
@@ -30,6 +31,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
                 make_actions_function=self.make_actions,
                 selenium_wait_timeout_seconds=self._selenium_wait_time,
                 page_load_timeout_seconds=self._page_load_timeout_seconds,
+                blocked_url_patterns=self._blocked_url_patterns,
             )
         )
         return html.encode()

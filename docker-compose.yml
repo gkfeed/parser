@@ -46,34 +46,53 @@ services:
     volumes:
       - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
+      - selenium_recovery:/selenium-recovery
     env_file:
       - .env
     environment:
       - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
       - REDIS_HOST=redis
       - SELENIUM_DOCKER_URL=http://chrome:4444
+      - SELENIUM_RECOVERY_REQUEST_PATH=/selenium-recovery/request
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - redis
-      - chrome
+      redis:
+        condition: service_started
+      chrome:
+        condition: service_healthy
   # should be in services/redis.compose
   redis:
     image: redis:alpine
     restart: always
   # should be in services/chrome.compose
   chrome:
-    image: selenium/standalone-chrome:latest
+    image: selenium/standalone-chrome:4.48.0-20260905@sha256:11faf9d193dbdce26b4d7370f2d28e299515a00dd94453f154219469eb53b1a7
     restart: always
+    entrypoint: ["python3", "/opt/gkfeed/watchdog.py"]
     environment:
+      - SE_SESSION_REQUEST_TIMEOUT=30
+      - SE_SESSION_RETRY_INTERVAL=1
+      - SE_NODE_SESSION_TIMEOUT=120
       # Clean up browser processes left behind by interrupted Selenium sessions.
       - SE_ENABLE_BROWSER_LEFTOVERS_CLEANUP=true
       - SE_BROWSER_LEFTOVERS_INTERVAL_SECS=300
       - SE_BROWSER_LEFTOVERS_PROCESSES_SECS=900
       - SE_BROWSER_LEFTOVERS_TEMPFILES_DAYS=0
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "5", "http://localhost:4444/status"]
+      interval: 10s
+      timeout: 6s
+      start_period: 60s
+      retries: 3
     tmpfs:
       # Chrome profiles are disposable. Keep them out of Docker's writable layer
       # and cap their aggregate size if an interrupted session leaks a profile.
       - /tmp:size=4g,mode=1777
     volumes:
       - /dev/shm:/dev/shm
+      - ./docker/chrome/watchdog.py:/opt/gkfeed/watchdog.py:ro
+      - selenium_recovery:/selenium-recovery:ro
+
+volumes:
+  selenium_recovery:

@@ -50,14 +50,20 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
             items.append(result)
 
-        log = logger.warning if failed or skipped else logger.info
+        outcome = "items_extracted"
+        if not items:
+            outcome = "no_items_extracted" if links else "no_links"
+        log = logger.warning if failed or skipped or not links else logger.info
         log(
             "tiktok_extraction_completed",
+            outcome=outcome,
             links=len(links),
             items=len(items),
             failed=failed,
             skipped=skipped,
         )
+        if links and not items:
+            raise ValueError("Could not extract any discovered TikTok videos")
         return items
 
     @override
@@ -73,7 +79,7 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
                 date=await self._get_video_publish_date(info["timestamp"]),
                 link=link,
             )
-        except (TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError) as exc:
             logger.warning(
                 "tiktok_video_skipped",
                 reason="invalid_video_data",

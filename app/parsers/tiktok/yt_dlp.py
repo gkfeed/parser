@@ -21,23 +21,37 @@ class TikTokFeed(BaseTikTokFeed):
 
         entries = info["entries"]
         videos: list[str] = []
-        skipped = 0
-        for index, v in enumerate(entries, start=1):
-            if len(videos) >= self._max_videos:
-                break
-            if "url" not in v:
-                skipped += 1
+        for index, entry in enumerate(entries, start=1):
+            if not isinstance(entry, dict):
                 logger.warning(
-                    "tiktok_entry_skipped", entry_index=index, reason="missing_url"
+                    "tiktok_entry_skipped",
+                    entry_index=index,
+                    reason="invalid_entry_type",
+                    entry_type=type(entry).__name__,
                 )
                 continue
-            videos.append(v["url"])
-        logger.info(
+            url = entry.get("url")
+            if not isinstance(url, str) or not url.strip():
+                logger.warning(
+                    "tiktok_entry_skipped", entry_index=index, reason="invalid_url"
+                )
+                continue
+            videos.append(url)
+
+        skipped = len(entries) - len(videos)
+        outcome = "links_found"
+        if not videos:
+            outcome = "no_valid_entries" if entries else "no_entries"
+        log = logger.warning if skipped or not videos else logger.info
+        log(
             "tiktok_discovery_completed",
+            outcome=outcome,
             requested_limit=self._max_videos,
             entries=len(entries),
             links=len(videos),
             skipped=skipped,
             below_limit=len(videos) < self._max_videos,
         )
+        if entries and not videos:
+            raise ValueError("TikTok discovery returned no valid video links")
         return videos

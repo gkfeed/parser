@@ -41,27 +41,60 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
         cache_id = f"{videos_url}::{type(extraction_mode).__qualname__}::{max_videos}"
         if cls.cache.has_valid_cache(cache_id):
             cached_info = cls.cache.get(cache_id)
-            logger.info(
-                "channel_discovery_completed",
+            cached_entries = cached_info.get("entries")
+            if cls._can_cache_entries(cached_entries):
+                logger.info(
+                    "channel_discovery_completed",
+                    source="cache",
+                    requested_limit=max_videos,
+                    entries=len(cached_entries),
+                )
+                return cached_info
+            logger.warning(
+                "channel_discovery_cache_ignored",
                 source="cache",
-                requested_limit=max_videos,
-                entries=len(cached_info.get("entries", [])),
+                reason="empty_or_invalid_entries",
             )
-            return cached_info
 
         info = await cls.get_info(videos_url, extraction_mode, max_videos=max_videos)
-        limited_info = {**info, "entries": info.get("entries", [])[:max_videos]}
-        logger.info(
+        entries = info.get("entries")
+        if not isinstance(entries, list):
+            logger.error(
+                "channel_discovery_failed",
+                reason="invalid_entries_type",
+                entries_type=type(entries).__name__,
+            )
+            raise TypeError("Channel extraction did not return an entries list")
+
+        selected_entries = entries[:max_videos]
+        limited_info = {**info, "entries": selected_entries}
+        cacheable = cls._can_cache_entries(selected_entries)
+        log = logger.info if cacheable else logger.warning
+        log(
             "channel_discovery_completed",
             source="yt_dlp",
             requested_limit=max_videos,
-            entries=len(info.get("entries", [])),
-            selected=len(limited_info["entries"]),
+            entries=len(entries),
+            selected=len(selected_entries),
+            cacheable=cacheable,
         )
-        cls.cache.set_with_expiry(
-            cache_id, limited_info, cls._channel_info_storage_time
-        )
+        if cacheable:
+            cls.cache.set_with_expiry(
+                cache_id, limited_info, cls._channel_info_storage_time
+            )
         return limited_info
+
+    @staticmethod
+    def _can_cache_entries(entries: object) -> bool:
+        if not isinstance(entries, list) or not entries:
+            return False
+        for entry in entries:
+            if not isinstance(entry, dict):
+                return False
+            url = entry.get("url") or entry.get("webpage_url")
+            if not isinstance(url, str) or not url.strip():
+                return False
+        return True
 
     @classmethod
     async def extract_video_urls(

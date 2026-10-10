@@ -7,6 +7,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.configs.env import SELENIUM_DOCKER_URL
 from app.utils.is_in_docker import IS_IN_DOCKER
+from app.utils.selenium import GridWebDriver
 
 SELENIUM_COOKIES_PATH = "/data/cookies.pkl"
 IS_HEADLESS = True
@@ -39,12 +40,16 @@ def _get_local_chrome_driver() -> WebDriver:
 
 
 def _get_docker_driver() -> WebDriver:
-    return webdriver.Remote(
+    return GridWebDriver(
         SELENIUM_DOCKER_URL,
         options=_get_chrome_options(),
         client_config=ClientConfig(
             remote_server_addr=SELENIUM_DOCKER_URL,
             timeout=_REMOTE_COMMAND_TIMEOUT_SECONDS,
+            # urllib3 retries DELETE by default, multiplying a quit timeout.
+            init_args_for_pool_manager={
+                "init_args_for_pool_manager": {"retries": 0},
+            },
         ),
     )
 
