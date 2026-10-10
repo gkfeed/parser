@@ -26,3 +26,12 @@ class ItemsHashExtension(_BaseFeed):
             if item.hash is None:
                 item.hash = await self._generate_hash(item)
         return items
+
+
+class ItemIdentityHashExtension(ItemsHashExtension):
+    """Hash the title/link/text identity used by repository fallback deduplication."""
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        identity = json.dumps([item.title, item.link, item.text])
+        return HashService.hash_str(identity)
