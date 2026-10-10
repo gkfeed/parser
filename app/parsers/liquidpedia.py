@@ -57,7 +57,7 @@ class LiquidpediaFeed(
     async def _get_post_title(self, post: Tag) -> str:
         team_names: list[str] = []
         for opponent in post.select(".match-info-opponent-row"):
-            name_tag = opponent.select_one(".name")
+            name_tag = opponent.select_one(".name, .brkts-opponent-block-literal")
             if not isinstance(name_tag, Tag):
                 raise ValueError(  # noqa: TRY004 - missing page data is a value error
                     "Team name not found"
@@ -94,6 +94,12 @@ class LiquidpediaFeed(
             title = parse_qs(url.query).get("title", [""])[0]
             if title.startswith("Match:"):
                 return link
+
+        tournament_link = post.select_one(".match-info-tournament-name a[href]")
+        if tournament_link:
+            href = tournament_link.get("href")
+            if isinstance(href, str):
+                return urljoin(self.feed.url, href)
 
         classes = post.get("class")
         if isinstance(classes, list) and "table2__row--body" in classes:
