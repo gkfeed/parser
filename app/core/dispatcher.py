@@ -12,7 +12,12 @@ from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, Item
-from app.services.broker import BrokerError, BrokerNoWorker, BrokerService
+from app.services.broker import (
+    BrokerError,
+    BrokerFeedUnavailable,
+    BrokerNoWorker,
+    BrokerService,
+)
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.feed_parser import FeedParserRepository
 from app.services.repositories.item import ItemsRepository
@@ -84,6 +89,19 @@ class Dispatcher:
                 broker_task_id=exc.task_id,
                 claim_state="pending",
                 recovery_action="reuse_task_on_retry",
+                next_retry=next_retry.isoformat(),
+            )
+            return
+        except BrokerFeedUnavailable as exc:
+            logger.warning("feed_unavailable", reason=exc.reason)
+            if exc.retry_at is None:
+                await self._schedule_failure(feed.id)
+                return
+            next_retry = max(exc.retry_at, datetime.now(UTC) + timedelta(seconds=1))
+            await self.feed_parser_repository.upsert(feed.id, next_retry)
+            logger.info(
+                "feed_retry_scheduled",
+                reason=exc.reason,
                 next_retry=next_retry.isoformat(),
             )
             return

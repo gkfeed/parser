@@ -1,11 +1,15 @@
 import asyncio
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import structlog
+from pydantic import ValidationError
 from structlog.contextvars import bound_contextvars
 
+from app.serializers.feed import FeedFailure
 from app.services.http import HttpRequestError, HttpService
 
 logger = structlog.get_logger(__name__)
@@ -15,10 +19,21 @@ class BrokerError(Exception):
     """Broker error"""
 
 
+class BrokerResultTooLarge(BrokerError):
+    """The broker rejected a result with HTTP 413."""
+
+
 class BrokerNoWorker(BrokerError):
     def __init__(self, task_id: str):
         self.task_id = task_id
         super().__init__(f"Task has not been claimed: task_id={task_id}")
+
+
+class BrokerFeedUnavailable(BrokerError):
+    def __init__(self, reason: str, retry_at: datetime | None):
+        super().__init__(f"Feed unavailable: {reason}")
+        self.reason = reason
+        self.retry_at = retry_at
 
 
 @dataclass
@@ -58,6 +73,15 @@ class BrokerService:
                 if status == "failed":
                     if task_key:
                         self._active_tasks.pop(task_key, None)
+                    result = result_data.get("result")
+                    failure = None
+                    if isinstance(result, str):
+                        try:
+                            failure = FeedFailure.model_validate_json(result)
+                        except ValidationError:
+                            pass
+                    if failure is not None:
+                        raise BrokerFeedUnavailable(failure.reason, failure.retry_at)
                     raise BrokerError(f"Task failed: task_id={task_id}")
                 if asyncio.get_event_loop().time() - start_time > timeout:
                     if status == "pending":
@@ -109,13 +133,21 @@ class BrokerService:
             raise BrokerError("Failed to get task from broker")
 
     async def submit_result(self, task_id: str, result: Any) -> None:
+        payload = {"task_id": task_id, "result": result}
         try:
             await self.http.post_json(
                 f"{self.broker_url}/submit_result",
-                {"task_id": task_id, "result": result},
+                payload,
             )
-        except HttpRequestError:
-            raise BrokerError("Failed to submit result to broker")
+        except HttpRequestError as exc:
+            logger.warning(
+                "broker_result_rejected",
+                status=exc.status,
+                payload_bytes=len(json.dumps(payload).encode("utf-8")),
+            )
+            if exc.status == 413:
+                raise BrokerResultTooLarge("Broker rejected result size") from exc
+            raise BrokerError("Failed to submit result to broker") from exc
 
     async def submit_error(self, task_id: str, error_message: str) -> None:
         try:

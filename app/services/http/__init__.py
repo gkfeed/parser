@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError, ClientError, InvalidURL
 
@@ -13,6 +15,17 @@ _headers = {
 class HttpRequestError(Exception):
     "Http request error"
 
+    def __init__(self, message: str = "HTTP request failed", status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+@dataclass(frozen=True)
+class HttpResponse:
+    status: int
+    content: bytes
+    headers: dict[str, str]
+
 
 class HttpService:
     headers = _headers
@@ -26,12 +39,34 @@ class HttpService:
     async def get_with_status(
         cls, url: str, headers: dict = headers
     ) -> tuple[int, bytes]:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        response = await cls.get_response(url, headers=headers)
+        return response.status, response.content
+
+    @classmethod
+    async def get_response(
+        cls, url: str, headers: dict = headers, max_bytes: int | None = None
+    ) -> HttpResponse:
+        async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url, headers=headers) as response:
-                    return response.status, await response.content.read()
-            except ClientError:
-                raise HttpRequestError
+                    if max_bytes is None:
+                        content = await response.read()
+                    else:
+                        body = bytearray()
+                        async for chunk in response.content.iter_chunked(65536):
+                            body.extend(chunk)
+                            if len(body) > max_bytes:
+                                raise HttpRequestError(
+                                    "HTTP response exceeds size limit"
+                                )
+                        content = bytes(body)
+                    return HttpResponse(
+                        response.status,
+                        content,
+                        {key.lower(): value for key, value in response.headers.items()},
+                    )
+            except (ClientError, TimeoutError) as exc:
+                raise HttpRequestError(status=getattr(exc, "status", None)) from exc
 
     @classmethod
     async def post(cls, url: str, body: dict, headers: dict | None = headers) -> bytes:
@@ -67,9 +102,10 @@ class HttpService:
         async with aiohttp.ClientSession(conn_timeout=None) as session:
             try:
                 async with session.post(url, json=json, headers=headers) as response:
+                    response.raise_for_status()
                     return await response.json()
-            except ClientError:
-                raise HttpRequestError
+            except (ClientError, TimeoutError) as exc:
+                raise HttpRequestError(status=getattr(exc, "status", None)) from exc
 
     @classmethod
     async def get_status(cls, url: str, headers: dict | None = headers) -> int:

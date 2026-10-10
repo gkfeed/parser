@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel
 
 
 class Feed(BaseModel):
@@ -17,3 +18,9 @@ class Item(BaseModel):
     link: str
     guid: str | None = None
     hash: str | None = None
+
+
+class FeedFailure(BaseModel):
+    error_type: Literal["feed_unavailable"]
+    reason: str
+    retry_at: AwareDatetime | None = None
