@@ -12,7 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -47,7 +47,7 @@ class HltvFeed(
     async def _fetch_html(self, url: str) -> bytes:
         html = await super()._fetch_html(url)
         if self._is_challenge(html):
-            raise UnavailableFeed(url)
+            raise FeedUnavailable(url, "cloudflare_challenge")
         return html
 
     @override
@@ -71,7 +71,7 @@ class HltvFeed(
                 else "upcoming_headline_timeout"
             )
             logger.warning("hltv_page_unavailable", url=self.feed.url, reason=reason)
-            raise UnavailableFeed(self.feed.url) from exc
+            raise FeedUnavailable(self.feed.url, reason) from exc
 
     @property
     @override

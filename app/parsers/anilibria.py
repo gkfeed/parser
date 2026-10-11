@@ -5,7 +5,7 @@ from typing import Any, cast, override
 from urllib.parse import quote, urljoin, urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
@@ -25,7 +25,7 @@ class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExt
     @override
     async def _parse_items(self) -> list[Item]:
         path = f"anime/releases/{quote(self._get_alias_from_url(), safe='')}"
-        last_error: ValueError | UnavailableFeed | None = None
+        last_error: ValueError | FeedUnavailable | None = None
 
         for base_url in self._api_base_urls:
             try:
@@ -33,7 +33,7 @@ class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExt
                     await self.get_html(urljoin(base_url, path))
                 )
                 return self._release_to_items(release)
-            except (ValueError, UnavailableFeed) as error:
+            except (ValueError, FeedUnavailable) as error:
                 last_error = error
 
         raise ValueError("AniLibria API mirrors returned invalid data") from last_error

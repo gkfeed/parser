@@ -5,7 +5,7 @@ from threading import Thread
 
 import pytest
 
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.parsers.rezka import RezkaFeed
 from app.serializers.feed import Feed
 from app.services.selenium import SeleniumGetHtmlArgs, SeleniumService
@@ -81,7 +81,7 @@ async def test_rezka_rejects_error_pages_without_caching(
     url = base_url + path
     parser = parser_for(url)
 
-    with pytest.raises(UnavailableFeed, match=reason):
+    with pytest.raises(FeedUnavailable, match=reason):
         await parser.get_html(url)
 
     assert requests[path] == attempts
