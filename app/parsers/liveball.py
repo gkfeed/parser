@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
@@ -25,7 +25,7 @@ class LiveballFeed(
 
         top_match_container = soup.select_one(".lb-top-matches")
         if top_match_container is None:
-            raise UnavailableFeed(self._source_url)
+            raise FeedUnavailable(self._source_url, "missing_content")
 
         return top_match_container.select("a.lb-match-card")
 
