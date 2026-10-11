@@ -1,22 +1,27 @@
 import asyncio
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import override
 
+import structlog
 from bs4 import Tag
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.media_upload import FallbackUploader
 from app.utils.datetime import constant_datetime
+
+logger = structlog.get_logger(__name__)
 
 
 class InstagramStoriesFeed(
@@ -44,6 +49,10 @@ class InstagramStoriesFeed(
         links = await asyncio.gather(
             *(self._upload_media(link) for link in self._extract_media_links(soup))
         )
+        uploaded = sum(link is not None for link in links)
+        logger.info("stories_media_processed", found=len(links), uploaded=uploaded)
+        if links and not uploaded:
+            raise self._unavailable("media_upload_error")
 
         return [
             Item(
@@ -126,35 +135,83 @@ class InstagramStoriesFeed(
                         ),
                     )
                 ),
-                expected_conditions.presence_of_element_located(
+                expected_conditions.visibility_of_element_located(
                     (By.CSS_SELECTOR, ".error-message")
                 ),
             )
         )
         result_classes = (result.get_attribute("class") or "").split()
+        if (
+            "tabs-component__button--disabled" in result_classes
+            or not result.is_enabled()
+            or result.get_attribute("aria-disabled") == "true"
+        ):
+            raise self._unavailable("private")
         if "error-message" in result_classes:
+            self._check_error(result)
             return
 
         self._click(driver, result)
-        WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.presence_of_element_located(
-                (
-                    By.XPATH,
-                    (
-                        "//button[contains(@class, "
-                        "'tabs-component__button--active') "
-                        "and normalize-space(translate(., "
-                        "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
-                        "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
+        stories_result = WebDriverWait(driver, self._results_wait_time).until(
+            expected_conditions.any_of(
+                expected_conditions.visibility_of_element_located(
+                    (By.CSS_SELECTOR, ".error-message")
+                ),
+                expected_conditions.all_of(
+                    expected_conditions.presence_of_element_located(
+                        (
+                            By.XPATH,
+                            (
+                                "//button[contains(@class, "
+                                "'tabs-component__button--active') "
+                                "and normalize-space(translate(., "
+                                "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+                                "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
+                            ),
+                        )
                     ),
-                )
+                    expected_conditions.invisibility_of_element_located(
+                        (By.CSS_SELECTOR, ".loader-component")
+                    ),
+                    expected_conditions.visibility_of_element_located(
+                        (
+                            By.CSS_SELECTOR,
+                            ".profile-media-list__item a.download-btn[href]",
+                        )
+                    ),
+                ),
             )
         )
-        time.sleep(self._selenium_wait_time)
+        if isinstance(stories_result, WebElement):
+            self._check_error(stories_result)
+            return
 
         for _ in range(3):
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(1)
+
+    def _check_error(self, error: WebElement) -> None:
+        message = error.text.lower()
+        if "no stories" in message:
+            # Anonyig also uses this message for upstream failures.
+            logger.warning("stories_empty_unverified")
+            return
+        if "private" in message:
+            raise self._unavailable("private")
+        if any(
+            text in message
+            for text in ("user not found", "profile not found", "account not found")
+        ):
+            raise self._unavailable("not_found")
+        raise self._unavailable("upstream_error")
+
+    def _unavailable(self, reason: str) -> FeedUnavailable:
+        delay = (
+            timedelta(days=1)
+            if reason in ("private", "not_found")
+            else timedelta(minutes=1)
+        )
+        return FeedUnavailable(self.feed.url, reason, datetime.now(UTC) + delay)
 
     @property
     def _user_name(self) -> str:
