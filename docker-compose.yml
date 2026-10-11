@@ -43,6 +43,7 @@ services:
     command: ["worker_heavy"]
     tty: True
     restart: on-failure
+    stop_grace_period: 120s
     volumes:
       - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs

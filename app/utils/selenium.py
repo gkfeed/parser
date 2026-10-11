@@ -48,17 +48,48 @@ class GridWebDriver(WebDriver):
             logger.info("selenium_grid_recovered", session_id=session_id)
 
 
-def _recover_grid_session(server_url: str, session_id: str) -> None:
+def cleanup_grid(server_url: str) -> None:
+    """Release sessions left by the previous, sole owner of this Grid."""
+    status_url = _grid_url(server_url, "/status")
+    deadline = monotonic() + QUIT_TIMEOUT_SECONDS + GRID_RECOVERY_TIMEOUT_SECONDS
+    with requests.Session() as http:
+        http.trust_env = False
+        while True:
+            value = _grid_status(http, status_url, deadline)
+            sessions = _session_ids(value)
+            if value.get("ready") and not sessions:
+                return
+            for session_id in sessions:
+                try:
+                    response = http.delete(
+                        _grid_url(server_url, f"/session/{session_id}"),
+                        timeout=min(QUIT_TIMEOUT_SECONDS, _remaining_timeout(deadline)),
+                    )
+                    response.raise_for_status()
+                except requests.RequestException:
+                    _recover_grid_session(server_url, session_id, deadline=deadline)
+                logger.info("selenium_orphan_session_removed", session_id=session_id)
+            sleep(min(0.2, _remaining_timeout(deadline)))
+
+
+def _grid_url(server_url: str, path: str) -> str:
     parts = urlsplit(server_url)
-    status_url = urlunsplit((parts.scheme, parts.netloc, "/status", "", ""))
-    deadline = monotonic() + GRID_RECOVERY_TIMEOUT_SECONDS
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
+def _recover_grid_session(
+    server_url: str, session_id: str, *, deadline: float | None = None
+) -> None:
+    status_url = _grid_url(server_url, "/status")
+    if deadline is None:
+        deadline = monotonic() + GRID_RECOVERY_TIMEOUT_SECONDS
     with requests.Session() as http:
         http.trust_env = False
         try:
             value = _grid_status(http, status_url, deadline)
         except requests.RequestException:
             value = None
-        if value is not None and not _has_session(value, session_id):
+        if value is not None and session_id not in _session_ids(value):
             return
 
         recovery_path = os.getenv("SELENIUM_RECOVERY_REQUEST_PATH")
@@ -79,7 +110,7 @@ def _recover_grid_session(server_url: str, session_id: str) -> None:
             if (
                 value is not None
                 and value.get("ready")
-                and not _has_session(value, session_id)
+                and session_id not in _session_ids(value)
             ):
                 request_path.unlink(missing_ok=True)
                 return
@@ -99,9 +130,10 @@ def _grid_status(http: requests.Session, status_url: str, deadline: float) -> di
     return response.json()["value"]
 
 
-def _has_session(status: dict, session_id: str) -> bool:
-    return any(
-        (slot.get("session") or {}).get("sessionId") == session_id
+def _session_ids(status: dict) -> list[str]:
+    return [
+        slot["session"]["sessionId"]
         for node in status["nodes"]
         for slot in node["slots"]
-    )
+        if slot.get("session")
+    ]
