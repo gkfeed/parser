@@ -10,7 +10,7 @@ from app.services.cache.use_temporary import (
 from app.services.http import HttpRequestError, HttpService
 
 from .base import BaseFeed as _BaseFeed
-from .exceptions import UnavailableFeed
+from .exceptions import FeedUnavailable
 
 
 async def http_get_in_queue(url: str, headers: dict) -> bytes:
@@ -37,8 +37,8 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
             if self._http_run_in_queue:
                 return await http_get_in_queue(url, self._headers)
             return await HttpService.get(url, headers=self._headers)
-        except HttpRequestError:
-            raise UnavailableFeed(self.feed.url)
+        except HttpRequestError as exc:
+            raise FeedUnavailable(self.feed.url, "http_request_failed") from exc
 
     async def get_soup(self, url: str) -> BeautifulSoup:
         return BeautifulSoup(await self.get_html(url), "html.parser")
