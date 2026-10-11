@@ -12,7 +12,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -48,7 +48,7 @@ class VkFeed(
             return legacy_posts
 
         if soup.select_one("button.start"):
-            raise UnavailableFeed(self.feed.url)
+            raise FeedUnavailable(self.feed.url, "browser_challenge")
 
         return []
 
@@ -83,11 +83,11 @@ class VkFeed(
                 if posts(driver):
                     return
                 if not start(driver):
-                    raise UnavailableFeed(self.feed.url)
+                    raise FeedUnavailable(self.feed.url, "browser_challenge")
 
-            raise UnavailableFeed(self.feed.url)
+            raise FeedUnavailable(self.feed.url, "browser_challenge")
         except (TimeoutException, WebDriverException) as error:
-            raise UnavailableFeed(self.feed.url) from error
+            raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
 
     @override
     async def _get_post_title(self, post: Tag) -> str:

@@ -19,7 +19,7 @@ dependencies = [
     "selenium>=4.31.0",
     "sqlalchemy[asyncio]>=2.0.45",
     "structlog>=26.1.0",
-    "yt-dlp==2025.7.21",
+    "yt-dlp==2026.8.19",
 ]
 
 [dependency-groups]
