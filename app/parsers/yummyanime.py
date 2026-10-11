@@ -1,4 +1,5 @@
 from typing import override
+from urllib.parse import urlsplit, urlunsplit
 
 from bs4 import Tag
 
@@ -11,6 +12,14 @@ class YummyAnimeFeed(PostToItemsMixin, HttpParserExtension):
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self._show_url)
+        page_title = soup.find("title")
+        title = (
+            page_title.get_text(" ", strip=True).casefold()
+            if isinstance(page_title, Tag)
+            else ""
+        )
+        if title.startswith("страница не найдена") or title == "404 not found":
+            raise ValueError("YummyAnime page not found: " + self._show_url)
         return [soup]
 
     @override
@@ -47,4 +56,18 @@ class YummyAnimeFeed(PostToItemsMixin, HttpParserExtension):
 
     @property
     def _show_url(self) -> str:
-        return self.feed.url.replace("yummyanime.org", "site.yummyani.me")
+        url = urlsplit(self.feed.url)
+        if url.hostname not in {
+            "yummyanime.org",
+            "www.yummyanime.org",
+            "site.yummyani.me",
+            "old.yummyani.me",
+        }:
+            return self.feed.url
+
+        netloc = url.netloc
+        if url.hostname in {"yummyanime.org", "www.yummyanime.org"}:
+            netloc = "site.yummyani.me"
+            if url.port is not None:
+                netloc += f":{url.port}"
+        return urlunsplit(url._replace(netloc=netloc))
