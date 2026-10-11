@@ -9,7 +9,7 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -46,12 +46,12 @@ class InstagramStoriesFeed(
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
-        links = await asyncio.gather(
+        uploads = await asyncio.gather(
             *(self._upload_media(link) for link in self._extract_media_links(soup))
         )
-        uploaded = sum(link is not None for link in links)
-        logger.info("stories_media_processed", found=len(links), uploaded=uploaded)
-        if links and not uploaded:
+        links = [link for link in uploads if link is not None]
+        logger.info("stories_media_processed", found=len(uploads), uploaded=len(links))
+        if uploads and not links:
             raise self._unavailable("media_upload_error")
 
         return [
@@ -62,7 +62,6 @@ class InstagramStoriesFeed(
                 link=link,
             )
             for link in links
-            if link is not None
         ]
 
     @staticmethod
@@ -101,8 +100,9 @@ class InstagramStoriesFeed(
         except NoSuchElementException:
             pass
 
-        links = WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.visibility_of_any_elements_located(
+        wait = WebDriverWait(driver, self._results_wait_time)
+        links = wait.until(
+            EC.visibility_of_any_elements_located(
                 (By.CSS_SELECTOR, "form.search-form input.search-form__input")
             )
         )
@@ -115,29 +115,25 @@ class InstagramStoriesFeed(
             self._user_name,
         )
 
-        button = WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.element_to_be_clickable(
+        button = wait.until(
+            EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "form.search-form .search-form__button")
             )
         )
         self._click(driver, button)
 
-        result = WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.any_of(
-                expected_conditions.presence_of_element_located(
-                    (
-                        By.XPATH,
-                        (
-                            "//button[contains(@class, 'tabs-component__button') "
-                            "and normalize-space(translate(., "
-                            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
-                            "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
-                        ),
-                    )
-                ),
-                expected_conditions.visibility_of_element_located(
-                    (By.CSS_SELECTOR, ".error-message")
-                ),
+        stories_button = (
+            "//button[contains(@class, 'tabs-component__button') "
+            "and normalize-space(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+            "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
+        )
+        visible_error = EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, ".error-message")
+        )
+        result = wait.until(
+            EC.any_of(
+                EC.presence_of_element_located((By.XPATH, stories_button)),
+                visible_error,
             )
         )
         result_classes = (result.get_attribute("class") or "").split()
@@ -152,36 +148,20 @@ class InstagramStoriesFeed(
             return
 
         self._click(driver, result)
-        stories_result = WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.any_of(
-                expected_conditions.visibility_of_element_located(
-                    (By.CSS_SELECTOR, ".error-message")
-                ),
-                expected_conditions.all_of(
-                    expected_conditions.presence_of_element_located(
-                        (
-                            By.XPATH,
-                            (
-                                "//button[contains(@class, "
-                                "'tabs-component__button--active') "
-                                "and normalize-space(translate(., "
-                                "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
-                                "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
-                            ),
-                        )
-                    ),
-                    expected_conditions.invisibility_of_element_located(
-                        (By.CSS_SELECTOR, ".loader-component")
-                    ),
-                    expected_conditions.visibility_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            ".profile-media-list__item a.download-btn[href]",
-                        )
-                    ),
-                ),
-            )
+        media_ready = EC.all_of(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    stories_button
+                    + "[contains(@class, 'tabs-component__button--active')]",
+                )
+            ),
+            EC.invisibility_of_element_located((By.CSS_SELECTOR, ".loader-component")),
+            EC.visibility_of_element_located(
+                (By.CSS_SELECTOR, ".profile-media-list__item a.download-btn[href]")
+            ),
         )
+        stories_result = wait.until(EC.any_of(visible_error, media_ready))
         if isinstance(stories_result, WebElement):
             self._check_error(stories_result)
             return
