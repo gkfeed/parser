@@ -58,30 +58,34 @@ class VkFeed(
 
     @override
     def make_actions(self, driver: WebDriver):
+        posts = ec.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
+        )
+        start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
+        challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
+        wait = WebDriverWait(driver, 30)
         try:
             for _ in range(self._challenge_attempts):
-                if driver.find_elements(By.CSS_SELECTOR, self._post_selector):
+                if posts(driver):
                     return
 
                 buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
                 if not buttons:
                     return
 
-                button = buttons[0]
+                button = wait.until(start)
                 button.click()
-                wait = WebDriverWait(driver, 30)
-                wait.until(ec.staleness_of(button))
+                # Hiding the button starts the challenge; it does not finish it.
                 wait.until(
-                    ec.presence_of_element_located(
-                        (
-                            By.CSS_SELECTOR,
-                            f"{self._post_selector}, .wall_post_cont, button.start",
-                        )
-                    )
+                    ec.any_of(posts, challenge_error, ec.invisibility_of_element(button))
                 )
+                wait.until(ec.any_of(posts, challenge_error, start))
+                if posts(driver):
+                    return
+                if not start(driver):
+                    raise UnavailableFeed(self.feed.url)
 
-            if driver.find_elements(By.CSS_SELECTOR, "button.start"):
-                raise UnavailableFeed(self.feed.url)
+            raise UnavailableFeed(self.feed.url)
         except (TimeoutException, WebDriverException) as error:
             raise UnavailableFeed(self.feed.url) from error
 
