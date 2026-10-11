@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -19,10 +19,9 @@ class RezkaPageMode(Enum):
     SERIES = auto()
 
 
-class RezkaPageUnavailable(UnavailableFeed):
+class RezkaPageUnavailable(FeedUnavailable):
     def __init__(self, url: str, reason: str) -> None:
-        super().__init__(url)
-        self.reason = reason
+        super().__init__(url, reason)
 
     def __str__(self) -> str:
         return f"Could not load Rezka page {self.url}: {self.reason}"
