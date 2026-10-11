@@ -3,11 +3,12 @@ from urllib.parse import urlsplit, urlunsplit
 
 from bs4 import Tag
 
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class YummyAnimeFeed(PostToItemsMixin, HttpParserExtension):
+class YummyAnimeFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
     @property
     @override
     async def _posts(self) -> list[Tag]:

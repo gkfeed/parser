@@ -5,11 +5,12 @@ from typing import Any, ClassVar, cast, override
 from urllib.parse import urlsplit
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 
 
-class MangaLibFeed(HttpParserExtension, CacheFeedExtension):
+class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
     _headers: ClassVar[dict[str, str]] = {
         **HttpParserExtension._headers,
         "Accept": "application/json",
