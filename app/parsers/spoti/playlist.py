@@ -1,11 +1,12 @@
 from bs4 import Tag
 
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
 
 
-class SpotifyPlaylistFeed(SeleniumParserExtension):
+class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
     _selenium_wait_time = 10
 
     async def _parse_items(self) -> list[Item]:

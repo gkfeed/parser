@@ -5,11 +5,14 @@ from urllib.parse import urljoin, urlsplit
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 
 
-class LiveballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
+class LiveballFeed(
+    PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
+):
     _cache_storage_time = timedelta(hours=1)
     _base_url = "https://liveball.to"
     _source_url = (
