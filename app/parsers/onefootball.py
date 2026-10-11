@@ -1,20 +1,30 @@
 import re
 from datetime import datetime, timedelta
 from typing import override
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.serializers.feed import Item
+from app.services.hash import HashService
 from app.utils.datetime import constant_datetime, convert_datetime
 
 
-class OneFootballFeed(PostToItemsMixin, HttpParserExtension, CacheFeedExtension):
+class OneFootballFeed(
+    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
+):
     __base_url = "https://onefootball.com"
     __match_path = re.compile(r"^/[^/]+/match/\d+/?$")
     _cache_storage_time = timedelta(hours=1)
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        match_id = urlsplit(item.link).path.rstrip("/").rsplit("/", 1)[-1]
+        return HashService.hash_str(match_id)
 
     @property
     @override
