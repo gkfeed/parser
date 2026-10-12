@@ -8,7 +8,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.extensions.parsers.exceptions import UnavailableFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
@@ -119,8 +119,8 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
                 )
                 return
         except (TimeoutException, WebDriverException) as error:
-            raise UnavailableFeed(self.feed.url) from error
-        raise UnavailableFeed(self.feed.url)
+            raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+        raise FeedUnavailable(self.feed.url, "browser_challenge")
 
     async def _parse_page_items(self) -> list[Item]:
         soup = await self.get_soup(self._get_target_url())
@@ -151,7 +151,7 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
             if len(items) == self._max_videos:
                 break
         if not items:
-            raise UnavailableFeed(self.feed.url)
+            raise FeedUnavailable(self.feed.url, "missing_content")
         return items
 
     async def _generate_hash(self, item: Item) -> str:
