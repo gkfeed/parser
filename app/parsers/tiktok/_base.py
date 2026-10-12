@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
-from typing import override
+from typing import Any, override
 
 import structlog
 
@@ -11,6 +11,7 @@ from app.extensions.parsers.hash import ItemsHashExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
+from app.services.ytdlp.tiktok import TikTokVideoRestricted
 from app.utils.datetime import convert_datetime
 from app.utils.logging import url_log_fields
 
@@ -62,6 +63,8 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
             failed=failed,
             skipped=skipped,
         )
+        if failed:
+            self.data["retry_at"] = datetime.now(UTC) + timedelta(minutes=15)
         if links and not items:
             raise ValueError("Could not extract any discovered TikTok videos")
         return items
@@ -72,7 +75,7 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
     async def _create_video_item(self, link: str) -> Item | None:
         try:
-            info = await YtdlpInfoExtractor.get_info(link)
+            info = await self._get_video_info(link)
             return Item(
                 title=info["description"],
                 text=info["description"],
@@ -80,13 +83,20 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
                 link=link,
             )
         except (KeyError, TypeError, ValueError) as exc:
+            if not isinstance(exc, TikTokVideoRestricted):
+                self.data["retry_at"] = datetime.now(UTC) + timedelta(minutes=15)
             logger.warning(
                 "tiktok_video_skipped",
-                reason="invalid_video_data",
+                reason="restricted"
+                if isinstance(exc, TikTokVideoRestricted)
+                else "invalid_video_data",
                 error_type=type(exc).__name__,
                 **url_log_fields(link, field="video_url"),
             )
             return None
+
+    async def _get_video_info(self, link: str) -> dict[str, Any]:
+        return await YtdlpInfoExtractor.get_info(link)
 
     @property
     @abstractmethod

@@ -68,7 +68,9 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
 
         selected_entries = entries[:max_videos]
         limited_info = {**info, "entries": selected_entries}
-        cacheable = cls._can_cache_entries(selected_entries)
+        cacheable = cls._can_cache_entries(selected_entries) and not info.get(
+            "extraction_incomplete"
+        )
         log = logger.info if cacheable else logger.warning
         log(
             "channel_discovery_completed",
@@ -115,4 +117,6 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
     ) -> dict:
         if mode is None:
             mode = BaseExtractionMode()
-        return await extract_info(url, mode.options(max_videos), keys)
+        return await extract_info(
+            url, mode.options(max_videos), keys, mode.result_handler
+        )

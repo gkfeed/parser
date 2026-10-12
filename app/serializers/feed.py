@@ -24,3 +24,8 @@ class FeedFailure(BaseModel):
     error_type: Literal["feed_unavailable"]
     reason: str
     retry_at: AwareDatetime | None = None
+
+
+class FeedResult(BaseModel):
+    items: list[Item]
+    retry_at: AwareDatetime | None = None

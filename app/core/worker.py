@@ -1,6 +1,4 @@
 import asyncio
-import json
-from datetime import datetime
 from pathlib import Path
 from time import monotonic
 
@@ -13,7 +11,7 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.result_size import ResultSizeExtension
 from app.parsers import PARSERS
-from app.serializers.feed import Feed, FeedFailure, Item
+from app.serializers.feed import Feed, FeedFailure, FeedResult, Item
 from app.services.broker import BrokerError, BrokerResultTooLarge, BrokerService, Task
 
 logger = structlog.get_logger(__name__)
@@ -103,11 +101,9 @@ async def _submit_result(
 ) -> None:
     original_items = items
     rejected_size: int | None = None
+    result = FeedResult(items=items, retry_at=parser.data.get("retry_at"))
     for attempt in range(_MAX_RESULT_RESIZE_ATTEMPTS + 1):
-        items_json = json.dumps(
-            [i.model_dump() for i in items],
-            default=lambda o: o.isoformat() if isinstance(o, datetime) else None,
-        )
+        items_json = result.model_dump_json()
         if rejected_size is not None and len(items_json) >= rejected_size:
             raise BrokerResultTooLarge("Result cannot be reduced further")
         try:
@@ -123,8 +119,10 @@ async def _submit_result(
         smaller_items = await parser.reduce_result_size(original_items, attempt + 1)
         if smaller_items is None:
             raise BrokerResultTooLarge("Result cannot be reduced further")
-        items = smaller_items
-        logger.info("feed_result_resized", attempt=attempt + 1, items=len(items))
+        result.items = smaller_items
+        logger.info(
+            "feed_result_resized", attempt=attempt + 1, items=len(smaller_items)
+        )
 
 
 async def _submit_error(broker: BrokerService, task_id: str, error: str) -> None:

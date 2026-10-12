@@ -1,7 +1,11 @@
 from typing import Any, ClassVar
 
+from app.services.ytdlp.tiktok import classify_profile, classify_video
+from app.workers.youtube import InfoResultHandler
+
 
 class BaseExtractionMode:
+    result_handler: InfoResultHandler | None = None
     opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
@@ -29,6 +33,18 @@ class ChannelExtractionMode(BaseExtractionMode):
                 "approximate_date": "upload_date",
             }
         },
+    }
+
+
+class TikTokProfileExtractionMode(BaseExtractionMode):
+    result_handler = staticmethod(classify_profile)
+
+
+class TikTokVideoExtractionMode(BaseExtractionMode):
+    result_handler = staticmethod(classify_video)
+    opts: ClassVar[dict[str, Any]] = {
+        **BaseExtractionMode.opts,
+        "ignore_no_formats_error": True,
     }
 
 

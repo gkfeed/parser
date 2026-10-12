@@ -5,13 +5,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
 import structlog
-from pydantic import TypeAdapter
 from structlog.contextvars import bound_contextvars
 
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
-from app.serializers.feed import Feed, Item
+from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import (
     BrokerError,
     BrokerFeedUnavailable,
@@ -79,7 +78,7 @@ class Dispatcher:
             return
 
         try:
-            items = await self._request_items_from_broker(feed)
+            result = await self._request_items_from_broker(feed)
         except BrokerNoWorker as exc:
             next_retry = datetime.now(UTC) + timedelta(minutes=1)
             await self.feed_parser_repository.upsert(feed.id, next_retry)
@@ -111,9 +110,10 @@ class Dispatcher:
             return
 
         self._failure_counts.pop(feed.id, None)
+        items = result.items
         received = len(items)
 
-        if len(items) != 0:
+        if items:
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
@@ -121,7 +121,16 @@ class Dispatcher:
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
-        new_valid_for = datetime.now(UTC) + delta
+        now = datetime.now(UTC)
+        if result.retry_at is None:
+            new_valid_for = now + delta
+        else:
+            new_valid_for = max(result.retry_at, now + timedelta(seconds=1))
+            logger.info(
+                "feed_retry_scheduled",
+                reason="parser_requested_retry",
+                next_retry=new_valid_for.isoformat(),
+            )
         await self.feed_parser_repository.upsert(feed.id, new_valid_for)
         logger.info("feed_items_received", received=received, returned=len(items))
 
@@ -140,7 +149,7 @@ class Dispatcher:
             next_retry=next_retry.isoformat(),
         )
 
-    async def _request_items_from_broker(self, feed: Feed) -> list[Item]:
+    async def _request_items_from_broker(self, feed: Feed) -> FeedResult:
         items_json = await self.broker.put_and_wait_for_result(
             f"gkfeed.process_feed_{feed.type}",
             (feed.model_dump_json(),),
@@ -148,10 +157,7 @@ class Dispatcher:
             task_key=f"feed:{feed.id}",
         )
 
-        adapter = TypeAdapter(list[Item])
-        items = adapter.validate_json(items_json)
-
-        return items
+        return FeedResult.model_validate_json(items_json)
 
     async def _save_items(self, feed: Feed, items: list[Item]) -> list[Item]:
         return await self.items_repository.add_items_to_feed(feed, items)
