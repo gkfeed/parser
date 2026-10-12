@@ -1,7 +1,7 @@
 import asyncio
 import time
 from datetime import UTC, datetime, timedelta
-from typing import override
+from typing import Literal, override
 
 import structlog
 from bs4 import Tag
@@ -127,26 +127,22 @@ class InstagramStoriesFeed(
             "and normalize-space(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
             "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
         )
-        visible_error = EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, ".error-message")
-        )
         result = wait.until(
             EC.any_of(
                 EC.presence_of_element_located((By.XPATH, stories_button)),
-                visible_error,
+                self._loaded_error,
             )
         )
         result_classes = (result.get_attribute("class") or "").split()
+        if "error-message__text" in result_classes:
+            self._check_error(result)
+            return
         if (
             "tabs-component__button--disabled" in result_classes
             or not result.is_enabled()
             or result.get_attribute("aria-disabled") == "true"
         ):
             raise self._unavailable("private")
-        if "error-message" in result_classes:
-            self._check_error(result)
-            return
-
         self._click(driver, result)
         media_ready = EC.all_of(
             EC.presence_of_element_located(
@@ -156,12 +152,21 @@ class InstagramStoriesFeed(
                     + "[contains(@class, 'tabs-component__button--active')]",
                 )
             ),
-            EC.invisibility_of_element_located((By.CSS_SELECTOR, ".loader-component")),
-            EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, ".profile-media-list__item a.download-btn[href]")
+            # The subscription landing hides results while requests still run.
+            # A hidden loader is not evidence that loading has finished.
+            EC.none_of(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, ".search-result .loader-component")
+                )
+            ),
+            EC.presence_of_element_located(
+                (
+                    By.CSS_SELECTOR,
+                    ".search-result .profile-media-list__item a.download-btn[href]",
+                )
             ),
         )
-        stories_result = wait.until(EC.any_of(visible_error, media_ready))
+        stories_result = wait.until(EC.any_of(self._loaded_error, media_ready))
         if isinstance(stories_result, WebElement):
             self._check_error(stories_result)
             return
@@ -170,8 +175,21 @@ class InstagramStoriesFeed(
             driver.execute_script("window.scrollBy(0, 500);")
             time.sleep(1)
 
+    @staticmethod
+    def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
+        if driver.find_elements(By.CSS_SELECTOR, ".search-result .loader-component"):
+            return False
+        # Anonyig's subscription landing can hide the whole search result.
+        # Read the actual error text, excluding the fallback popup's ad copy.
+        for error in driver.find_elements(
+            By.CSS_SELECTOR, ".search-result .error-message__text"
+        ):
+            if (error.get_attribute("textContent") or "").strip():
+                return error
+        return False
+
     def _check_error(self, error: WebElement) -> None:
-        message = error.text.lower()
+        message = (error.get_attribute("textContent") or "").lower()
         if "no stories" in message:
             # Anonyig also uses this message for upstream failures.
             logger.warning("stories_empty_unverified")

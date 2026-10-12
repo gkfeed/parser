@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Stories result under the subscription landing</title>
+<!-- Reduced DOM from Anonyig, feeds 829 and 849, captured 2026-10-12.
+     The upstream responses and the subscription presentation are independent. -->
+<style>
+.tz-landing-exp .search-result {
+    display: none !important;
+    visibility: hidden !important;
+}
+</style>
+<main id="app">
+    <form class="search-form" onsubmit="return false">
+        <input class="search-form__input">
+        <button class="search-form__button" type="button">Search</button>
+    </form>
+    <div class="search-result"></div>
+    <p>Your content is ready</p>
+    <p>Want to view private posts and accounts too?</p>
+</main>
+<script>
+const app = document.querySelector('#app');
+const output = document.querySelector('.search-result');
+const scenario = location.hash.slice(1);
+const error = message => `<div class="error-message"><p class="error-message__text">${message}</p></div>`;
+const media = name => `<ul class="profile-media-list"><li class="profile-media-list__item"><a class="download-btn" href="https://media.example/${name}.mp4">Download</a></li></ul>`;
+const empty = 'It seems that there are no stories for the last 24 hours. Please try again later.';
+document.querySelector('.search-form__button').addEventListener('click', () => {
+    app.classList.add('tz-landing-exp');
+    app.dataset.query = document.querySelector('input').value;
+    output.innerHTML = '<div class="loader-component"></div>';
+    setTimeout(() => {
+        if (scenario === 'upstream') {
+            output.innerHTML = '<div class="error-message fallback-popup fallback-popup--extension"><p class="error-message__text" style="display:none">The download link not found</p><p>Try our partner to view private accounts!</p></div>';
+            return;
+        }
+        if (scenario === 'not_found') {
+            output.innerHTML = error('User not found');
+            return;
+        }
+        output.innerHTML = `<button class="tabs-component__button tabs-component__button--active">posts</button><button class="tabs-component__button ${scenario === 'private' ? 'tabs-component__button--disabled' : ''}">stories</button>${media('post')}`;
+        const stories = output.querySelectorAll('button')[1];
+        stories.addEventListener('click', () => {
+            output.querySelector('button').classList.remove('tabs-component__button--active');
+            stories.classList.add('tabs-component__button--active');
+            // The hidden loader and old post link remain until Stories finishes.
+            output.insertAdjacentHTML('beforeend', '<div class="loader-component"></div>' + error(empty));
+            setTimeout(() => {
+                output.querySelector('.loader-component').remove();
+                output.querySelector('.profile-media-list').remove();
+                output.querySelector('.error-message').remove();
+                output.insertAdjacentHTML('beforeend', scenario === 'empty' ? error(empty) : media('story'));
+                app.dataset.finished = 'stories';
+            }, 800);
+        });
+    }, 200);
+});
+</script>
