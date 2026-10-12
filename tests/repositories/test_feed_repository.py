@@ -6,7 +6,7 @@ from aiohttp.test_utils import TestServer
 
 from app.core.dispatcher import Dispatcher
 from app.extensions.parsers.base import BaseFeed
-from app.serializers.feed import Feed
+from app.serializers.feed import Feed, FeedResult
 from app.services.broker import BrokerService
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.feed_parser import FeedParserRepository
@@ -88,7 +88,9 @@ async def test_dispatch_only_eligible_feeds(scheduled_feeds):
         return web.json_response({"task_id": str(feed.id)})
 
     async def result(request):
-        return web.json_response({"status": "completed", "result": "[]"})
+        return web.json_response(
+            {"status": "completed", "result": FeedResult(items=[]).model_dump_json()}
+        )
 
     app = web.Application()
     app.router.add_post("/enqueue", enqueue)

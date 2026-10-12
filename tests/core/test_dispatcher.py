@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.dispatcher import Dispatcher
-from app.serializers.feed import Feed, Item
+from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import BrokerError
 
 
@@ -33,14 +33,14 @@ async def test_request_items_from_broker_success(dispatcher):
             hash="hash1",
         ),
     ]
-    items_json = f"[{items[0].model_dump_json()}]"
+    result_json = FeedResult(items=items).model_dump_json()
 
-    dispatcher.broker.put_and_wait_for_result.return_value = items_json
+    dispatcher.broker.put_and_wait_for_result.return_value = result_json
 
     result = await dispatcher._request_items_from_broker(feed)
 
-    assert len(result) == 1
-    assert result[0].title == "Item 1"
+    assert len(result.items) == 1
+    assert result.items[0].title == "Item 1"
     dispatcher.broker.put_and_wait_for_result.assert_called_once()
 
 
@@ -88,7 +88,7 @@ async def test_fetch_feed_items_success(dispatcher):
         ) as mock_request,
         patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
     ):
-        mock_request.return_value = items
+        mock_request.return_value = FeedResult(items=items)
         mock_save.return_value = items
 
         await dispatcher._fetch_feed_items(feed)
@@ -123,7 +123,7 @@ async def test_fetch_feed_items_no_items(dispatcher):
         ) as mock_request,
         patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
     ):
-        mock_request.return_value = []
+        mock_request.return_value = FeedResult(items=[])
 
         await dispatcher._fetch_feed_items(feed)
 
@@ -176,7 +176,11 @@ async def test_success_resets_failure_backoff(dispatcher):
             dispatcher,
             "_request_items_from_broker",
             new_callable=AsyncMock,
-            side_effect=[BrokerError("Error"), [], BrokerError("Error")],
+            side_effect=[
+                BrokerError("Error"),
+                FeedResult(items=[]),
+                BrokerError("Error"),
+            ],
         ),
         patch("app.core.dispatcher.random.uniform", return_value=1),
     ):
