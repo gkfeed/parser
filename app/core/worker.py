@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 from time import monotonic
 
 import structlog
@@ -18,7 +17,7 @@ logger = structlog.get_logger(__name__)
 _MAX_RESULT_RESIZE_ATTEMPTS = 8
 
 
-async def run_worker(type: str, *, active_task_path: Path | None = None):
+async def run_worker(type: str):
     clear_contextvars()
     await asyncio.sleep(1)
 
@@ -28,29 +27,9 @@ async def run_worker(type: str, *, active_task_path: Path | None = None):
     if not task:
         return
 
-    if active_task_path is not None:
-        temporary_path = active_task_path.with_suffix(".tmp")
-        temporary_path.write_text(task.id)
-        temporary_path.replace(active_task_path)
-
-    try:
-        feed = Feed.model_validate_json(task.args[0])
-        with bound_contextvars(task_id=task.id, parser=type, feed_id=feed.id):
-            await _process_feed(task, feed, broker)
-    finally:
-        await recover_worker_task(broker, active_task_path)
-
-
-async def recover_worker_task(broker: BrokerService, task_path: Path | None) -> None:
-    if task_path is None or not task_path.exists():
-        return
-    task_id = task_path.read_text().strip()
-    async with asyncio.timeout(10):
-        status = (await broker.get_task_data(task_id))["status"]
-        if status == "processing":
-            await broker.submit_error(task_id, "worker_interrupted")
-            logger.warning("worker_task_interrupted", task_id=task_id)
-    task_path.unlink(missing_ok=True)
+    feed = Feed.model_validate_json(task.args[0])
+    with bound_contextvars(task_id=task.id, parser=type, feed_id=feed.id):
+        await _process_feed(task, feed, broker)
 
 
 async def _process_feed(task: Task, feed: Feed, broker: BrokerService) -> None:
