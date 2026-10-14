@@ -12,6 +12,7 @@ from .instagram import InstagramFeed
 from .kinogo import KinogoFeed
 from .liquidpedia import LiquidpediaFeed
 from .mangalib import MangaLibFeed
+from .matreshka import MatreshkaFeed
 from .onefootball import OneFootballFeed
 from .pornhub import PornHubFeed
 from .porno365 import Porno365Feed
@@ -67,6 +68,7 @@ class Parser(Enum):
     ONEFOOTBALL = ParserConfig("onefootball", OneFootballFeed)
     RTL = ParserConfig("rtl", RTLSeriesFeed)
     REZKA_COLLECTION = ParserConfig("rezka:collection", RezkaCollectionFeed)
+    MATRESHKA = ParserConfig("matreshka", MatreshkaFeed)
     SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed)
     ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed)
     PORNHUB = ParserConfig("pornhub", PornHubFeed)
