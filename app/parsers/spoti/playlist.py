@@ -11,10 +11,10 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
-        first_track = self._get_first_track_element(soup)
-        anchor_tag = self._get_track_anchor_tag(first_track)
+        anchor_tag = self._get_track_anchor_tag(soup)
+        first_track = self._get_track_container(anchor_tag)
         first_track_name = self._get_track_name(anchor_tag)
-        first_track_artist = self._get_track_artist(anchor_tag)
+        first_track_artist = self._get_artist_names(first_track)
         first_track_id = self._get_track_id(anchor_tag)
 
         return [
@@ -27,15 +27,7 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
         ]
 
     def _get_first_track_element(self, soup: Tag) -> Tag:
-        track_anchor = soup.find(
-            "a",
-            href=lambda href: isinstance(href, str) and href.startswith("/track/"),
-        )
-        if not isinstance(track_anchor, Tag):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Could not find the first track element."
-            )
-
+        track_anchor = self._get_track_anchor_tag(soup)
         return self._get_track_container(track_anchor)
 
     def _get_track_container(self, track_anchor: Tag) -> Tag:
@@ -43,8 +35,7 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
         while isinstance(track_element, Tag):
             artist_anchor = track_element.find(
                 "a",
-                href=lambda href: isinstance(href, str)
-                and href.startswith("/artist/"),
+                href=lambda href: isinstance(href, str) and href.startswith("/artist/"),
             )
             if isinstance(artist_anchor, Tag):
                 return track_element
@@ -59,7 +50,7 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
         )
         if not isinstance(anchor_tag, Tag):
             raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Could not find the anchor tag for the track."
+                "Could not find the first track element."
             )
         return anchor_tag
 
@@ -70,11 +61,12 @@ class SpotifyPlaylistFeed(ItemIdentityHashExtension, SeleniumParserExtension):
         return track_name
 
     def _get_track_artist(self, anchor_tag: Tag) -> str:
-        track_container = self._get_track_container(anchor_tag)
+        return self._get_artist_names(self._get_track_container(anchor_tag))
+
+    def _get_artist_names(self, track_container: Tag) -> str:
         artist_tags = track_container.find_all(
             "a",
-            href=lambda href: isinstance(href, str)
-            and href.startswith("/artist/"),
+            href=lambda href: isinstance(href, str) and href.startswith("/artist/"),
         )
         artist_names = [tag.get_text(strip=True) for tag in artist_tags]
         artist_names = [name for name in artist_names if name]

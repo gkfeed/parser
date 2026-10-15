@@ -53,12 +53,10 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         span_tag = post.find("span")
-        if isinstance(span_tag, Tag):
-            time_tag = span_tag.find("time")
-            if isinstance(time_tag, Tag):
-                datetime_str = time_tag.get("datetime")
-                if isinstance(datetime_str, str):
-                    return convert_datetime(datetime_str)
+        time_tag = span_tag.find("time") if isinstance(span_tag, Tag) else None
+        datetime_str = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
+        if isinstance(datetime_str, str):
+            return convert_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @property
