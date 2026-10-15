@@ -53,10 +53,12 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
 
         links = soup.find_all("a")
         for link in links:
-            if isinstance(link, Tag) and "href" in link.attrs:
-                href = link["href"]
-                if isinstance(href, str) and href.startswith("/artist"):
-                    return link.text
+            if not isinstance(link, Tag):
+                continue
+            href = link.get("href")
+            if not isinstance(href, str) or not href.startswith("/artist"):
+                continue
+            return link.text
         raise ValueError("Artist name not found")
 
     def _extract_text(self, link: Tag) -> str:
