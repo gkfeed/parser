@@ -31,16 +31,11 @@ back to a different logging configuration.
 
 Worker parser types are configured in `app/configs/workers.py`.
 
-To disable scheduling and processing in both light and heavy workers, add parser
-enum members to `ignored_parser_types`. Their registry entries and saved feeds
-remain available:
+To skip parser types in both light and heavy workers, add them to `ignored_parser_types`:
 
 ```python
-ignored_parser_types: set[Parser] = {Parser.X, Parser.MATRESHKA}
+ignored_parser_types = ["yt", "rezka:collection"]
 ```
-
-Matreshka is disabled because the site has closed. Remove its entry from this set
-to enable it again, then restart the dispatcher and workers.
 
 ## Docker worker logs
 

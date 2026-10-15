@@ -7,9 +7,9 @@ from typing import Protocol
 import structlog
 from structlog.contextvars import bound_contextvars
 
-from app.configs.workers import active_parsers
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
+from app.parsers import PARSERS
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import (
     BrokerError,
@@ -48,7 +48,7 @@ class Dispatcher:
         self,
         broker: BrokerService,
         feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
-        parsers: Mapping[str, type[BaseFeed]] = active_parsers,
+        parsers: Mapping[str, type[BaseFeed]] = PARSERS,
         feed_repository: FeedRepositoryProtocol = FeedRepository,
         items_repository: ItemsRepositoryProtocol = ItemsRepository,
         broker_wait_timeout: int = 300,
