@@ -22,9 +22,6 @@ else
 	$(PYTHON) -m pytest -m integration
 endif
 
-dev:
-	$(PYTHON) -m app.main
-
 dispatcher:
 	$(PYTHON) -m app.run.dispatcher
 
@@ -44,7 +41,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
+.PHONY: merge-to-master test test-integration debug format migrate makemigrations docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
 
 migrate:
 	$(ALEMBIC) upgrade head
