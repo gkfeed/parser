@@ -1,34 +1,17 @@
 from datetime import timedelta
-from typing import NamedTuple
 
 import structlog
 
-from app.services.cache.use_temporary import (
-    UseTemporaryCacheServiceExtension,
-    async_store_in_cache_for,
-)
+from app.services.cache.use_temporary import UseTemporaryCacheServiceExtension
 from app.workers.youtube import extract_info
 
-from .modes import BaseExtractionMode, VideoExtractionMode
+from .modes import BaseExtractionMode
 
 logger = structlog.get_logger(__name__)
 
 
-class VideoInfo(NamedTuple):
-    title: str
-    upload_date_str: str
-    channel_name: str
-
-
 class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
     _channel_info_storage_time = timedelta(hours=1)
-    _video_info_storage_time = timedelta(weeks=1)
-
-    @classmethod
-    @async_store_in_cache_for(_video_info_storage_time)
-    async def extract_video_info(cls, url: str) -> VideoInfo:
-        info = await cls.get_info(url, VideoExtractionMode())
-        return VideoInfo(info["title"], info["upload_date"], info["uploader"])
 
     @classmethod
     async def extract_channel_videos_info(
