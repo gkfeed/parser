@@ -1,6 +1,5 @@
 import asyncio
 import re
-from datetime import timedelta
 from enum import Enum, auto
 from functools import cached_property
 from typing import override
@@ -33,25 +32,22 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
 
     @override
     async def get_html(self, url: str, *, attempts: int = 3) -> bytes:
-        if self.cache.has_valid_cache(url):
-            html = self.cache.get(url)
-            if not self._page_error(html):
-                return html
-            # Discard error pages cached before response validation was added.
-            self.cache.set_with_expiry(url, b"", timedelta(0))
-
         while True:
-            html = await super()._fetch_html(url)
-            error = self._page_error(html)
-            if not error:
-                self.cache.set_with_expiry(url, html, self._http_response_storage_time)
-                return html
-            attempts -= 1
-            if attempts <= 0 or not error.startswith(
-                ("HTTP ERROR 5", "ERR_", "net::ERR_")
-            ):
-                raise RezkaPageUnavailable(url, error)
+            try:
+                return await super().get_html(url)
+            except RezkaPageUnavailable as exc:
+                attempts -= 1
+                if attempts <= 0 or not exc.reason.startswith(
+                    ("HTTP ERROR 5", "ERR_", "net::ERR_")
+                ):
+                    raise
             await asyncio.sleep(2)
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        error = self._page_error(html)
+        if error:
+            raise RezkaPageUnavailable(url, error)
 
     @staticmethod
     def _page_error(html: bytes) -> str | None:
