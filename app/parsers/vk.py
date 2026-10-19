@@ -13,17 +13,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.utils.datetime import constant_datetime, convert_datetime
 
 
 class VkFeed(
     PostToItemsMixin,
-    ItemsHashExtension,
+    ItemLinkHashExtension,
     SeleniumParserExtension,
     CacheFeedExtension,
 ):
@@ -51,10 +49,6 @@ class VkFeed(
             raise FeedUnavailable(self.feed.url, "browser_challenge")
 
         return []
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     @override
     def make_actions(self, driver: WebDriver):

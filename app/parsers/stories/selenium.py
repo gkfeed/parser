@@ -79,10 +79,12 @@ class InstagramStoriesFeed(
         links = []
         for media in soup.select(".profile-media-list__item"):
             download = media.select_one("a.download-btn[href]")
-            if isinstance(download, Tag):
-                href = download.get("href")
-                if isinstance(href, str):
-                    links.append(href)
+            if not isinstance(download, Tag):
+                continue
+            href = download.get("href")
+            if not isinstance(href, str):
+                continue
+            links.append(href)
         return links
 
     @override
@@ -193,7 +195,7 @@ class InstagramStoriesFeed(
         if "no stories" in message:
             # Anonyig also uses this message for upstream failures.
             logger.warning("stories_empty_unverified")
-            return
+            raise self._unavailable("empty_unverified")
         if "private" in message:
             raise self._unavailable("private")
         if any(

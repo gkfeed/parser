@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import override
 from urllib.parse import urljoin
 
@@ -33,22 +33,9 @@ class HltvFeed(
         )
 
     @override
-    async def get_html(self, url: str) -> bytes:
-        if self.cache.has_valid_cache(url):
-            html = self.cache.get(url)
-            if not self._is_challenge(html):
-                return html
-            # Discard challenges cached by older versions and try a fresh page.
-            self.cache.set_with_expiry(url, html, timedelta(0))
-
-        return await super().get_html(url)
-
-    @override
-    async def _fetch_html(self, url: str) -> bytes:
-        html = await super()._fetch_html(url)
+    def _validate_html(self, url: str, html: bytes) -> None:
         if self._is_challenge(html):
             raise FeedUnavailable(url, "cloudflare_challenge")
-        return html
 
     @override
     def make_actions(self, driver: WebDriver) -> None:

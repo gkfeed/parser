@@ -18,9 +18,11 @@ class TikTokSeleniumFeed(BaseTikTokFeed, SeleniumParserExtension):
 
         video_links = []
         for link in links:
-            if isinstance(link, Tag) and link.name == "a" and link.has_attr("href"):
-                href = link["href"]
-                if isinstance(href, str) and href.startswith(self.feed.url):
-                    video_links.append(href)
+            if not isinstance(link, Tag) or link.name != "a" or not link.has_attr("href"):
+                continue
+            href = link["href"]
+            if not isinstance(href, str) or not href.startswith(self.feed.url):
+                continue
+            video_links.append(href)
 
         return video_links
