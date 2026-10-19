@@ -1,17 +1,12 @@
 from typing import override
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.rss import RSSParser
 
 
-class SasflixFeed(ItemsHashExtension, HttpParserExtension):
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
-
+class SasflixFeed(ItemLinkHashExtension, HttpParserExtension):
     @override
     async def _fetch_html(self, url: str) -> bytes:
         return await RSSParser.fetch_bytes(url, headers=self._headers)

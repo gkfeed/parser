@@ -3,21 +3,15 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import Tag
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.utils.html import require_tag, required_attr
 
 
-class Porno365Feed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+class Porno365Feed(PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension):
     _canonical_scheme = "http"
     _canonical_host = "porno365.broker"
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     @property
     @override

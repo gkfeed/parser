@@ -4,14 +4,12 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
 
 
-class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
+class PornHubFeed(PostToItemsMixin, ItemLinkHashExtension, SeleniumParserExtension):
     _base_url = "https://www.pornhub.com"
     _video_section_ids = (
         "claimedUploadedVideoSection",
@@ -22,10 +20,6 @@ class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension)
         "pornstarsVideoSection",
         "showAllChanelVideos",
     )
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     @property
     @override

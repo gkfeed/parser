@@ -9,10 +9,9 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.ytdlp import BaseExtractionMode, YtdlpInfoExtractor
 from app.utils.datetime import constant_datetime
 
@@ -25,7 +24,7 @@ class VkVideoExtractionMode(BaseExtractionMode):
     }
 
 
-class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
+class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
     _max_videos = 5
     _page_load_timeout_seconds = 30
     _video_selector = (
@@ -153,6 +152,3 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
         if not items:
             raise FeedUnavailable(self.feed.url, "missing_content")
         return items
-
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
