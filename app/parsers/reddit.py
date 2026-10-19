@@ -49,22 +49,28 @@ class RedditFeed(
         base_urls = await self._get_base_urls()
 
         for base_url in base_urls:
-            try:
-                url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
-                soup = await self.get_soup(url)
-                posts = [
-                    post
-                    for post in soup.find_all(class_="post")
-                    if isinstance(post, Tag)
-                ]
-                if not posts:
-                    self.__url_ranker.demote_url(base_url)
-                    continue
-                self.__url_ranker.promote_url(base_url)
+            posts = await self._get_instance_posts(base_url)
+            if posts:
                 return posts
-            except Exception:  # noqa: BLE001 - try the next public instance on any failure
+
+        return []
+
+    async def _get_instance_posts(self, base_url: str) -> list[Tag]:
+        try:
+            url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
+            soup = await self.get_soup(url)
+            posts = [
+                post
+                for post in soup.find_all(class_="post")
+                if isinstance(post, Tag)
+            ]
+            if not posts:
                 self.__url_ranker.demote_url(base_url)
-                continue
+                return []
+            self.__url_ranker.promote_url(base_url)
+            return posts
+        except Exception:  # noqa: BLE001 - try the next public instance on any failure
+            self.__url_ranker.demote_url(base_url)
 
         return []
 
