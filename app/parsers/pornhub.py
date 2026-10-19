@@ -69,11 +69,15 @@ class PornHubFeed(PostToItemsMixin, ItemLinkHashExtension, SeleniumParserExtensi
     @override
     async def _get_post_title(self, post: Tag) -> str:
         image = post.find("img")
-        if isinstance(image, Tag):
-            for attribute in ("title", "data-title", "alt"):
-                title = image.attrs.get(attribute)
-                if title and str(title).strip():
-                    return str(title).strip()
+        if not isinstance(image, Tag):
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "No title found in post"
+            )
+
+        for attribute in ("title", "data-title", "alt"):
+            title = image.attrs.get(attribute)
+            if title and str(title).strip():
+                return str(title).strip()
         raise ValueError("No title found in post")
 
     @override
