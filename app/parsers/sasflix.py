@@ -9,6 +9,20 @@ from app.services.hash import HashService
 from app.utils.datetime import convert_datetime
 
 
+def _extract_description(item_tag: Tag) -> str:
+    # The XML parser often maps content:encoded to encoded.
+    content_encoded = item_tag.find("encoded") or item_tag.find("content:encoded")
+    description = content_encoded.text if content_encoded else ""
+    if description:
+        return description
+
+    enclosure = item_tag.find("enclosure")
+    if isinstance(enclosure, Tag) and "url" in enclosure.attrs:
+        return f'<img src="{enclosure["url"]}" alt="" />'
+
+    return ""
+
+
 class SasflixFeed(ItemsHashExtension, HttpParserExtension):
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -29,22 +43,10 @@ class SasflixFeed(ItemsHashExtension, HttpParserExtension):
             link = getattr(item_tag.find("link"), "text", "")
             pub_date = getattr(item_tag.find("pubDate"), "text", "")
 
-            # The XML parser often maps content:encoded to encoded.
-            content_encoded = item_tag.find("encoded") or item_tag.find(
-                "content:encoded"
-            )
-
-            description = content_encoded.text if content_encoded else ""
-
-            if not description:
-                enclosure = item_tag.find("enclosure")
-                if isinstance(enclosure, Tag) and "url" in enclosure.attrs:
-                    description = f'<img src="{enclosure["url"]}" alt="" />'
-
             items.append(
                 Item(
                     title=title,
-                    text=description,
+                    text=_extract_description(item_tag),
                     link=link,
                     date=convert_datetime(pub_date),
                 )
