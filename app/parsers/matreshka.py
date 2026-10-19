@@ -34,6 +34,7 @@ class MatreshkaFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensi
 
     def _extract_channel_title(self, soup: Tag) -> str:
         title_tag = soup.select_one("title")
-        if title_tag and title_tag.text:
-            return title_tag.text.split("|")[0].strip()
-        return "Unknown Channel"
+        channel_title = title_tag.text.split("|")[0].strip() if title_tag else ""
+        if not channel_title:
+            raise ValueError("Could not find Matreshka channel title in page")
+        return channel_title

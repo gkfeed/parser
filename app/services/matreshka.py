@@ -37,10 +37,38 @@ class MatreshkaClient:
             )
         except HttpRequestError as error:
             raise FeedUnavailable(self._channel_url, "http_request_failed") from error
+        except ValueError as error:
+            raise ValueError(
+                "Invalid Matreshka API response: expected valid JSON"
+            ) from error
 
-        # Preserve the existing payload policy here. Audit task 05 owns stricter
-        # validation, including the distinction between missing and empty data.
-        videos = response.get("data", [])
+        if not isinstance(response, dict):
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Invalid Matreshka API response: expected an object"
+            )
+        if "data" not in response:
+            raise ValueError("Invalid Matreshka API response: missing 'data'")
+        videos = response["data"]
         if not isinstance(videos, list):
-            return []
-        return [video for video in videos if video.get("id") and video.get("name")]
+            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                "Invalid Matreshka API response: 'data' must be a list"
+            )
+
+        for index, video in enumerate(videos):
+            if not isinstance(video, dict):
+                raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
+                    f"Invalid Matreshka video at data[{index}]: expected an object"
+                )
+            video_id = video.get("id")
+            if not isinstance(video_id, str) or not video_id.strip():
+                raise ValueError(
+                    f"Invalid Matreshka video at data[{index}]: "
+                    "'id' must be a non-empty string"
+                )
+            name = video.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(
+                    f"Invalid Matreshka video at data[{index}]: "
+                    "'name' must be a non-empty string"
+                )
+        return videos
