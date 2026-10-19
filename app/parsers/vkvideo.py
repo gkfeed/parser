@@ -91,36 +91,43 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
         target = self._get_target_url()
         target_path = urlsplit(target).path.rstrip("/")
         wait = WebDriverWait(driver, 30)
-        try:
-            # Leave room to reopen the channel after the verification redirects.
-            for _ in range(self._challenge_attempts + 2):
-                wait.until(
-                    ec.presence_of_element_located(
-                        (By.CSS_SELECTOR, f"button.start, {self._video_link_selector}")
-                    )
-                )
-                buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
-                if buttons:
-                    wait.until(ec.element_to_be_clickable(buttons[0])).click()
-                    wait.until(ec.staleness_of(buttons[0]))
-                    continue
-
-                # Verification redirects to the homepage, losing the channel URL.
-                if urlsplit(driver.current_url).path.rstrip("/") != target_path:
-                    driver.get(target)
-                    continue
-                wait.until(
-                    lambda current: any(
-                        link.text.strip()
-                        for link in current.find_elements(
-                            By.CSS_SELECTOR, self._video_link_selector
-                        )
-                    )
-                )
+        # Leave room to reopen the channel after the verification redirects.
+        for _ in range(self._challenge_attempts + 2):
+            try:
+                ready = self._make_browser_attempt(driver, wait, target, target_path)
+            except (TimeoutException, WebDriverException) as error:
+                raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+            if ready:
                 return
-        except (TimeoutException, WebDriverException) as error:
-            raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
         raise FeedUnavailable(self.feed.url, "browser_challenge")
+
+    def _make_browser_attempt(
+        self, driver: WebDriver, wait: WebDriverWait, target: str, target_path: str
+    ) -> bool:
+        wait.until(
+            ec.presence_of_element_located(
+                (By.CSS_SELECTOR, f"button.start, {self._video_link_selector}")
+            )
+        )
+        buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
+        if buttons:
+            wait.until(ec.element_to_be_clickable(buttons[0])).click()
+            wait.until(ec.staleness_of(buttons[0]))
+            return False
+
+        # Verification redirects to the homepage, losing the channel URL.
+        if urlsplit(driver.current_url).path.rstrip("/") != target_path:
+            driver.get(target)
+            return False
+        wait.until(
+            lambda current: any(
+                link.text.strip()
+                for link in current.find_elements(
+                    By.CSS_SELECTOR, self._video_link_selector
+                )
+            )
+        )
+        return True
 
     async def _parse_page_items(self) -> list[Item]:
         soup = await self.get_soup(self._get_target_url())
