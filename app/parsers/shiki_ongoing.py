@@ -3,6 +3,7 @@ from typing import override
 
 from bs4 import Tag
 
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
@@ -20,7 +21,7 @@ class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension
 
         container = soup.find("div", class_="fc-ongoings")
         if not isinstance(container, Tag):
-            return []
+            raise FeedUnavailable(self.feed.url, "missing_ongoings_container")
 
         return [a for a in container.find_all("article") if isinstance(a, Tag)]
 
