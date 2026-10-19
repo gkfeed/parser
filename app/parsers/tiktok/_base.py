@@ -1,15 +1,14 @@
 import asyncio
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime, timedelta
-from typing import Any, override
+from typing import Any
 
 import structlog
 
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.services.ytdlp.tiktok import TikTokVideoRestricted
 from app.utils.datetime import convert_datetime
@@ -18,7 +17,7 @@ from app.utils.logging import url_log_fields
 logger = structlog.get_logger(__name__)
 
 
-class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
+class BaseTikTokFeed(ItemLinkHashExtension, CacheFeedExtension, _BaseFeed, ABC):
     _cache_storage_time_if_success = timedelta(days=1)
 
     async def _parse_items(self) -> list[Item]:
@@ -68,10 +67,6 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
         if links and not items:
             raise ValueError("Could not extract any discovered TikTok videos")
         return items
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     async def _create_video_item(self, link: str) -> Item | None:
         try:

@@ -6,18 +6,16 @@ from urllib.parse import urljoin
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
 from app.utils.datetime import convert_datetime
 
 
 class RedditFeed(
-    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
+    PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension
 ):
     _cache_storage_time = timedelta(hours=1)
     _headers: ClassVar[dict[str, str]] = {"User-Agent": "gkfeed-parser/0.1"}
@@ -38,10 +36,6 @@ class RedditFeed(
         ]
         self.__base_urls_cache = self.__url_ranker.get_ranked_urls(all_urls)
         return self.__base_urls_cache
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     @property
     @override
