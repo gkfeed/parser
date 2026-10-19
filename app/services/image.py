@@ -96,12 +96,23 @@ class ImageService:
                 raise ValueError("Image exceeds pixel limit")
             image = ImageOps.exif_transpose(source).convert("RGB")
         while True:
-            for quality in (85, 70, 55, 40):
-                output = BytesIO()
-                image.save(output, format="JPEG", quality=quality, optimize=True)
-                content = output.getvalue()
-                if len(content) <= budget or (max(image.size) <= 128 and quality == 40):
-                    return content
+            content = cls._try_encode_jpeg(image, budget)
+            if content is not None:
+                return content
             image.thumbnail(
                 (max(128, image.width * 3 // 4), max(128, image.height * 3 // 4))
             )
+
+    @staticmethod
+    def _try_encode_jpeg(image: Image.Image, budget: int) -> bytes | None:
+        """Return the first JPEG within budget, or None if resizing is needed.
+
+        At a longest side of 128 px or less, return quality 40 even over budget.
+        """
+        for quality in (85, 70, 55, 40):
+            output = BytesIO()
+            image.save(output, format="JPEG", quality=quality, optimize=True)
+            content = output.getvalue()
+            if len(content) <= budget or (max(image.size) <= 128 and quality == 40):
+                return content
+        return None
