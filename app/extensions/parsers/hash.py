@@ -20,6 +20,14 @@ class ItemsHashExtension(_BaseFeed):
         return items
 
 
+class ItemLinkHashExtension(ItemsHashExtension):
+    """Hash the item link without normalization or other item fields."""
+
+    @override
+    async def _generate_hash(self, item: Item) -> str:
+        return HashService.hash_str(item.link)
+
+
 class ItemIdentityHashExtension(ItemsHashExtension):
     """Hash the title/link/text identity used by repository fallback deduplication."""
 

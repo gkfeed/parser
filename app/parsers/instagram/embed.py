@@ -1,13 +1,9 @@
-import asyncio
-import base64
 import re
 from datetime import timedelta
-from io import BytesIO
 from typing import override
 from urllib.parse import urlparse
 
 import structlog
-from PIL import Image, ImageOps
 
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -17,12 +13,13 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.result_size import ResultSizeExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.services.http import HttpRequestError, HttpService
+from app.services.http import HttpRequestError
+from app.services.image import EmbeddedImage, ImageResponseError, ImageService
 from app.services.instagram import InstagramService
 from app.utils.datetime import constant_datetime
 
 logger = structlog.get_logger(__name__)
-_IMAGE_SOURCE = re.compile(r'src="data:[^;]+;base64,([^"]+)"')
+_IMAGE_SOURCE = re.compile(r'src="data:(?P<mime_type>[^;]+);base64,(?P<encoded>[^"]+)"')
 
 
 class InstagramFeed(
@@ -30,14 +27,12 @@ class InstagramFeed(
 ):
     worker_kind = WorkerKind.HEAVY
     _cache_storage_time_if_success = timedelta(weeks=1)
-    _max_download_bytes = 20 * 1024 * 1024
-    _max_image_pixels = 20_000_000
 
     @override
     async def _generate_hash(self, item: Item) -> str:
         match = _IMAGE_SOURCE.search(item.text)
         if match:
-            return HashService.hash_str(match.group(1))
+            return HashService.hash_str(match["encoded"])
         return HashService.hash_str(item.text)
 
     async def _parse_items(self) -> list[Item]:
@@ -50,44 +45,34 @@ class InstagramFeed(
 
     async def _create_image_item(self, src: str, link: str) -> Item:
         try:
-            response = await HttpService.get_response(
-                src, max_bytes=self._max_download_bytes
-            )
-        except HttpRequestError as exc:
-            raise FeedUnavailable(self.feed.url, "image_download_failed") from exc
-        content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
-        if response.status >= 400 or not content_type.startswith("image/"):
+            image = await ImageService.download(src)
+        except ImageResponseError as exc:
             logger.warning(
                 "instagram_image_rejected",
-                status=response.status,
-                content_type=content_type,
+                status=exc.status,
+                content_type=exc.content_type,
                 reason="invalid_response",
             )
-            raise FeedUnavailable(self.feed.url, "invalid_image_response")
-        try:
-            mime_type = await asyncio.to_thread(self._validate_image, response.content)
-        except (
-            OSError,
-            ValueError,
-            Image.DecompressionBombError,
-        ) as exc:
+            raise FeedUnavailable(self.feed.url, "invalid_image_response") from exc
+        except HttpRequestError as exc:
+            raise FeedUnavailable(self.feed.url, "image_download_failed") from exc
+        except ValueError as exc:
             logger.warning("instagram_image_rejected", reason="invalid_image")
-            raise FeedUnavailable(self.feed.url, "invalid_image") from exc
+            raise ValueError(
+                f"Invalid Instagram image for {self.feed.url}: {exc}"
+            ) from exc
 
-        encoded = base64.b64encode(response.content).decode("utf-8")
         logger.info(
             "instagram_image_prepared",
-            image_bytes=len(response.content),
+            image_bytes=len(image.content),
         )
-        img_tag = (
-            f'<img src="data:{mime_type};base64,{encoded}" alt="{self._user_name}" />'
-        )
+        img_tag = f'<img src="{image.data_url}" alt="{self._user_name}" />'
         return Item(
             title="inst: " + self._user_name,
             text=f"{self._user_name}<br>{img_tag}",
             date=constant_datetime,
             link=link,
-            hash=HashService.hash_str(encoded),
+            hash=HashService.hash_str(image.encoded),
         )
 
     @override
@@ -99,53 +84,31 @@ class InstagramFeed(
             match = _IMAGE_SOURCE.search(item.text)
             if match is None:
                 return None
-            original = base64.b64decode(match.group(1), validate=True)
-            compressed = await asyncio.to_thread(
-                self._resize_image, original, len(original) // (2**attempt)
-            )
-            if len(compressed) >= len(original):
+            try:
+                original = EmbeddedImage.from_base64(
+                    match["mime_type"], match["encoded"]
+                )
+                compressed = await ImageService.resize(
+                    original, len(original.content) // (2**attempt)
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"Cannot reduce Instagram image for {self.feed.url}: {exc}"
+                ) from exc
+            if len(compressed.content) >= len(original.content):
                 items.append(item)
                 continue
-            encoded = base64.b64encode(compressed).decode("utf-8")
-            replacement = f'src="data:image/jpeg;base64,{encoded}"'
+            replacement = f'src="{compressed.data_url}"'
             text = item.text[: match.start()] + replacement + item.text[match.end() :]
             # Re-encode the original each time and keep its deduplication hash.
             items.append(item.model_copy(update={"text": text}))
             logger.info(
                 "instagram_image_compressed",
                 attempt=attempt,
-                original_bytes=len(original),
-                image_bytes=len(compressed),
+                original_bytes=len(original.content),
+                image_bytes=len(compressed.content),
             )
         return items or None
-
-    @classmethod
-    def _validate_image(cls, data: bytes) -> str:
-        with Image.open(BytesIO(data)) as image:
-            if image.width * image.height > cls._max_image_pixels:
-                raise ValueError("Image exceeds pixel limit")
-            mime_type = Image.MIME.get(image.format or "")
-            if mime_type is None:
-                raise ValueError("Unknown image format")
-            image.verify()
-            return mime_type
-
-    @classmethod
-    def _resize_image(cls, data: bytes, budget: int) -> bytes:
-        with Image.open(BytesIO(data)) as source:
-            if source.width * source.height > cls._max_image_pixels:
-                raise ValueError("Image exceeds pixel limit")
-            image = ImageOps.exif_transpose(source).convert("RGB")
-        while True:
-            for quality in (85, 70, 55, 40):
-                output = BytesIO()
-                image.save(output, format="JPEG", quality=quality, optimize=True)
-                content = output.getvalue()
-                if len(content) <= budget or (max(image.size) <= 128 and quality == 40):
-                    return content
-            image.thumbnail(
-                (max(128, image.width * 3 // 4), max(128, image.height * 3 // 4))
-            )
 
     @property
     def _user_name(self) -> str:
