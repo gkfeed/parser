@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 import structlog
 from bs4 import Tag
+from requests.exceptions import RequestException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -46,13 +47,13 @@ class InstagramStoriesFeed(
     async def _generate_hash(self, item: Item) -> str:
         try:
             return await HashService.hash_video_from_url(item.link)
-        except Exception as exc:  # noqa: BLE001 - try the link hash for unavailable media
+        except RequestException as exc:
             logger.warning(
                 "stories_media_hash_failed",
                 error_type=type(exc).__name__,
                 **url_log_fields(item.link),
             )
-            return HashService.hash_str(item.link)
+            raise self._unavailable("media_hash_error") from exc
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
