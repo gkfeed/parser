@@ -117,31 +117,46 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
         link = self.feed.url
         unavailable: RezkaPageUnavailable | None = None
         for index, url in enumerate(self._show_urls):
-            try:
-                html = await self.get_html(url, attempts=3 if index == 0 else 1)
-            except RezkaPageUnavailable as exc:
-                if not exc.reason.startswith(("HTTP ERROR 5", "HTTP ERROR 404")):
-                    raise
-                unavailable = unavailable or exc
+            is_primary = index == 0
+            page = await self._load_show_page(url, attempts=3 if is_primary else 1)
+            if isinstance(page, RezkaPageUnavailable):
+                unavailable = unavailable or page
                 continue
-            page = BeautifulSoup(html, "html.parser")
-            heading = page.select_one(".b-post__title h1")
-            episodes = page.select_one(".b-simple_episode__item")
-            if index == 0:
+            if is_primary:
                 soup = page
-                if self._page_mode is RezkaPageMode.FILM or episodes or not heading:
-                    break
-            elif (
-                heading and episodes and page.select_one(f'#post_id[value="{show_id}"]')
-            ):
-                soup, link = page, url
-                break
+            if not self._is_show_page_candidate(page, show_id, is_primary=is_primary):
+                continue
+            soup = page
+            link = self.feed.url if is_primary else url
+            break
 
         if soup is None:
             assert unavailable is not None
             raise unavailable
         self._show_page = soup, link
         return soup
+
+    async def _load_show_page(
+        self, url: str, *, attempts: int
+    ) -> Tag | RezkaPageUnavailable:
+        try:
+            html = await self.get_html(url, attempts=attempts)
+        except RezkaPageUnavailable as exc:
+            if not exc.reason.startswith(("HTTP ERROR 5", "HTTP ERROR 404")):
+                raise
+            return exc
+        return BeautifulSoup(html, "html.parser")
+
+    def _is_show_page_candidate(
+        self, page: Tag, show_id: str, *, is_primary: bool
+    ) -> bool:
+        heading = page.select_one(".b-post__title h1")
+        episodes = page.select_one(".b-simple_episode__item")
+        if is_primary:
+            return self._page_mode is RezkaPageMode.FILM or bool(episodes) or not heading
+        return bool(
+            heading and episodes and page.select_one(f'#post_id[value="{show_id}"]')
+        )
 
     @cached_property
     def _show_urls(self) -> list[str]:
