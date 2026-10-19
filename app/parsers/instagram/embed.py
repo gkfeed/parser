@@ -27,6 +27,8 @@ class InstagramFeed(
 ):
     worker_kind = WorkerKind.HEAVY
     _cache_storage_time_if_success = timedelta(weeks=1)
+    # At most 30 images are embedded, so base64 stays near 40 MiB before JSON.
+    _max_image_bytes = 1024 * 1024
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -45,7 +47,10 @@ class InstagramFeed(
 
     async def _create_image_item(self, src: str, link: str) -> Item:
         try:
-            image = await ImageService.download(src)
+            original = await ImageService.download(src)
+            image = original
+            if len(original.content) > self._max_image_bytes:
+                image = await ImageService.resize(original, self._max_image_bytes)
         except ImageResponseError as exc:
             logger.warning(
                 "instagram_image_rejected",
@@ -64,6 +69,7 @@ class InstagramFeed(
 
         logger.info(
             "instagram_image_prepared",
+            original_bytes=len(original.content),
             image_bytes=len(image.content),
         )
         img_tag = f'<img src="{image.data_url}" alt="{self._user_name}" />'
@@ -72,7 +78,8 @@ class InstagramFeed(
             text=f"{self._user_name}<br>{img_tag}",
             date=constant_datetime,
             link=link,
-            hash=HashService.hash_str(image.encoded),
+            # Keep existing item identities when their embedded image is resized.
+            hash=HashService.hash_str(original.encoded),
         )
 
     @override
