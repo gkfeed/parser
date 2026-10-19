@@ -5,7 +5,7 @@ from typing import Literal, override
 
 import structlog
 from bs4 import Tag
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -173,9 +173,45 @@ class InstagramStoriesFeed(
             self._check_error(stories_result)
             return
 
-        for _ in range(3):
-            driver.execute_script("window.scrollBy(0, 500);")
-            time.sleep(1)
+        self._load_all_media(driver)
+
+    def _load_all_media(self, driver: WebDriver) -> None:
+        # Anonyig initially renders six cards, revealing the next six when
+        # this trigger intersects the viewport. Fixed-distance scrolling can
+        # stop before the trigger and silently submit only the first batch.
+        cards_selector = ".search-result .profile-media-list__item"
+        deadline = time.monotonic() + self._results_wait_time
+        while time.monotonic() < deadline:
+            triggers = driver.find_elements(
+                By.CSS_SELECTOR, ".search-result .profile-media-list .trigger"
+            )
+            if not triggers:
+                return
+            count = len(driver.find_elements(By.CSS_SELECTOR, cards_selector))
+            driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center', behavior: 'instant'});",
+                triggers[-1],
+            )
+            if not triggers[-1].is_displayed():
+                raise self._unavailable("media_loading_unverified")
+
+            def more_cards(browser: WebDriver, previous_count: int = count) -> bool:
+                return (
+                    len(browser.find_elements(By.CSS_SELECTOR, cards_selector))
+                    > previous_count
+                )
+
+            try:
+                # The site's observer debounces updates by 200ms. After the
+                # final batch its trigger remains, but no new cards appear.
+                WebDriverWait(
+                    driver, min(2, max(0, deadline - time.monotonic()))
+                ).until(more_cards)
+            except TimeoutException:
+                if time.monotonic() >= deadline:
+                    break
+                return
+        raise self._unavailable("media_loading_timeout")
 
     @staticmethod
     def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
