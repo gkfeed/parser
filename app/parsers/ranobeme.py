@@ -28,8 +28,9 @@ class RanobeMeFeed(
                 continue
             for chapter_link in chapter_list.select("a[href]"):
                 href = chapter_link.get("href")
-                if isinstance(href, str):
-                    chapters[href] = chapter_link
+                if not isinstance(href, str):
+                    continue
+                chapters[href] = chapter_link
 
         return list(chapters.values())
 
