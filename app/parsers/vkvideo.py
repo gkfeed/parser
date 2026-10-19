@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
+from yt_dlp.utils import DownloadError
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -17,7 +18,55 @@ from app.services.ytdlp import BaseExtractionMode, YtdlpInfoExtractor
 from app.utils.datetime import constant_datetime
 
 
+class _InvalidVkVideoMetadata(ValueError):
+    """The source returned metadata that cannot describe a video feed."""
+
+
+def _video_link(video: dict[str, Any]) -> str:
+    video_id = video.get("id")
+    if video_id:
+        if not isinstance(video_id, (str, int)) or isinstance(video_id, bool):
+            raise _InvalidVkVideoMetadata(
+                "VK Video extraction returned an invalid video ID"
+            )
+        if not str(video_id).strip():
+            raise _InvalidVkVideoMetadata(
+                "VK Video extraction returned a blank video ID"
+            )
+        return f"https://vkvideo.ru/video{video_id}"
+
+    link = video.get("webpage_url") or video.get("url")
+    if not isinstance(link, str) or not link.strip():
+        raise _InvalidVkVideoMetadata(
+            "VK Video extraction returned a video without a usable link"
+        )
+    return link
+
+
+def _validate_extraction(
+    url: str, info: dict[str, Any] | None, error: str | None
+) -> dict[str, Any]:
+    if not isinstance(info, dict):
+        raise _InvalidVkVideoMetadata("VK Video extraction did not return metadata")
+    entries = info.get("entries")
+    if not isinstance(entries, list):
+        raise _InvalidVkVideoMetadata(
+            "VK Video extraction did not return an entries list"
+        )
+    if not entries:
+        # An empty extraction does not confirm that the channel has no videos.
+        raise _InvalidVkVideoMetadata("VK Video extraction returned no videos")
+    for video in entries:
+        if not isinstance(video, dict) or not video:
+            raise _InvalidVkVideoMetadata(
+                "VK Video extraction returned an invalid video entry"
+            )
+        _video_link(video)
+    return info
+
+
 class VkVideoExtractionMode(BaseExtractionMode):
+    result_handler = staticmethod(_validate_extraction)
     opts: ClassVar[dict[str, Any]] = {
         **BaseExtractionMode.opts,
         "extract_flat": False,
@@ -39,34 +88,31 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
             info = await YtdlpInfoExtractor.extract_channel_videos_info(
                 self.feed.url, VkVideoExtractionMode(), self._max_videos
             )
-        except ValueError:
+            # Cached results bypass the extraction mode's result handler.
+            info = _validate_extraction(self.feed.url, info, None)
+        except (ValueError, DownloadError):
             return await self._parse_page_items()
 
         channel = info.get("title") or self.feed.title
         items = []
         for video in info["entries"]:
-            if not video:
-                continue
-
-            video_id = video.get("id")
-            link = (
-                f"https://vkvideo.ru/video{video_id}"
-                if video_id
-                else video.get("webpage_url") or video.get("url")
-            )
-            if not link:
-                continue
+            link = _video_link(video)
 
             timestamp = video.get("timestamp") or video.get("release_timestamp")
             upload_date = video.get("upload_date")
-            if timestamp:
-                published_at = datetime.fromtimestamp(timestamp, UTC)
-            elif upload_date:
-                published_at = datetime.strptime(upload_date, "%Y%m%d").replace(
-                    tzinfo=UTC
-                )
-            else:
-                published_at = constant_datetime
+            try:
+                if timestamp:
+                    published_at = datetime.fromtimestamp(timestamp, UTC)
+                elif upload_date:
+                    published_at = datetime.strptime(upload_date, "%Y%m%d").replace(
+                        tzinfo=UTC
+                    )
+                else:
+                    published_at = constant_datetime
+            except (TypeError, ValueError, OverflowError, OSError) as error:
+                raise ValueError(
+                    f"Invalid VK Video publication date for {link}"
+                ) from error
 
             items.append(
                 Item(
@@ -123,9 +169,14 @@ class VkVideoFeed(ItemsHashExtension, SeleniumParserExtension):
         raise FeedUnavailable(self.feed.url, "browser_challenge")
 
     async def _parse_page_items(self) -> list[Item]:
-        soup = await self.get_soup(self._get_target_url())
+        try:
+            soup = await self.get_soup(self._get_target_url())
+        except WebDriverException as error:
+            raise FeedUnavailable(self.feed.url, "browser_load_failed") from error
         channel_tag = soup.select_one('[data-testid="video_channel_name"]')
-        channel = channel_tag.get_text(" ", strip=True) if channel_tag else self.feed.title
+        channel = (
+            channel_tag.get_text(" ", strip=True) if channel_tag else self.feed.title
+        )
         items: list[Item] = []
         links: set[str] = set()
         for card in soup.select(self._video_selector):
