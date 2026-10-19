@@ -1,11 +1,10 @@
 import asyncio
-import time
 from datetime import UTC, datetime, timedelta
-from typing import Literal, override
+from typing import Literal, Never, override
+from urllib.parse import urlsplit
 
 import structlog
 from bs4 import Tag
-from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -19,7 +18,13 @@ from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.media_upload import FallbackUploader
+from app.services.selenium.lazy_list import (
+    LazyListLoader,
+    LazyListTimeoutError,
+    LazyListUnavailableError,
+)
 from app.utils.datetime import constant_datetime
+from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
 
@@ -41,17 +46,25 @@ class InstagramStoriesFeed(
     async def _generate_hash(self, item: Item) -> str:
         try:
             return await HashService.hash_video_from_url(item.link)
-        except Exception:  # noqa: BLE001 - persisted media can be temporarily unavailable
+        except Exception as exc:  # noqa: BLE001 - try the link hash for unavailable media
+            logger.warning(
+                "stories_media_hash_failed",
+                error_type=type(exc).__name__,
+                **url_log_fields(item.link),
+            )
             return HashService.hash_str(item.link)
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
         uploads = await asyncio.gather(
-            *(self._upload_media(link) for link in self._extract_media_links(soup))
+            *(
+                FallbackUploader.upload_with_url(link)
+                for link in self._extract_media_links(soup)
+            )
         )
         links = [link for link in uploads if link is not None]
         logger.info("stories_media_processed", found=len(uploads), uploaded=len(links))
-        if uploads and not links:
+        if len(links) != len(uploads):
             raise self._unavailable("media_upload_error")
 
         return [
@@ -64,28 +77,32 @@ class InstagramStoriesFeed(
             for link in links
         ]
 
-    @staticmethod
-    async def _upload_media(url: str) -> str | None:
-        return await FallbackUploader.upload_with_url(url)
-
-    @staticmethod
-    def _extract_media_links(soup: Tag) -> list[str]:
-        active_tab = soup.select_one(".tabs-component__button--active")
+    def _extract_media_links(self, soup: Tag) -> list[str]:
+        active_tab = soup.select_one(".search-result .tabs-component__button--active")
         if not isinstance(active_tab, Tag):
-            return []
+            raise self._unavailable("media_response_invalid")
         if active_tab.get_text(strip=True).lower() != "stories":
-            return []
+            raise self._unavailable("media_response_invalid")
 
-        links = []
-        for media in soup.select(".profile-media-list__item"):
-            download = media.select_one("a.download-btn[href]")
-            if not isinstance(download, Tag):
-                continue
-            href = download.get("href")
-            if not isinstance(href, str):
-                continue
-            links.append(href)
-        return links
+        media = soup.select(".search-result .profile-media-list__item")
+        if not media:
+            raise self._unavailable("empty_unverified")
+        return [self._media_link(card) for card in media]
+
+    def _media_link(self, media: Tag) -> str:
+        download = media.select_one("a.download-btn[href]")
+        if not isinstance(download, Tag):
+            raise self._unavailable("media_response_invalid")
+        href = download.get("href")
+        if not isinstance(href, str):
+            raise self._unavailable("media_response_invalid")
+        try:
+            url = urlsplit(href)
+        except ValueError as exc:
+            raise self._unavailable("media_response_invalid") from exc
+        if url.scheme not in ("http", "https") or not url.netloc:
+            raise self._unavailable("media_response_invalid")
+        return href
 
     @override
     def make_actions(self, driver: WebDriver) -> None:
@@ -93,14 +110,12 @@ class InstagramStoriesFeed(
         # click can otherwise wait for Selenium's five-minute default timeout.
         driver.set_page_load_timeout(30)
 
-        try:
-            button = driver.find_element(
-                By.XPATH,
-                "/html/body/div/div[2]/div[2]/div[3]/div[2]/button[1]",
-            )
-            self._click(driver, button)
-        except NoSuchElementException:
-            pass
+        dismiss_buttons = driver.find_elements(
+            By.XPATH,
+            "/html/body/div/div[2]/div[2]/div[3]/div[2]/button[1]",
+        )
+        if dismiss_buttons:
+            self._click(driver, dismiss_buttons[0])
 
         wait = WebDriverWait(driver, self._results_wait_time)
         links = wait.until(
@@ -138,7 +153,6 @@ class InstagramStoriesFeed(
         result_classes = (result.get_attribute("class") or "").split()
         if "error-message__text" in result_classes:
             self._check_error(result)
-            return
         if (
             "tabs-component__button--disabled" in result_classes
             or not result.is_enabled()
@@ -171,11 +185,20 @@ class InstagramStoriesFeed(
         stories_result = wait.until(EC.any_of(self._loaded_error, media_ready))
         if isinstance(stories_result, WebElement):
             self._check_error(stories_result)
-            return
 
-        for _ in range(3):
-            driver.execute_script("window.scrollBy(0, 500);")
-            time.sleep(1)
+        self._load_all_media(driver)
+
+    def _load_all_media(self, driver: WebDriver) -> None:
+        try:
+            LazyListLoader(
+                driver,
+                items_selector=".search-result .profile-media-list__item",
+                trigger_selector=".search-result .profile-media-list .trigger",
+            ).load(self._results_wait_time)
+        except LazyListUnavailableError as exc:
+            raise self._unavailable("media_loading_unverified") from exc
+        except LazyListTimeoutError as exc:
+            raise self._unavailable("media_loading_timeout") from exc
 
     @staticmethod
     def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
@@ -190,7 +213,7 @@ class InstagramStoriesFeed(
                 return error
         return False
 
-    def _check_error(self, error: WebElement) -> None:
+    def _check_error(self, error: WebElement) -> Never:
         message = (error.get_attribute("textContent") or "").lower()
         if "no stories" in message:
             # Anonyig also uses this message for upstream failures.
