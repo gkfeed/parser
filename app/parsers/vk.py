@@ -18,7 +18,7 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class VkFeed(
@@ -161,20 +161,17 @@ class VkFeed(
         return self._parse_datetime(datetime_str)
 
     def _parse_datetime(self, datetime_str: str) -> datetime:
-        if datetime_str.startswith("today"):
-            today_str = datetime.now(UTC).date().strftime("%m/%d/%Y")
-            datetime_str = today_str + datetime_str.split("at")[1]
+        if datetime_str.startswith(("today", "yesterday")):
+            match = re.fullmatch(r"(today|yesterday)\s+at\s+(.+)", datetime_str)
+            if match is None:
+                raise ValueError(f"Invalid VK relative date: {datetime_str!r}")
 
-        if datetime_str.startswith("yesterday"):
-            yesterday = datetime.now(UTC).date() - timedelta(days=1)
-            yesterday_str = yesterday.strftime("%m/%d/%Y")
-            datetime_str = yesterday_str + datetime_str.split("at")[1]
+            relative_date = datetime.now(UTC).date()
+            if match.group(1) == "yesterday":
+                relative_date -= timedelta(days=1)
+            datetime_str = f"{relative_date.isoformat()} {match.group(2)}"
 
-        try:
-            return convert_datetime(datetime_str)
-        except (IndexError, ValueError) as e:
-            print(e)
-            return constant_datetime
+        return parse_datetime(datetime_str)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:

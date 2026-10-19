@@ -6,7 +6,7 @@ from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class SasflixFeed(ItemsHashExtension, HttpParserExtension):
@@ -46,7 +46,9 @@ class SasflixFeed(ItemsHashExtension, HttpParserExtension):
                     title=title,
                     text=description,
                     link=link,
-                    date=convert_datetime(pub_date),
+                    date=parse_datetime(pub_date)
+                    if pub_date.strip()
+                    else constant_datetime,
                 )
             )
         return items

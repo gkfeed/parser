@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup, Tag
 
 from app.serializers.feed import Item
 from app.services.http import HttpService
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class RSSParser:
@@ -13,7 +13,11 @@ class RSSParser:
                 title=item.get("title", ""),
                 link=item.get("link", ""),
                 text=item.get("description", ""),
-                date=convert_datetime(item.get("pub_date", "")),
+                date=(
+                    parse_datetime(pub_date)
+                    if (pub_date := item.get("pub_date", "")).strip()
+                    else constant_datetime
+                ),
                 guid=item.get("guid", ""),
             )
             for item in await RSSParser.parse_feed(url)

@@ -11,7 +11,7 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class OneFootballFeed(
@@ -48,8 +48,8 @@ class OneFootballFeed(
     async def _get_post_datetime(self, post: Tag) -> datetime:
         time_tag = post.find("time")
         datetime_attr = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
-        if isinstance(datetime_attr, str):
-            return convert_datetime(datetime_attr)
+        if isinstance(datetime_attr, str) and datetime_attr.strip():
+            return parse_datetime(datetime_attr)
         return constant_datetime
 
     @override

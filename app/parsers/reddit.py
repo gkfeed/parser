@@ -13,7 +13,7 @@ from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 
 
 class RedditFeed(
@@ -99,8 +99,8 @@ class RedditFeed(
         datetime_tag = post.find(class_="created")
         if isinstance(datetime_tag, Tag):
             datetime_str = datetime_tag.get("title")
-            if isinstance(datetime_str, str):
-                return convert_datetime(datetime_str)
+            if isinstance(datetime_str, str) and datetime_str.strip():
+                return parse_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @override

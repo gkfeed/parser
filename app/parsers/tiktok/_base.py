@@ -12,7 +12,7 @@ from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.services.ytdlp.tiktok import TikTokVideoRestricted
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
@@ -105,4 +105,4 @@ class BaseTikTokFeed(ItemsHashExtension, CacheFeedExtension, _BaseFeed, ABC):
 
     async def _get_video_publish_date(self, timestamp: float) -> datetime:
         date_str = datetime.fromtimestamp(timestamp, UTC).strftime("%Y%m%d %H:%M:%S")
-        return convert_datetime(date_str)
+        return parse_datetime(date_str)

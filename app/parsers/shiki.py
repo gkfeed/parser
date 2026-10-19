@@ -7,7 +7,7 @@ from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 
 
 class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
@@ -55,8 +55,8 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
         span_tag = post.find("span")
         time_tag = span_tag.find("time") if isinstance(span_tag, Tag) else None
         datetime_str = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
-        if isinstance(datetime_str, str):
-            return convert_datetime(datetime_str)
+        if isinstance(datetime_str, str) and datetime_str.strip():
+            return parse_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @property

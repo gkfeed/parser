@@ -6,7 +6,7 @@ from bs4 import Tag
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 
 
 class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
@@ -38,8 +38,8 @@ class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
         date_tag = post.find(class_="tweet-date")
         if isinstance(date_tag, Tag):
             date_str = date_tag.a.text if date_tag.a else ""
-            if date_str:
-                return convert_datetime(date_str)
+            if date_str.strip():
+                return parse_datetime(date_str)
         return await super()._get_post_datetime(post)
 
     @property
