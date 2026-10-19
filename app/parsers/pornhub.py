@@ -56,20 +56,18 @@ class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension)
             if not isinstance(post, Tag):
                 continue
 
-            if "href" not in post.attrs:
-                continue
-
-            try:
-                await self._get_post_title(post)
-            except ValueError:
-                continue
-
+            # Validate every card, including duplicates, before returning a feed.
+            # A partial result would hide broken markup and silently lose videos.
+            await self._get_post_title(post)
             link = await self._get_post_link(post)
             if link in seen_links:
                 continue
 
             posts.append(post)
             seen_links.add(link)
+
+        if not posts:
+            raise ValueError("No video cards found in video sections")
         return posts
 
     @override
@@ -84,9 +82,10 @@ class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        if "href" in post.attrs:
-            return self._get_base_url() + str(post["href"])
-        raise ValueError("No link found in post")
+        href = post.attrs.get("href")
+        if not isinstance(href, str) or not href.strip():
+            raise ValueError("No link found in post: missing or empty href")
+        return self._get_base_url() + href.strip()
 
     def _get_posts_url(self) -> str:
         url = self.feed.url.rstrip("/")
