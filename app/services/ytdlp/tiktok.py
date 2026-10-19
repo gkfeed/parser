@@ -55,13 +55,20 @@ def classify_profile(
         logger.warning("tiktok_profile_classified", outcome="unavailable")
         raise FeedUnavailable(url, "tiktok_profile_unavailable", retry_at)
 
-    if info and info.get("entries") and error:
+    # yt-dlp can return [None] after a playlist request fails. Only real
+    # video links make an errored extraction useful as a partial result.
+    entries = info.get("entries") if info else None
+    has_links = isinstance(entries, list) and any(
+        _has_video_link(entry) for entry in entries
+    )
+    if info is not None and has_links and error:
         logger.warning("tiktok_profile_classified", outcome="partial")
         return {**info, "tiktok_outcome": "partial", "extraction_incomplete": True}
 
-    if info is None or error:
+    if info is None or error or (entries != [] and not has_links):
         logger.warning("tiktok_profile_classified", outcome="extraction_failed")
-        raise FeedUnavailable(url, "tiktok_profile_extraction_failed")
+        retry_at = datetime.now(UTC) + timedelta(minutes=15)
+        raise FeedUnavailable(url, "tiktok_profile_extraction_failed", retry_at)
 
     if info.get("entries") == []:
         logger.warning("tiktok_profile_classified", outcome="empty_unverified")
@@ -69,3 +76,10 @@ def classify_profile(
 
     logger.info("tiktok_profile_classified", outcome="videos_found")
     return {**info, "tiktok_outcome": "videos_found"}
+
+
+def _has_video_link(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    url = entry.get("url") or entry.get("webpage_url")
+    return isinstance(url, str) and bool(url.strip())
