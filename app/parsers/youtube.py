@@ -2,9 +2,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.youtube import YoutubePublishDateService
 from app.services.ytdlp import (
     BaseExtractionMode,
@@ -35,7 +34,7 @@ class _BaseYoutubeFeed(BaseFeed):
         return urlunsplit(parsed_url._replace(path=videos_path))
 
 
-class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
+class YoutubeFeed(ItemLinkHashExtension, _BaseYoutubeFeed):
     worker_kind = WorkerKind.LIGHT
 
     async def _parse_items(self) -> list[Item]:
@@ -78,6 +77,3 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
             )
 
         return items
-
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
