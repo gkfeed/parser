@@ -7,6 +7,7 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.html import require_tag, required_attr
 
 
 class InsolaranceFeed(
@@ -23,17 +24,15 @@ class InsolaranceFeed(
     @override
     async def _get_post_title(self, post: Tag) -> str:
         a_tags = post.find_all("a")
-        if len(a_tags) >= 2 and isinstance(a_tags[-2], Tag):
-            return a_tags[-2].text.strip()
-        raise ValueError("Could not extract post title")
+        title = require_tag(
+            a_tags[-2] if len(a_tags) >= 2 else None, "Insolarance post title"
+        )
+        return title.text.strip()
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
         a_tags = post.find_all("a")
-        if len(a_tags) < 2:
-            raise ValueError("Could not extract post link")
-        tag = a_tags[-2]
-        href = tag.get("href") if isinstance(tag, Tag) else None
-        if isinstance(href, str):
-            return href
-        raise ValueError("Could not extract post link")
+        link = require_tag(
+            a_tags[-2] if len(a_tags) >= 2 else None, "Insolarance post link"
+        )
+        return required_attr(link, "href", "Insolarance post link")
