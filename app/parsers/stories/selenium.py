@@ -195,7 +195,7 @@ class InstagramStoriesFeed(
         if "no stories" in message:
             # Anonyig also uses this message for upstream failures.
             logger.warning("stories_empty_unverified")
-            return
+            raise self._unavailable("empty_unverified")
         if "private" in message:
             raise self._unavailable("private")
         if any(
