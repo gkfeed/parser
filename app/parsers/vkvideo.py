@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import override
+from typing import Any, override
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -15,6 +15,19 @@ from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.ytdlp.vkvideo import extract_channel_videos, video_link
 from app.utils.datetime import constant_datetime
+
+
+def _video_publication_date(video: dict[str, Any], link: str) -> datetime:
+    timestamp = video.get("timestamp") or video.get("release_timestamp")
+    upload_date = video.get("upload_date")
+    try:
+        if timestamp:
+            return datetime.fromtimestamp(timestamp, UTC)
+        if upload_date:
+            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
+        return constant_datetime
+    except (TypeError, ValueError, OverflowError, OSError) as error:
+        raise ValueError(f"Invalid VK Video publication date for {link}") from error
 
 
 class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
@@ -37,21 +50,7 @@ class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
         for video in info["entries"]:
             link = video_link(video)
 
-            timestamp = video.get("timestamp") or video.get("release_timestamp")
-            upload_date = video.get("upload_date")
-            try:
-                if timestamp:
-                    published_at = datetime.fromtimestamp(timestamp, UTC)
-                elif upload_date:
-                    published_at = datetime.strptime(upload_date, "%Y%m%d").replace(
-                        tzinfo=UTC
-                    )
-                else:
-                    published_at = constant_datetime
-            except (TypeError, ValueError, OverflowError, OSError) as error:
-                raise ValueError(
-                    f"Invalid VK Video publication date for {link}"
-                ) from error
+            published_at = _video_publication_date(video, link)
 
             items.append(
                 Item(
