@@ -14,6 +14,7 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
 from app.utils.datetime import convert_datetime
+from app.utils.html import require_tag, required_text
 from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
@@ -112,10 +113,8 @@ class RedditFeed(
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        title_tag = post.find(class_="post_title")
-        if isinstance(title_tag, Tag):
-            return title_tag.text
-        return ""
+        title_tag = require_tag(post.find(class_="post_title"), "Reddit post title")
+        return required_text(title_tag, "Reddit post title", separator=" ")
 
     @override
     async def _get_post_text(self, post: Tag) -> str:

@@ -6,7 +6,7 @@ from bs4 import Tag
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.utils.html import require_tag, required_attr
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class Porno365Feed(PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension):
@@ -31,10 +31,13 @@ class Porno365Feed(PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension)
     async def _get_post_title(self, post: Tag) -> str:
         title = post.find("p")
         if isinstance(title, Tag):
-            return title.text.strip()
+            return required_text(title, "Porno365 post title", separator=" ")
 
         image = require_tag(post.find("img"), "Porno365 post title")
-        return required_attr(image, "alt", "Porno365 post title").strip()
+        image_title = required_attr(image, "alt", "Porno365 post title").strip()
+        if not image_title:
+            raise ValueError("Empty alt text for Porno365 post title")
+        return image_title
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
