@@ -11,7 +11,6 @@ from app.services.ytdlp import (
     PlaylistExtractionMode,
 )
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
-from app.utils.datetime import constant_datetime
 
 
 class _BaseYoutubeFeed(BaseFeed):
@@ -67,12 +66,14 @@ class YoutubeFeed(ItemLinkHashExtension, _BaseYoutubeFeed):
             published_at = YoutubePublishDateService.resolve(
                 video_info, channel_publish_dates
             )
+            if published_at is None:
+                raise ValueError(f"YouTube video has no publish date: {video_url}")
 
             items.append(
                 Item(
                     title="YT: " + channel_name,
                     text=title,
-                    date=published_at or constant_datetime,
+                    date=published_at,
                     link=video_url,
                 )
             )
