@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 from typing import override
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
@@ -13,14 +14,22 @@ class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        self._get_ongoings_container(BeautifulSoup(html, "html.parser"))
+
+    def _get_ongoings_container(self, soup: BeautifulSoup) -> Tag:
+        container = soup.find("div", class_="fc-ongoings")
+        if not isinstance(container, Tag):
+            raise FeedUnavailable(self.feed.url, "missing_ongoings_container")
+        return container
+
     @property
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
 
-        container = soup.find("div", class_="fc-ongoings")
-        if not isinstance(container, Tag):
-            return []
+        container = self._get_ongoings_container(soup)
 
         return [a for a in container.find_all("article") if isinstance(a, Tag)]
 
