@@ -2,25 +2,32 @@ import asyncio
 import base64
 import re
 from datetime import timedelta
-from typing import override
+from io import BytesIO
+from typing import Literal, override
 from urllib.parse import urlparse
 
+import structlog
+from bs4 import BeautifulSoup
 from bs4.element import Tag
+from PIL import Image
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.http import HttpRequestError
 from app.utils.datetime import constant_datetime
-from app.utils.media import detect_mime_type
 from app.workers.http import get_html
+
+logger = structlog.get_logger(__name__)
 
 
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
@@ -48,10 +55,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
-
-        media_list_items = soup.find_all(class_="profile-media-list__item")
-
-        media = [item for item in media_list_items if isinstance(item, Tag)]
+        media = soup.select(".search-result .profile-media-list__item")
         semaphore = asyncio.Semaphore(self._image_download_concurrency)
 
         async def create_item(item: Tag) -> Item | None:
@@ -59,57 +63,69 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 return await self._create_item_from_media(item)
 
         items = await asyncio.gather(*(create_item(item) for item in media))
+        # Only explicitly unsupported videos may be omitted.
         return [item for item in items if item is not None]
 
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        result = soup.select_one(".search-result")
+        if result is None:
+            raise FeedUnavailable(self.feed.url, "missing_search_result")
+        if result.select_one(".loader-component") is not None:
+            raise FeedUnavailable(self.feed.url, "media_loading_unverified")
+        error = result.select_one(".error-message__text")
+        if error is None:
+            error = result.select_one(".error-message")
+        if error is not None and error.get_text(strip=True):
+            self._check_error(error.get_text(" ", strip=True))
+            if result.select_one(".profile-media-list__item") is not None:
+                raise ValueError(
+                    "Anonyig response contains both media and an empty result"
+                )
+            return
+        if result.select_one(".profile-media-list__item") is None:
+            raise FeedUnavailable(self.feed.url, "empty_unverified")
+
     async def _create_item_from_media(self, media: Tag) -> Item | None:
-        img = media.find("img")
-        if not isinstance(img, Tag):
+        if media.find(class_="tags__item--video") is not None:
+            # Video links expire. Skip every explicitly marked video, including
+            # links without an .mp4 suffix, rather than publishing its thumbnail.
+            logger.info("anonyig_media_skipped", reason="unsupported_video")
             return None
 
-        is_video = media.find(class_="tags__item--video") is not None
-
-        link_tag = media.find("a")
-        media_url = link_tag.get("href") if isinstance(link_tag, Tag) else None
-
-        if is_video and isinstance(media_url, str) and ".mp4" in media_url:
-            print(
-                f"warning: Instagram video is tmp unavailable because media links expire: {media_url}"
-            )
-            # video_html = (
-            #     f'<video src="{media_url}" controls preload="metadata" '
-            #     f'style="max-width: 100%; height: auto;"></video>'
-            # )
-            # return Item(
-            #     title="inst: " + self._user_name,
-            #     text=f"{self._user_name}<br>{video_html}",
-            #     date=constant_datetime,
-            #     link=self.feed.url,
-            # )
-            return None
+        img = media.select_one("img")
+        if img is None:
+            raise ValueError("Anonyig media is missing an image")
 
         src = img.get("src")
-        if isinstance(src, list):
-            src = src[0]
-
-        if not src or not isinstance(src, str):
-            return None
+        if not isinstance(src, str) or not src.strip():
+            raise ValueError("Anonyig image is missing a valid src")
+        src = src.strip()
 
         if src.startswith("data:"):
-            # Handle data URI
+            header, separator, encoded = src.partition(",")
+            if not separator or not re.fullmatch(
+                r"data:image/[a-zA-Z0-9.+-]+;base64", header
+            ):
+                raise ValueError("Anonyig image has an invalid base64 data URI header")
             try:
-                header, encoded = src.split(",", 1)
-                mime_type = header.split(";")[0].split(":")[1]
-                # encoded is already base64 string
-            except (ValueError, IndexError):
-                return None
+                img_bytes = base64.b64decode(encoded, validate=True)
+            except ValueError as exc:
+                raise ValueError("Anonyig image contains invalid base64") from exc
+            mime_type = self._image_mime_type(img_bytes)
+            if header[5:-7].lower() != mime_type:
+                raise ValueError("Anonyig image MIME type does not match its data")
         else:
-            # Handle remote URL
+            parsed = urlparse(src)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                raise ValueError("Anonyig image has an invalid URL")
             try:
                 img_bytes = await get_html(src)
-                encoded = base64.b64encode(img_bytes).decode("utf-8")
-                mime_type = detect_mime_type(img_bytes)
-            except HttpRequestError:
-                return None
+            except HttpRequestError as exc:
+                raise FeedUnavailable(self.feed.url, "image_download_failed") from exc
+            mime_type = self._image_mime_type(img_bytes)
+            encoded = base64.b64encode(img_bytes).decode("utf-8")
 
         img_tag = (
             f'<img src="data:{mime_type};base64,{encoded}" alt="{self._user_name}" />'
@@ -122,8 +138,28 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             link=self.feed.url,
         )
 
+    @staticmethod
+    def _image_mime_type(content: bytes) -> str:
+        try:
+            with Image.open(BytesIO(content)) as image:
+                mime_type = Image.MIME.get(image.format or "")
+                image.verify()
+            with Image.open(BytesIO(content)) as image:
+                image.load()
+        except (OSError, ValueError, Image.DecompressionBombError) as exc:
+            raise ValueError("Anonyig image contains invalid image data") from exc
+        if mime_type is None or not mime_type.startswith("image/"):
+            raise ValueError("Anonyig image has an unsupported format")
+        return mime_type
+
     @override
     def make_actions(self, driver: WebDriver):
+        try:
+            self._search_media(driver)
+        except (NoSuchElementException, TimeoutException) as exc:
+            raise FeedUnavailable(self.feed.url, "browser_action_failed") from exc
+
+    def _search_media(self, driver: WebDriver) -> None:
         try:
             reject_consent = driver.find_element(
                 By.CSS_SELECTOR, ".fc-cta-do-not-consent"
@@ -147,15 +183,18 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
         result = WebDriverWait(driver, self._results_wait_time).until(
             expected_conditions.any_of(
+                self._loaded_error,
                 expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".profile-media-list__item")
-                ),
-                expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".error-message")
+                    (By.CSS_SELECTOR, ".search-result .profile-media-list__item")
                 ),
             )
         )
+        if not isinstance(result, WebElement):
+            raise FeedUnavailable(self.feed.url, "browser_action_failed")
         if "error-message" in (result.get_attribute("class") or "").split():
+            errors = result.find_elements(By.CSS_SELECTOR, ".error-message__text")
+            error = errors[0] if errors else result
+            self._check_error(error.get_attribute("textContent") or "")
             return
 
         search_result = driver.find_element(By.CSS_SELECTOR, ".search-result")
@@ -169,6 +208,33 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             )
 
         self._load_more_media(driver)
+
+    @staticmethod
+    def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
+        if driver.find_elements(By.CSS_SELECTOR, ".search-result .loader-component"):
+            return False
+        for error in driver.find_elements(
+            By.CSS_SELECTOR, ".search-result .error-message"
+        ):
+            texts = error.find_elements(By.CSS_SELECTOR, ".error-message__text")
+            text = texts[0] if texts else error
+            if (text.get_attribute("textContent") or "").strip():
+                return error
+        return False
+
+    def _check_error(self, message: str) -> None:
+        message = " ".join(message.lower().split()).rstrip(".! ")
+        if message in ("no posts", "no posts found", "no publications found"):
+            logger.info("anonyig_posts_empty")
+            return
+        if "private" in message:
+            raise FeedUnavailable(self.feed.url, "private")
+        if any(
+            text in message
+            for text in ("user not found", "profile not found", "account not found")
+        ):
+            raise FeedUnavailable(self.feed.url, "not_found")
+        raise FeedUnavailable(self.feed.url, "upstream_error")
 
     def _load_more_media(self, driver: WebDriver) -> None:
         media_selector = ".profile-media-list__item"
@@ -185,20 +251,20 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 "arguments[0].scrollIntoView({block: 'center'});", trigger
             )
 
-            def media_count_increased(
+            def media_loading_finished(
                 current_driver: WebDriver, previous_count: int = media_count
             ) -> bool:
                 return (
                     len(current_driver.find_elements(By.CSS_SELECTOR, media_selector))
                     > previous_count
-                )
+                ) or not current_driver.find_elements(By.CSS_SELECTOR, trigger_selector)
 
             try:
                 WebDriverWait(driver, self._load_more_wait_time).until(
-                    media_count_increased
+                    media_loading_finished
                 )
-            except TimeoutException:
-                break
+            except TimeoutException as exc:
+                raise FeedUnavailable(self.feed.url, "media_loading_timeout") from exc
 
             media_count = len(driver.find_elements(By.CSS_SELECTOR, media_selector))
 
