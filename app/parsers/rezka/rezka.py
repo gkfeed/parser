@@ -33,15 +33,22 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
     @override
     async def get_html(self, url: str, *, attempts: int = 3) -> bytes:
         while True:
-            try:
-                return await super().get_html(url)
-            except RezkaPageUnavailable as exc:
-                attempts -= 1
-                if attempts <= 0 or not exc.reason.startswith(
-                    ("HTTP ERROR 5", "ERR_", "net::ERR_")
-                ):
-                    raise
+            html = await self._get_html_attempt(url, attempts=attempts)
+            if html is not None:
+                return html
+            attempts -= 1
             await asyncio.sleep(2)
+
+    async def _get_html_attempt(self, url: str, *, attempts: int) -> bytes | None:
+        """Return None only when a transient page error permits another attempt."""
+        try:
+            return await super().get_html(url)
+        except RezkaPageUnavailable as exc:
+            if attempts <= 1 or not exc.reason.startswith(
+                ("HTTP ERROR 5", "ERR_", "net::ERR_")
+            ):
+                raise
+            return None
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
