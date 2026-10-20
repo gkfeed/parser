@@ -22,8 +22,12 @@ class LiquidpediaClient:
         self._fetch = fetch
 
     async def get_page_html(self, page_url: str) -> str:
+        return self.parse_page_html(await self._fetch(self._get_api_url(page_url)))
+
+    @staticmethod
+    def parse_page_html(response_body: bytes) -> str:
         try:
-            response = json.loads(await self._fetch(self._get_api_url(page_url)))
+            response = json.loads(response_body)
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as error:
             raise ValueError("Invalid Liquipedia API response") from error
 

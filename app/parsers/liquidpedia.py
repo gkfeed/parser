@@ -21,12 +21,23 @@ class LiquidpediaFeed(
 ):
     _headers: ClassVar[dict[str, str]] = LiquidpediaClient.headers
 
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        page_html = LiquidpediaClient.parse_page_html(html)
+        self._get_matches(BeautifulSoup(page_html, "html.parser"))
+
     @property
     @override
     async def _posts(self) -> list[Tag]:
         html = await LiquidpediaClient(self.get_html).get_page_html(self.feed.url)
-        soup = BeautifulSoup(html, "html.parser")
-        matches = self._get_upcoming_matches(soup)
+        return self._get_matches(BeautifulSoup(html, "html.parser"))
+
+    @classmethod
+    def _get_matches(cls, soup: BeautifulSoup) -> list[Tag]:
+        if soup.select_one(".mw-message-box-error, .scribunto-error, .errorbox"):
+            raise ValueError("Liquipedia page contains a rendering error")
+
+        matches = cls._get_upcoming_matches(soup)
         if matches:
             return matches
 
@@ -34,7 +45,24 @@ class LiquidpediaFeed(
         # heading. Their recent matches are rendered using table2 markup. The
         # rows are not guaranteed to be ``tr`` elements, so select the row
         # class independently of the element name.
-        return list(soup.select(".match-table-wrapper .table2__row--body"))
+        matches = list(soup.select(".match-table-wrapper .table2__row--body"))
+        if matches:
+            return matches
+
+        if soup.select_one(".match-info") is not None:
+            raise ValueError("Liquipedia upcoming matches structure is invalid")
+
+        for table in soup.select(".match-table-wrapper"):
+            if table.select_one(".table2__row--head") is None:
+                raise ValueError("Liquipedia recent matches table is invalid")
+
+        # A missing match section is normal for teams with no matches, but
+        # missing selectors alone cannot distinguish them from error pages.
+        team_header = soup.select_one('[data-infobox-type="Team"] .infobox-header')
+        if team_header is None or not team_header.get_text(strip=True):
+            raise ValueError("Liquipedia team page structure not found")
+
+        return []
 
     @staticmethod
     def _get_upcoming_matches(soup: BeautifulSoup) -> list[Tag]:
@@ -44,9 +72,18 @@ class LiquidpediaFeed(
 
         container = heading.parent.find_next_sibling()
         if not isinstance(container, Tag):
-            return []
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Liquipedia upcoming matches container not found"
+            )
 
-        return list(container.select(".match-info"))
+        matches = list(container.select(".match-info, .table2__row--body"))
+        if matches:
+            return matches
+
+        if container.select_one(".table2__row--head") is None:
+            raise ValueError("Liquipedia upcoming matches structure is invalid")
+
+        return []
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
