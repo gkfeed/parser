@@ -42,6 +42,19 @@ def _video_link(video: dict[str, Any]) -> str:
     return link
 
 
+def _video_publication_date(video: dict[str, Any], link: str) -> datetime:
+    timestamp = video.get("timestamp") or video.get("release_timestamp")
+    upload_date = video.get("upload_date")
+    try:
+        if timestamp:
+            return datetime.fromtimestamp(timestamp, UTC)
+        if upload_date:
+            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
+        return constant_datetime
+    except (TypeError, ValueError, OverflowError, OSError) as error:
+        raise ValueError(f"Invalid VK Video publication date for {link}") from error
+
+
 def _validate_extraction(
     url: str, info: dict[str, Any] | None, error: str | None
 ) -> dict[str, Any]:
@@ -96,22 +109,7 @@ class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
         items = []
         for video in info["entries"]:
             link = _video_link(video)
-
-            timestamp = video.get("timestamp") or video.get("release_timestamp")
-            upload_date = video.get("upload_date")
-            try:
-                if timestamp:
-                    published_at = datetime.fromtimestamp(timestamp, UTC)
-                elif upload_date:
-                    published_at = datetime.strptime(upload_date, "%Y%m%d").replace(
-                        tzinfo=UTC
-                    )
-                else:
-                    published_at = constant_datetime
-            except (TypeError, ValueError, OverflowError, OSError) as error:
-                raise ValueError(
-                    f"Invalid VK Video publication date for {link}"
-                ) from error
+            published_at = _video_publication_date(video, link)
 
             items.append(
                 Item(
