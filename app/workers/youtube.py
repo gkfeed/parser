@@ -19,12 +19,17 @@ class _YtdlpLogger:
         self.warnings = 0
         self.errors = 0
         self.last_error: str | None = None
+        self.incomplete_reason: str | None = None
 
     def debug(self, message: str) -> None:
         self.logger.debug("yt_dlp_message", message=message)
 
     def warning(self, message: str) -> None:
         self.warnings += 1
+        # YouTube tab extraction stops pagination after this warning. Retry
+        # warnings alone do not mean the eventual result is incomplete.
+        if "Incomplete data received" in message and "Retrying" not in message:
+            self.incomplete_reason = message
         self.logger.warning("yt_dlp_warning", message=message)
 
     def error(self, message: str) -> None:
@@ -56,14 +61,13 @@ async def extract_info(
 
     if result_handler is not None:
         info = result_handler(url, info, extraction_logger.last_error)
+    elif extraction_logger.errors or extraction_logger.incomplete_reason:
+        # Warnings may describe source limits, such as hidden playlist videos.
+        # Errors and exhausted incomplete-data retries invalidate the result.
+        reason = extraction_logger.last_error or extraction_logger.incomplete_reason
+        raise ValueError(f"yt-dlp extraction failed: {reason}")
     if info is None:
         raise ValueError("Could not extract info from URL")
-    if (
-        result_handler is None
-        and extraction_logger.errors
-        and info.get("entries") == []
-    ):
-        raise ValueError("yt-dlp reported errors and returned no entries")
     if keys:
         info = {key: info[key] for key in keys}
     if not info:
