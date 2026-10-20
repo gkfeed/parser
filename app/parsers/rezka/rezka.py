@@ -156,10 +156,14 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
         heading = page.select_one(".b-post__title h1")
         episodes = page.select_one(".b-simple_episode__item")
         if is_primary:
-            return self._page_mode is RezkaPageMode.FILM or bool(episodes) or not heading
-        return bool(
-            heading and episodes and page.select_one(f'#post_id[value="{show_id}"]')
-        )
+            return (
+                self._page_mode is RezkaPageMode.FILM or bool(episodes) or not heading
+            )
+        if not heading or not page.select_one(f'#post_id[value="{show_id}"]'):
+            return False
+        if self._page_mode is RezkaPageMode.FILM:
+            return bool(page.select_one("h2"))
+        return bool(episodes)
 
     @cached_property
     def _show_urls(self) -> list[str]:
@@ -168,9 +172,13 @@ class RezkaFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
             r"(.*/\d+-.+)-(\d{4})(?:-(?:u|latest))?\.html",
             parts.path,
         )
-        if self._page_mode is RezkaPageMode.FILM or match is None:
+        if match is None:
             return [parts.geturl()]
         prefix, year = match.groups()
+        if self._page_mode is RezkaPageMode.FILM:
+            # Moved films can return HTTP 500 at the old URL in a fresh session.
+            paths = [parts.path, f"{prefix}-{year}-latest.html"]
+            return [parts._replace(path=path).geturl() for path in dict.fromkeys(paths)]
         paths = [parts.path, f"{prefix}-{year}-u.html", f"{prefix}-{year}-latest.html"]
         if not prefix.endswith("-serial"):
             paths.append(f"{prefix}-serial-{year}-latest.html")
