@@ -23,12 +23,17 @@ bs4==0.0.2
     # via parser
 certifi==2025.7.14
     # via
+    #   curl-cffi
     #   requests
     #   selenium
-cffi==1.17.1 ; implementation_name != 'pypy' and os_name == 'nt'
-    # via trio
+cffi==2.1.1 ; (implementation_name == 'cpython' and os_name != 'nt') or (implementation_name != 'pypy' and os_name == 'nt')
+    # via
+    #   curl-cffi
+    #   trio
 charset-normalizer==3.4.2
     # via requests
+curl-cffi==0.16.3 ; implementation_name == 'cpython'
+    # via yt-dlp
 frozenlist==1.7.0
     # via
     #   aiohttp
@@ -64,7 +69,7 @@ propcache==0.3.2
     # via
     #   aiohttp
     #   yarl
-pycparser==2.22 ; implementation_name != 'pypy' and os_name == 'nt'
+pycparser==2.22 ; (implementation_name != 'PyPy' and implementation_name != 'pypy' and os_name == 'nt') or (implementation_name == 'cpython' and os_name != 'nt')
     # via cffi
 pydantic==2.11.7
     # via parser

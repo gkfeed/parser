@@ -32,7 +32,11 @@ class HttpService:
 
     @classmethod
     async def get(cls, url: str, headers: dict = headers) -> bytes:
-        _, content = await cls.get_with_status(url, headers=headers)
+        status, content = await cls.get_with_status(url, headers=headers)
+        if status >= 400:
+            raise HttpRequestError(
+                f"HTTP request failed with status {status}", status=status
+            )
         return content
 
     @classmethod

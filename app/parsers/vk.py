@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urlparse
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -13,24 +13,37 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class VkFeed(
     PostToItemsMixin,
-    ItemsHashExtension,
+    ItemLinkHashExtension,
     SeleniumParserExtension,
     CacheFeedExtension,
 ):
     _cache_storage_time = timedelta(hours=1)
     _selenium_wait_time = 5
     _post_selector = '[data-testid="post"][data-post-id]'
+    _empty_selector = (
+        '#page-wall [data-testid="feed-empty-result"], '
+        '#page-wall [data-testid="empty_wall"]'
+    )
     _challenge_attempts = 3
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.select_one(f"{self._post_selector}, .wall_post_cont") is not None:
+            return
+        if soup.select_one("button.start") is not None:
+            raise FeedUnavailable(url, "browser_challenge")
+        if soup.select_one(self._empty_selector) is not None:
+            return
+        raise FeedUnavailable(url, "missing_wall")
 
     @property
     @override
@@ -44,43 +57,38 @@ class VkFeed(
             for post in soup.find_all(class_="wall_post_cont")
             if isinstance(post, Tag)
         ]
-        if legacy_posts:
-            return legacy_posts
-
-        if soup.select_one("button.start"):
-            raise FeedUnavailable(self.feed.url, "browser_challenge")
-
-        return []
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
+        return legacy_posts
 
     @override
     def make_actions(self, driver: WebDriver):
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
+        empty = ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector))
+        page_ready = ec.any_of(posts, empty)
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
         wait = WebDriverWait(driver, 30)
         try:
             for _ in range(self._challenge_attempts):
-                if posts(driver):
+                if page_ready(driver):
                     return
 
                 buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
                 if not buttons:
+                    wait.until(page_ready)
                     return
 
                 button = wait.until(start)
                 button.click()
                 # Hiding the button starts the challenge; it does not finish it.
                 wait.until(
-                    ec.any_of(posts, challenge_error, ec.invisibility_of_element(button))
+                    ec.any_of(
+                        page_ready, challenge_error, ec.invisibility_of_element(button)
+                    )
                 )
-                wait.until(ec.any_of(posts, challenge_error, start))
-                if posts(driver):
+                wait.until(ec.any_of(page_ready, challenge_error, start))
+                if page_ready(driver):
                     return
                 if not start(driver):
                     raise FeedUnavailable(self.feed.url, "browser_challenge")

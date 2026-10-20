@@ -6,18 +6,16 @@ from urllib.parse import urljoin
 from bs4 import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
 from app.utils.datetime import parse_datetime
 
 
 class RedditFeed(
-    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
+    PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension
 ):
     _cache_storage_time = timedelta(hours=1)
     _headers: ClassVar[dict[str, str]] = {"User-Agent": "gkfeed-parser/0.1"}
@@ -39,32 +37,34 @@ class RedditFeed(
         self.__base_urls_cache = self.__url_ranker.get_ranked_urls(all_urls)
         return self.__base_urls_cache
 
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
-
     @property
     @override
     async def _posts(self) -> list[Tag]:
         base_urls = await self._get_base_urls()
 
         for base_url in base_urls:
-            try:
-                url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
-                soup = await self.get_soup(url)
-                posts = [
-                    post
-                    for post in soup.find_all(class_="post")
-                    if isinstance(post, Tag)
-                ]
-                if not posts:
-                    self.__url_ranker.demote_url(base_url)
-                    continue
-                self.__url_ranker.promote_url(base_url)
+            posts = await self._get_instance_posts(base_url)
+            if posts:
                 return posts
-            except Exception:  # noqa: BLE001 - try the next public instance on any failure
+
+        return []
+
+    async def _get_instance_posts(self, base_url: str) -> list[Tag]:
+        try:
+            url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
+            soup = await self.get_soup(url)
+            posts = [
+                post
+                for post in soup.find_all(class_="post")
+                if isinstance(post, Tag)
+            ]
+            if not posts:
                 self.__url_ranker.demote_url(base_url)
-                continue
+                return []
+            self.__url_ranker.promote_url(base_url)
+            return posts
+        except Exception:  # noqa: BLE001 - try the next public instance on any failure
+            self.__url_ranker.demote_url(base_url)
 
         return []
 
