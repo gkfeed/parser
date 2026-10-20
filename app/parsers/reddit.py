@@ -4,7 +4,7 @@ from typing import ClassVar, override
 from urllib.parse import urljoin
 
 import structlog
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
@@ -83,14 +83,18 @@ class RedditFeed(
 
     async def _get_instance_posts(self, base_url: str) -> list[Tag]:
         url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
-        soup = await self.get_soup(url)
+        return self._extract_posts(await self.get_soup(url))
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        self._extract_posts(BeautifulSoup(html, "html.parser"))
+
+    def _extract_posts(self, soup: BeautifulSoup) -> list[Tag]:
         if soup.select_one("#challenge-form, #cf-challenge-running, .cf-turnstile"):
             raise FeedUnavailable(self.feed.url, "reddit_mirror_challenge")
         if soup.select_one("#error"):
             raise FeedUnavailable(self.feed.url, "reddit_mirror_error_page")
-        posts = [
-            post for post in soup.find_all(class_="post") if isinstance(post, Tag)
-        ]
+        posts = [post for post in soup.find_all(class_="post") if isinstance(post, Tag)]
         if posts:
             return posts
 
