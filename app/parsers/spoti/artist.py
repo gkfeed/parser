@@ -1,5 +1,9 @@
+import json
+from base64 import b64decode
 from datetime import timedelta
+from typing import override
 
+from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -12,6 +16,69 @@ from app.utils.datetime import constant_datetime
 class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        discography_url = self.feed.url.removesuffix("/") + "/discography"
+        if (
+            url == discography_url
+            and soup.title
+            and "Page not found" in soup.title.text
+        ):
+            # Only the discography route may be missing; try the artist root.
+            return
+        self._validate_release_page(soup)
+
+    def _validate_release_page(self, soup: BeautifulSoup) -> None:
+        if soup.title and "Page not found" in soup.title.text:
+            raise ValueError("Spotify artist page not found")
+        page_url = soup.find("meta", property="og:url")
+        canonical = soup.find("link", rel="canonical")
+        expected_url = self.feed.url.removesuffix("/")
+        meta_matches = (
+            isinstance(page_url, Tag) and page_url.get("content") == expected_url
+        )
+        canonical_matches = isinstance(canonical, Tag) and canonical.get("href") in (
+            expected_url,
+            expected_url + "/discography",
+        )
+        if not meta_matches and not canonical_matches:
+            raise ValueError("Spotify page does not identify the requested artist")
+        if soup.select_one('a[href^="/album"]') is not None:
+            return
+        if self._has_confirmed_empty_discography(soup):
+            return
+        raise ValueError(
+            "Spotify releases missing without a confirmed empty discography"
+        )
+
+    def _has_confirmed_empty_discography(self, soup: BeautifulSoup) -> bool:
+        state_tag = soup.find("script", id="initialState")
+        if state_tag is None:
+            return False
+        # Spotify's artist state lists each release category. Metadata and a
+        # missing album selector alone do not prove that the artist is empty.
+        artist_id = self.feed.url.removesuffix("/").rsplit("/", maxsplit=1)[-1]
+        try:
+            state = json.loads(b64decode(state_tag.get_text(strip=True), validate=True))
+            artist = state["entities"]["items"][f"spotify:artist:{artist_id}"]
+            discography = artist["discography"]
+            return (
+                artist["__typename"] == "Artist"
+                and discography["latest"] is None
+                and all(
+                    discography[category]["items"] == []
+                    for category in (
+                        "albums",
+                        "singles",
+                        "compilations",
+                        "popularReleasesAlbums",
+                    )
+                )
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ValueError("Invalid Spotify artist discography state") from exc
 
     async def _parse_items(self) -> list[Item]:
         soup = await self._get_discography_soup()
@@ -35,6 +102,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         return soup
 
     async def _parse_releases_links(self, soup) -> list[Tag]:
+        self._validate_release_page(soup)
         return list(soup.select('a[href^="/album"]'))
 
     @property
