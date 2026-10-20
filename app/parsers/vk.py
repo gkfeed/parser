@@ -61,6 +61,13 @@ class VkFeed(
 
     @override
     def make_actions(self, driver: WebDriver):
+        for _ in range(self._challenge_attempts):
+            if self._attempt_challenge(driver):
+                return
+
+        raise FeedUnavailable(self.feed.url, "browser_challenge")
+
+    def _attempt_challenge(self, driver: WebDriver) -> bool:
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
@@ -70,30 +77,29 @@ class VkFeed(
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
         wait = WebDriverWait(driver, 30)
         try:
-            for _ in range(self._challenge_attempts):
-                if page_ready(driver):
-                    return
+            if page_ready(driver):
+                return True
 
-                buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
-                if not buttons:
-                    wait.until(page_ready)
-                    return
+            buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
+            if not buttons:
+                wait.until(page_ready)
+                return True
 
-                button = wait.until(start)
-                button.click()
-                # Hiding the button starts the challenge; it does not finish it.
-                wait.until(
-                    ec.any_of(
-                        page_ready, challenge_error, ec.invisibility_of_element(button)
-                    )
+            button = wait.until(start)
+            button.click()
+            # Hiding the button starts the challenge; it does not finish it.
+            wait.until(
+                ec.any_of(
+                    page_ready, challenge_error, ec.invisibility_of_element(button)
                 )
-                wait.until(ec.any_of(page_ready, challenge_error, start))
-                if page_ready(driver):
-                    return
-                if not start(driver):
-                    raise FeedUnavailable(self.feed.url, "browser_challenge")
+            )
+            wait.until(ec.any_of(page_ready, challenge_error, start))
+            if page_ready(driver):
+                return True
+            if not start(driver):
+                raise FeedUnavailable(self.feed.url, "browser_challenge")
 
-            raise FeedUnavailable(self.feed.url, "browser_challenge")
+            return False
         except (TimeoutException, WebDriverException) as error:
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
 
@@ -141,16 +147,18 @@ class VkFeed(
             'a[href*="photo-"][style*="background-image"], '
             '.page_post_thumb_wrap[style*="background-image"]'
         )
-        if isinstance(thumbnail, Tag):
-            style = thumbnail.get("style")
-            if isinstance(style, str):
-                match = re.search(
-                    r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style
-                )
-                if match and self._is_http_url(match.group(2)):
-                    return match.group(2)
+        if not isinstance(thumbnail, Tag):
+            return None
 
-        return None
+        style = thumbnail.get("style")
+        if not isinstance(style, str):
+            return None
+
+        match = re.search(r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style)
+        if not match or not self._is_http_url(match.group(2)):
+            return None
+
+        return match.group(2)
 
     @staticmethod
     def _is_http_url(value: str) -> bool:

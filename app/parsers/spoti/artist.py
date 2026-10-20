@@ -7,6 +7,7 @@ from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
+from app.utils.html import required_attr, required_text
 
 
 class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
@@ -45,11 +46,16 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
     async def _parse_artist_name(self, soup) -> str:
         meta_title = soup.find("meta", property="og:title")
         if meta_title and isinstance(meta_title, Tag) and meta_title.get("content"):
-            return str(meta_title["content"])
+            artist_name = required_attr(
+                meta_title, "content", "Spotify artist name"
+            ).strip()
+            if not artist_name:
+                raise ValueError("Empty content for Spotify artist name")
+            return artist_name
 
         h1 = soup.find("h1")
         if h1 and h1.text and h1.text != "Your Library":
-            return h1.text
+            return required_text(h1, "Spotify artist name", separator=" ")
 
         links = soup.find_all("a")
         for link in links:
@@ -58,13 +64,11 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
             href = link.get("href")
             if not isinstance(href, str) or not href.startswith("/artist"):
                 continue
-            return link.text
+            return required_text(link, "Spotify artist name", separator=" ")
         raise ValueError("Artist name not found")
 
     def _extract_text(self, link: Tag) -> str:
-        if isinstance(link.text, str):
-            return link.text
-        raise ValueError("Link text not found or not a string")
+        return required_text(link, "Spotify release title", separator=" ")
 
     def _extract_title(self, link: Tag, artist_name: str) -> str:
         text = self._extract_text(link)

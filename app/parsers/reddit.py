@@ -1,9 +1,8 @@
-import json
 from datetime import datetime, timedelta
+from functools import cached_property
 from typing import ClassVar, override
 from urllib.parse import urljoin
 
-import structlog
 from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
@@ -11,16 +10,9 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.services.http import HttpService
-from app.services.url_ranker import URLRanker
+from app.services.redlib import InvalidRedlibPage, RedlibClient
 from app.utils.datetime import parse_datetime
-from app.utils.logging import url_log_fields
-
-logger = structlog.get_logger(__name__)
-
-
-class _InvalidRedditPage(ValueError):
-    """A mirror returned neither posts nor a confirmed empty listing."""
+from app.utils.html import require_tag, required_text
 
 
 class RedditFeed(
@@ -28,62 +20,16 @@ class RedditFeed(
 ):
     _cache_storage_time = timedelta(hours=1)
     _headers: ClassVar[dict[str, str]] = {"User-Agent": "gkfeed-parser/0.1"}
-    __instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
-    __base_urls_cache: list[str] | None = None
-    __url_ranker = URLRanker(data_file="data/reddit_url_ranks.json")
 
-    async def _get_base_urls(self) -> list[str]:
-        if self.__base_urls_cache:
-            return self.__base_urls_cache
-
-        response = await HttpService.get(self.__instances_url)
-        instances_data = json.loads(response)
-        all_urls = [
-            instance["url"]
-            for instance in instances_data["instances"]
-            if "url" in instance
-        ]
-        self.__base_urls_cache = self.__url_ranker.get_ranked_urls(all_urls)
-        return self.__base_urls_cache
+    @cached_property
+    def _redlib_client(self) -> RedlibClient:
+        return RedlibClient(self.get_html)
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        base_urls = await self._get_base_urls()
-        last_error: FeedUnavailable | _InvalidRedditPage | None = None
-
-        for base_url in base_urls:
-            try:
-                posts = await self._get_instance_posts(base_url)
-            except (FeedUnavailable, _InvalidRedditPage) as error:
-                last_error = error
-                self.__url_ranker.demote_url(base_url)
-                logger.warning(
-                    "reddit_mirror_failed",
-                    **url_log_fields(base_url, field="mirror"),
-                    reason=(
-                        error.reason
-                        if isinstance(error, FeedUnavailable)
-                        else "invalid_page"
-                    ),
-                )
-                continue
-
-            self.__url_ranker.promote_url(base_url)
-            return posts
-
-        reason = "no_mirrors_available" if last_error is None else "invalid_page"
-        retry_at = None
-        if isinstance(last_error, FeedUnavailable):
-            reason = last_error.reason
-            retry_at = last_error.retry_at
-        raise FeedUnavailable(
-            self.feed.url, f"reddit_mirrors_exhausted:{reason}", retry_at
-        ) from last_error
-
-    async def _get_instance_posts(self, base_url: str) -> list[Tag]:
-        url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
-        return self._extract_posts(await self.get_soup(url))
+        html = await self._redlib_client.get_page_html(self.feed.url)
+        return self._extract_posts(BeautifulSoup(html, "html.parser"))
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
@@ -105,17 +51,15 @@ class RedditFeed(
             or empty_message is None
             or empty_message.get_text(strip=True) != "No posts were found."
         ):
-            raise _InvalidRedditPage(
+            raise InvalidRedlibPage(
                 "Reddit mirror returned neither posts nor a confirmed empty listing"
             )
         return []
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        title_tag = post.find(class_="post_title")
-        if isinstance(title_tag, Tag):
-            return title_tag.text
-        return ""
+        title_tag = require_tag(post.find(class_="post_title"), "Reddit post title")
+        return required_text(title_tag, "Reddit post title", separator=" ")
 
     @override
     async def _get_post_text(self, post: Tag) -> str:
