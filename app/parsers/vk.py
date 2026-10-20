@@ -5,6 +5,7 @@ from typing import override
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
+from dateutil.parser import parse
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -63,6 +64,7 @@ class VkFeed(
     def make_actions(self, driver: WebDriver):
         for _ in range(self._challenge_attempts):
             if self._attempt_challenge(driver):
+                self._capture_post_datetimes(driver)
                 return
 
         raise FeedUnavailable(self.feed.url, "browser_challenge")
@@ -166,15 +168,112 @@ class VkFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        time_tag = post.find("time")
-        if not isinstance(time_tag, Tag):
+        time_tag = self._post_date_element(post)
+        if time_tag is None:
             return constant_datetime
 
-        datetime_str = time_tag.text.strip()
-        if not datetime_str:
-            return constant_datetime
+        try:
+            if time_tag.has_attr("data-parser-published-at"):
+                return datetime.fromtimestamp(
+                    int(str(time_tag["data-parser-published-at"])), UTC
+                )
+            if time_tag.has_attr("datetime"):
+                parsed = datetime.fromisoformat(str(time_tag["datetime"]))
+                return self._date_in_utc(parsed)
 
-        return self._parse_datetime(datetime_str)
+            datetime_str = time_tag.get_text(" ", strip=True)
+            if not datetime_str:
+                raise ValueError("Empty VK post date")
+            return self._parse_post_date_text(datetime_str, post)
+        except (ValueError, IndexError, OverflowError, OSError) as error:
+            raise ValueError(f"Invalid VK post date: {time_tag}") from error
+
+    @staticmethod
+    def _post_date_element(post: Tag) -> Tag | None:
+        candidates = post.select('[data-testid="post_date_block_preview"]')
+        candidates.extend(post.select("time"))
+        for element in candidates:
+            owner = element.find_parent(attrs={"data-testid": "post"})
+            if owner is None or owner is post:
+                return element
+        return None
+
+    @staticmethod
+    def _capture_post_datetimes(driver: WebDriver) -> None:
+        # The preview has no timestamp attribute. Preserve the backing post's
+        # exact date before Selenium serializes the DOM and discards React props.
+        driver.execute_script("""
+            function findPostDate(element, postId) {
+                const key = Object.keys(element).find(
+                    key => key.startsWith('__reactFiber$')
+                );
+                let fiber = element[key];
+                while (fiber) {
+                    const value = fiber.memoizedProps?.postItem?.value;
+                    fiber = fiber.return;
+                    if (!value) continue;
+                    if (`${value.owner_id}_${value.id}` !== postId) continue;
+                    if (!Number.isSafeInteger(value.date)) {
+                        throw new Error('Invalid VK post timestamp');
+                    }
+                    return value.date;
+                }
+            }
+            for (const element of document.querySelectorAll(
+                '[data-testid="post_date_block_preview"]'
+            )) {
+                const post = element.closest('[data-testid="post"][data-post-id]');
+                if (!post) continue;
+                const date = findPostDate(element, post.dataset.postId);
+                if (date === undefined) continue;
+                element.setAttribute('data-parser-published-at', String(date));
+            }
+        """)
+
+    def _parse_post_date_text(self, value: str, post: Tag) -> datetime:
+        # VK's English preview contract uses just now, min/h/d ago, then a
+        # calendar date. Old cached snapshots may lack the captured timestamp.
+        relative = re.fullmatch(r"(\d+)\s+(min|h|d)\s+ago", value)
+        if value == "just now" or relative is not None:
+            reference = self._post_date_reference(post)
+            if relative is None:
+                return reference
+            seconds = {"min": 60, "h": 3600, "d": 86400}
+            return reference - timedelta(
+                seconds=int(relative.group(1)) * seconds[relative.group(2)]
+            )
+        if value.startswith(("today", "yesterday")):
+            match = re.fullmatch(r"(today|yesterday)\s+at\s+(.+)", value)
+            if match is None:
+                raise ValueError(f"Invalid VK relative date: {value!r}")
+            parse(match.group(2))
+
+        parsed = self._parse_datetime(value)
+        # Until the strict datetime API lands, validate the old helper's sentinel
+        # result so malformed text cannot masquerade as an absent optional date.
+        if parsed == constant_datetime:
+            parse(value)
+        return parsed
+
+    @staticmethod
+    def _post_date_reference(post: Tag) -> datetime:
+        root = post
+        while isinstance(root.parent, Tag):
+            root = root.parent
+        # vk.ts is the source page's epoch, so cached relative dates do not drift.
+        for script in root.find_all("script"):
+            match = re.search(
+                r"\bvk\s*=\s*\{.*?\bts:\s*(\d+)\s*,", script.get_text(), re.DOTALL
+            )
+            if match is not None:
+                return datetime.fromtimestamp(int(match.group(1)), UTC)
+        raise ValueError("VK relative date has no source page timestamp")
+
+    @staticmethod
+    def _date_in_utc(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
     def _parse_datetime(self, datetime_str: str) -> datetime:
         if datetime_str.startswith("today"):
