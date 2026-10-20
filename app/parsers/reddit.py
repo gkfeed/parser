@@ -3,15 +3,24 @@ from datetime import datetime, timedelta
 from typing import ClassVar, override
 from urllib.parse import urljoin
 
-from bs4 import Tag
+import structlog
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.http import HttpService
 from app.services.url_ranker import URLRanker
 from app.utils.datetime import parse_datetime
+from app.utils.logging import url_log_fields
+
+logger = structlog.get_logger(__name__)
+
+
+class _InvalidRedditPage(ValueError):
+    """A mirror returned neither posts nor a confirmed empty listing."""
 
 
 class RedditFeed(
@@ -41,31 +50,64 @@ class RedditFeed(
     @override
     async def _posts(self) -> list[Tag]:
         base_urls = await self._get_base_urls()
+        last_error: FeedUnavailable | _InvalidRedditPage | None = None
 
         for base_url in base_urls:
-            posts = await self._get_instance_posts(base_url)
-            if posts:
-                return posts
-
-        return []
-
-    async def _get_instance_posts(self, base_url: str) -> list[Tag]:
-        try:
-            url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
-            soup = await self.get_soup(url)
-            posts = [
-                post
-                for post in soup.find_all(class_="post")
-                if isinstance(post, Tag)
-            ]
-            if not posts:
+            try:
+                posts = await self._get_instance_posts(base_url)
+            except (FeedUnavailable, _InvalidRedditPage) as error:
+                last_error = error
                 self.__url_ranker.demote_url(base_url)
-                return []
+                logger.warning(
+                    "reddit_mirror_failed",
+                    **url_log_fields(base_url, field="mirror"),
+                    reason=(
+                        error.reason
+                        if isinstance(error, FeedUnavailable)
+                        else "invalid_page"
+                    ),
+                )
+                continue
+
             self.__url_ranker.promote_url(base_url)
             return posts
-        except Exception:  # noqa: BLE001 - try the next public instance on any failure
-            self.__url_ranker.demote_url(base_url)
 
+        reason = "no_mirrors_available" if last_error is None else "invalid_page"
+        retry_at = None
+        if isinstance(last_error, FeedUnavailable):
+            reason = last_error.reason
+            retry_at = last_error.retry_at
+        raise FeedUnavailable(
+            self.feed.url, f"reddit_mirrors_exhausted:{reason}", retry_at
+        ) from last_error
+
+    async def _get_instance_posts(self, base_url: str) -> list[Tag]:
+        url = base_url + "/" + "/".join(self.feed.url.split("/")[3:])
+        return self._extract_posts(await self.get_soup(url))
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        self._extract_posts(BeautifulSoup(html, "html.parser"))
+
+    def _extract_posts(self, soup: BeautifulSoup) -> list[Tag]:
+        if soup.select_one("#challenge-form, #cf-challenge-running, .cf-turnstile"):
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_challenge")
+        if soup.select_one("#error"):
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_error_page")
+        posts = [post for post in soup.find_all(class_="post") if isinstance(post, Tag)]
+        if posts:
+            return posts
+
+        # Redlib renders this message alongside #posts for no_posts.
+        empty_message = soup.select_one("#column_one > center")
+        if (
+            soup.select_one("#posts") is None
+            or empty_message is None
+            or empty_message.get_text(strip=True) != "No posts were found."
+        ):
+            raise _InvalidRedditPage(
+                "Reddit mirror returned neither posts nor a confirmed empty listing"
+            )
         return []
 
     @override
