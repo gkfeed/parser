@@ -187,20 +187,25 @@ class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
         links: set[str] = set()
         for card in soup.select(self._video_selector):
             title_tag = card.select_one('[data-testid="video_card_title"] a')
-            href = title_tag.get("href") if title_tag else None
-            if not isinstance(href, str) or title_tag is None:
-                continue
+            if title_tag is None:
+                raise FeedUnavailable(self.feed.url, "video_card_missing_title_link")
+            href = title_tag.get("href")
+            if not isinstance(href, str) or not href.strip():
+                raise FeedUnavailable(self.feed.url, "video_card_missing_href")
             path = urlsplit(urljoin(self.feed.url, href)).path
             if not path.startswith("/video"):
                 continue
             link = urljoin("https://vkvideo.ru/", path)
             if link in links:
                 continue
+            title = title_tag.get_text(" ", strip=True)
+            if not title:
+                raise FeedUnavailable(self.feed.url, "video_card_missing_title")
             links.add(link)
             items.append(
                 Item(
                     title=f"VK Video: {channel}",
-                    text=title_tag.get_text(" ", strip=True),
+                    text=title,
                     date=constant_datetime,
                     link=link,
                 )

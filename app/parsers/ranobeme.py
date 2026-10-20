@@ -23,16 +23,31 @@ class RanobeMeFeed(
         chapters: dict[str, Tag] = {}
 
         for title_link in soup.select(f'.FicTable_Title a[href="{feed_path}"]'):
-            chapter_list = title_link.find_next("div", class_="news_chapters_list")
-            if not isinstance(chapter_list, Tag):
-                continue
-            for chapter_link in chapter_list.select("a[href]"):
-                href = chapter_link.get("href")
-                if not isinstance(href, str):
-                    continue
-                chapters[href] = chapter_link
+            chapters.update(self._get_chapter_links(title_link))
 
         return list(chapters.values())
+
+    def _get_chapter_links(self, title_link: Tag) -> dict[str, Tag]:
+        card = title_link.find_parent(class_="news_item")
+        if not isinstance(card, Tag):
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                f"RanobeMe news card is missing for {self.feed.url}"
+            )
+        chapter_list = card.select_one("div.news_chapters_list")
+        if chapter_list is None:
+            raise ValueError(f"RanobeMe chapter list is missing for {self.feed.url}")
+        chapter_links = chapter_list.select("a")
+        if not chapter_links:
+            raise ValueError(f"RanobeMe news card has no chapters for {self.feed.url}")
+        chapters: dict[str, Tag] = {}
+        for chapter_link in chapter_links:
+            href = chapter_link.get("href")
+            if not isinstance(href, str) or not href.strip():
+                raise ValueError(
+                    f"RanobeMe chapter has no usable link for {self.feed.url}"
+                )
+            chapters[href] = chapter_link
+        return chapters
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
