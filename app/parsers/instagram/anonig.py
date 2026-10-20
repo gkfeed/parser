@@ -1,32 +1,26 @@
 import asyncio
 import re
 from datetime import timedelta
-from typing import Literal, override
+from typing import override
 from urllib.parse import urlparse
 
 import structlog
-from bs4 import BeautifulSoup
 from bs4.element import Tag
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
+from app.services.anonyig import (
+    ANONYIG_URL,
+    AnonyigClient,
+    AnonyigError,
+    AnonyigOptions,
+)
 from app.services.hash import HashService
 from app.services.http import HttpRequestError
 from app.services.image import EmbeddedImage, ImageService
-from app.services.selenium.lazy_list import (
-    LazyListLoader,
-    LazyListTimeoutError,
-    LazyListUnavailableError,
-)
 from app.utils.datetime import constant_datetime
 
 logger = structlog.get_logger(__name__)
@@ -35,14 +29,9 @@ logger = structlog.get_logger(__name__)
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
     _cache_storage_time_if_success = timedelta(weeks=1)
-    _selenium_wait_time = 0
-    _results_wait_time = 30
-    _load_more_wait_time = 5
-    _max_media_items = 30
     _image_download_concurrency = 6
-    _page_load_timeout_seconds = 30
-    _should_delete_cookies = True
-    _service_url = "https://anonyig.com/en/iganony/"
+    _max_media_items = 30
+    _service_url = ANONYIG_URL
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -69,27 +58,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
         items = await asyncio.gather(*(create_item(item) for item in media))
         # Only explicitly unsupported videos may be omitted.
         return [item for item in items if item is not None]
-
-    @override
-    def _validate_html(self, url: str, html: bytes) -> None:
-        soup = BeautifulSoup(html, "html.parser")
-        result = soup.select_one(".search-result")
-        if result is None:
-            raise FeedUnavailable(self.feed.url, "missing_search_result")
-        if result.select_one(".loader-component") is not None:
-            raise FeedUnavailable(self.feed.url, "media_loading_unverified")
-        error = result.select_one(".error-message__text")
-        if error is None:
-            error = result.select_one(".error-message")
-        if error is not None and error.get_text(strip=True):
-            self._check_error(error.get_text(" ", strip=True))
-            if result.select_one(".profile-media-list__item") is not None:
-                raise ValueError(
-                    "Anonyig response contains both media and an empty result"
-                )
-            return
-        if result.select_one(".profile-media-list__item") is None:
-            raise FeedUnavailable(self.feed.url, "empty_unverified")
 
     async def _create_item_from_media(self, media: Tag) -> Item | None:
         if media.find(class_="tags__item--video") is not None:
@@ -140,103 +108,32 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             raise FeedUnavailable(self.feed.url, "image_download_failed") from exc
         return image.data_url
 
+    @property
+    def _anonyig(self) -> AnonyigClient:
+        return AnonyigClient(
+            username=self._user_name,
+            media_kind="posts",
+            options=AnonyigOptions(
+                pagination_settle_seconds=5, max_media_items=self._max_media_items
+            ),
+        )
+
     @override
-    def make_actions(self, driver: WebDriver):
+    async def _fetch_html(self, url: str) -> bytes:
         try:
-            self._search_media(driver)
-        except (NoSuchElementException, TimeoutException) as exc:
-            raise FeedUnavailable(self.feed.url, "browser_action_failed") from exc
+            return await self._anonyig.get_html(url)
+        except AnonyigError as exc:
+            reason = exc.reason
+            if reason in ("page_timeout", "browser_error"):
+                reason = "browser_action_failed"
+            raise FeedUnavailable(self.feed.url, reason) from exc
 
-    def _search_media(self, driver: WebDriver) -> None:
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
         try:
-            reject_consent = driver.find_element(
-                By.CSS_SELECTOR, ".fc-cta-do-not-consent"
-            )
-            self._click(driver, reject_consent)
-        except NoSuchElementException:
-            pass
-
-        # Insert account name in form
-        link = driver.find_element(
-            By.CSS_SELECTOR, "form.search-form input.search-form__input"
-        )
-        link.send_keys(self._user_name)
-
-        # Click search button
-        button = driver.find_element(
-            By.CSS_SELECTOR,
-            ".search-form__button",
-        )
-        self._click(driver, button)
-
-        result = WebDriverWait(driver, self._results_wait_time).until(
-            expected_conditions.any_of(
-                self._loaded_error,
-                expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".search-result .profile-media-list__item")
-                ),
-            )
-        )
-        if not isinstance(result, WebElement):
-            raise FeedUnavailable(self.feed.url, "browser_action_failed")
-        if "error-message" in (result.get_attribute("class") or "").split():
-            errors = result.find_elements(By.CSS_SELECTOR, ".error-message__text")
-            error = errors[0] if errors else result
-            self._check_error(error.get_attribute("textContent") or "")
-            return
-
-        search_result = driver.find_element(By.CSS_SELECTOR, ".search-result")
-        if not search_result.is_displayed():
-            # The landing-page experiment hides the populated result in headless
-            # browsers, preventing its load-more IntersectionObserver from firing.
-            driver.execute_script(
-                "arguments[0].style.setProperty('display', 'block', 'important');"
-                "arguments[0].style.setProperty('visibility', 'visible', 'important');",
-                search_result,
-            )
-
-        self._load_more_media(driver)
-
-    @staticmethod
-    def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
-        if driver.find_elements(By.CSS_SELECTOR, ".search-result .loader-component"):
-            return False
-        for error in driver.find_elements(
-            By.CSS_SELECTOR, ".search-result .error-message"
-        ):
-            texts = error.find_elements(By.CSS_SELECTOR, ".error-message__text")
-            text = texts[0] if texts else error
-            if (text.get_attribute("textContent") or "").strip():
-                return error
-        return False
-
-    def _check_error(self, message: str) -> None:
-        message = " ".join(message.lower().split()).rstrip(".! ")
-        if message in ("no posts", "no posts found", "no publications found"):
-            logger.info("anonyig_posts_empty")
-            return
-        if "private" in message:
-            raise FeedUnavailable(self.feed.url, "private")
-        if any(
-            text in message
-            for text in ("user not found", "profile not found", "account not found")
-        ):
-            raise FeedUnavailable(self.feed.url, "not_found")
-        raise FeedUnavailable(self.feed.url, "upstream_error")
-
-    def _load_more_media(self, driver: WebDriver) -> None:
-        try:
-            LazyListLoader(
-                driver,
-                items_selector=".search-result .profile-media-list__item",
-                trigger_selector=".search-result .profile-media-list > .trigger",
-                settle_seconds=self._load_more_wait_time,
-                trigger_removed_on_completion=True,
-            ).load(self._results_wait_time, max_items=self._max_media_items)
-        except LazyListUnavailableError as exc:
-            raise FeedUnavailable(self.feed.url, "media_loading_unverified") from exc
-        except LazyListTimeoutError as exc:
-            raise FeedUnavailable(self.feed.url, "media_loading_timeout") from exc
+            self._anonyig.validate_html(html)
+        except AnonyigError as exc:
+            raise FeedUnavailable(self.feed.url, exc.reason) from exc
 
     @property
     def _user_name(self) -> str:
