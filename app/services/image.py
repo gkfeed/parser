@@ -60,11 +60,16 @@ class ImageService:
         content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
         if response.status >= 400 or not content_type.startswith("image/"):
             raise ImageResponseError(response.status, content_type)
+        return await cls.from_content(response.content)
+
+    @classmethod
+    async def from_content(cls, content: bytes) -> EmbeddedImage:
+        """Validate existing image bytes without re-encoding their content."""
         try:
-            mime_type = await asyncio.to_thread(cls._validate_image, response.content)
+            mime_type = await asyncio.to_thread(cls._validate_image, content)
         except (OSError, ValueError, Image.DecompressionBombError) as exc:
             raise ValueError(f"Invalid image: {exc}") from exc
-        return EmbeddedImage(response.content, mime_type)
+        return EmbeddedImage(content, mime_type)
 
     @classmethod
     async def resize(cls, image: EmbeddedImage, budget: int) -> EmbeddedImage:
@@ -87,7 +92,9 @@ class ImageService:
             if mime_type is None:
                 raise ValueError("Unknown image format")
             image.verify()
-            return mime_type
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+        return mime_type
 
     @classmethod
     def _resize_image(cls, data: bytes, budget: int) -> bytes:
