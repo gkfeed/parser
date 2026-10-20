@@ -12,6 +12,7 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.redlib import InvalidRedlibPage, RedlibClient
 from app.utils.datetime import convert_datetime
+from app.utils.html import require_tag, required_text
 
 
 class RedditFeed(
@@ -57,10 +58,8 @@ class RedditFeed(
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        title_tag = post.find(class_="post_title")
-        if isinstance(title_tag, Tag):
-            return title_tag.text
-        return ""
+        title_tag = require_tag(post.find(class_="post_title"), "Reddit post title")
+        return required_text(title_tag, "Reddit post title", separator=" ")
 
     @override
     async def _get_post_text(self, post: Tag) -> str:

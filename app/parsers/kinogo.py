@@ -8,6 +8,7 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.html import require_tag, required_text
 
 
 class KinogoFeed(
@@ -37,13 +38,9 @@ class KinogoFeed(
         return self.feed.url
 
     async def _show_status(self, soup: Tag) -> str:
-        status = soup.find(class_="status7")
-        if isinstance(status, Tag):
-            return status.text
-        raise ValueError
+        status = require_tag(soup.find(class_="status7"), "Kinogo show status")
+        return required_text(status, "Kinogo show status", separator=" ")
 
     async def _show_title(self, soup: Tag) -> str:
-        title = soup.find("h1")
-        if isinstance(title, Tag):
-            return title.text
-        raise ValueError("Couldn'n find status of show: " + self.feed.url)
+        title = require_tag(soup.find("h1"), "Kinogo show title")
+        return required_text(title, "Kinogo show title", separator=" ")
