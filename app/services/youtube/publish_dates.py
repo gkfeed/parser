@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
 from xml.etree import ElementTree
 
+import structlog
+
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.services.http import HttpRequestError, HttpService
+
+logger = structlog.get_logger(__name__)
 
 
 class YoutubePublishDateService:
@@ -64,9 +68,25 @@ class YoutubePublishDateService:
             return published_at
 
         if (timestamp := video_info.get("timestamp")) is not None:
-            return datetime.fromtimestamp(timestamp, tz=UTC)
+            try:
+                return datetime.fromtimestamp(timestamp, tz=UTC)
+            except (ValueError, TypeError, OverflowError, OSError):
+                logger.warning(
+                    "youtube_publish_date_invalid",
+                    video_id=video_info.get("id"),
+                    source="timestamp",
+                    exc_info=True,
+                )
 
-        if upload_date := video_info.get("upload_date"):
-            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
+        if (upload_date := video_info.get("upload_date")) is not None:
+            try:
+                return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
+            except (ValueError, TypeError):
+                logger.warning(
+                    "youtube_publish_date_invalid",
+                    video_id=video_info.get("id"),
+                    source="upload_date",
+                    exc_info=True,
+                )
 
         return None
