@@ -5,6 +5,7 @@ from typing import override
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
+from dateutil.parser import parse
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -166,15 +167,31 @@ class VkFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        time_tag = post.find("time")
-        if not isinstance(time_tag, Tag):
+        for time_tag in post.select('[data-testid="post_date_block_preview"], time'):
+            owner = time_tag.find_parent(attrs={"data-testid": "post"})
+            if owner is None or owner is post:
+                break
+        else:
             return constant_datetime
 
-        datetime_str = time_tag.text.strip()
+        datetime_str = time_tag.get_text(" ", strip=True)
+        if time_tag.get("data-testid") == "post_date_block_preview":
+            return self._parse_post_day(datetime_str)
         if not datetime_str:
             return constant_datetime
-
         return self._parse_datetime(datetime_str)
+
+    @staticmethod
+    def _parse_post_day(value: str) -> datetime:
+        # Relative previews cannot reliably identify a calendar day. Keep the
+        # constant rather than guessing from the current time or browser state.
+        if re.fullmatch(r"just now|\d+\s+(min|h|d)\s+ago", value, re.IGNORECASE):
+            return constant_datetime
+        try:
+            parsed = parse(value)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid VK post date: {value!r}") from error
+        return parsed.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
 
     def _parse_datetime(self, datetime_str: str) -> datetime:
         if datetime_str.startswith("today"):
