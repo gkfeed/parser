@@ -30,3 +30,10 @@ class TemporaryCacheService(CacheService[_T]):
             return False
 
         return datetime.now(UTC).timestamp() < expired_timestamp
+
+    def get_expiry(self, id: str) -> datetime | None:
+        try:
+            timestamp = self._storage.get(f"{id}__timestamp")
+        except ValueError:
+            return None
+        return datetime.fromtimestamp(timestamp, UTC)

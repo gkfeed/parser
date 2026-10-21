@@ -1,7 +1,7 @@
 from app.configs.selenium import FALLBACK_TO_EXTERNAL_SELENIUM
 
 from ._external import ExternalSelenium
-from ._worker import WorkerSelenium
+from ._local import get_html as get_html_locally
 from .schemas import SeleniumGetHtmlArgs
 
 
@@ -15,7 +15,7 @@ class SeleniumService:
             fallback_to_external_selenium = FALLBACK_TO_EXTERNAL_SELENIUM
 
         try:
-            html = await WorkerSelenium.get_html(args)
+            html = await get_html_locally(args)
         except Exception:
             # The external worker receives serialized arguments and cannot run a
             # parser's browser callback. Let action-based parsers keep the actual

@@ -1,3 +1,4 @@
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +7,8 @@ from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
 
 from ._base import BaseRepository
+
+logger = structlog.get_logger(__name__)
 
 
 class ItemsRepository(BaseRepository):
@@ -18,24 +21,40 @@ class ItemsRepository(BaseRepository):
 
     async def add_items_to_feed(self, feed: Feed, items: list[Item]) -> list[Item]:
         unseen_items = []
+        received = len(items)
+        inserted = 0
+        known_hash_skipped = 0
+        existing_item_skipped = 0
         async with self._session_factory() as session, session.begin():
             for item in items:
                 if item.hash and await self._contains_hash(session, item.hash, feed.id):
+                    known_hash_skipped += 1
+                    logger.debug("item_skipped", reason="known_hash")
                     continue
 
                 if not await self._check_if_exists(session, feed, item):
                     self._create_item(session, feed, item)
+                    inserted += 1
+                else:
+                    existing_item_skipped += 1
+                    logger.debug("item_skipped", reason="existing_item")
 
                 if item.hash:
                     session.add(ItemHash(hash=item.hash, feed_id=feed.id))
                 unseen_items.append(item)
 
+        logger.info(
+            "items_persisted",
+            received=received,
+            inserted=inserted,
+            known_hash_skipped=known_hash_skipped,
+            existing_item_skipped=existing_item_skipped,
+            returned=len(unseen_items),
+        )
         return unseen_items
 
     @staticmethod
-    async def _contains_hash(
-        session: AsyncSession, hash: str, feed_id: int
-    ) -> bool:
+    async def _contains_hash(session: AsyncSession, hash: str, feed_id: int) -> bool:
         stmt = select(ItemHash).where(
             ItemHash.hash == hash, ItemHash.feed_id == feed_id
         )
@@ -43,9 +62,7 @@ class ItemsRepository(BaseRepository):
         return result.scalars().first() is not None
 
     @staticmethod
-    async def _check_if_exists(
-        session: AsyncSession, feed: Feed, item: Item
-    ) -> bool:
+    async def _check_if_exists(session: AsyncSession, feed: Feed, item: Item) -> bool:
         # Omitting date from the fallback identity is intentional.
         stmt = select(_Item).where(
             _Item.feed_id == feed.id,

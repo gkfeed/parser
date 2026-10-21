@@ -2,9 +2,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.youtube import YoutubePublishDateService
 from app.services.ytdlp import (
     BaseExtractionMode,
@@ -35,11 +34,10 @@ class _BaseYoutubeFeed(BaseFeed):
         return urlunsplit(parsed_url._replace(path=videos_path))
 
 
-class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
+class YoutubeFeed(ItemLinkHashExtension, _BaseYoutubeFeed):
     worker_kind = WorkerKind.LIGHT
 
-    @property
-    async def items(self) -> list[Item]:
+    async def _parse_items(self) -> list[Item]:
         videos_url = self._get_target_url()
         extraction_mode = self._choose_extraction_mode(self.feed.url)
         max_items = 5
@@ -47,9 +45,13 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
         channel_info = await YtdlpInfoExtractor.extract_channel_videos_info(
             videos_url, extraction_mode, max_items
         )
+        self._validate_channel_info(channel_info)
+
+        entries = channel_info["entries"]
+        if not entries:
+            return []
 
         channel_name = channel_info["channel"]
-        entries = channel_info["entries"]
         channel_id = channel_info.get("channel_id")
         channel_publish_dates = (
             await YoutubePublishDateService.get_channel_publish_dates(channel_id)
@@ -59,9 +61,6 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
 
         items = []
         for video_info in entries:
-            if video_info is None:
-                continue
-
             title = video_info["title"]
             video_url = video_info.get("url") or video_info["webpage_url"]
 
@@ -80,5 +79,25 @@ class YoutubeFeed(ItemsHashExtension, _BaseYoutubeFeed):
 
         return items
 
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
+    @staticmethod
+    def _validate_channel_info(info: dict) -> None:
+        if info.get("extraction_incomplete"):
+            raise ValueError("YouTube extraction returned incomplete results")
+        entries = info.get("entries")
+        if not isinstance(entries, list):
+            raise TypeError("YouTube extraction did not return an entries list")
+        if not entries:
+            return
+
+        channel = info.get("channel")
+        if not isinstance(channel, str) or not channel.strip():
+            raise ValueError("YouTube extraction returned no channel name")
+        for index, video in enumerate(entries, start=1):
+            if not isinstance(video, dict):
+                raise TypeError(f"YouTube extraction failed for video entry {index}")
+            title = video.get("title")
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError(f"YouTube video entry {index} has no title")
+            link = video.get("url") or video.get("webpage_url")
+            if not isinstance(link, str) or not link.strip():
+                raise ValueError(f"YouTube video entry {index} has no usable link")

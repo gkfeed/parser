@@ -3,14 +3,14 @@ name = "parser"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = "==3.12.*"
+requires-python = "==3.13.*"
 dependencies = [
     "aiohttp>=3.11.16",
-    "aiosqlite>=0.22.1",
     "alembic>=1.17.2",
     "asyncpg>=0.30.0",
     "bs4>=0.0.2",
     "lxml>=5.3.2",
+    "pillow>=12.0.0",
     "pydantic>=2.11.3",
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.0",
@@ -18,11 +18,13 @@ dependencies = [
     "requests>=2.32.3",
     "selenium>=4.31.0",
     "sqlalchemy[asyncio]>=2.0.45",
-    "yt-dlp==2025.7.21",
+    "structlog>=26.1.0",
+    "yt-dlp[curl-cffi]==2026.8.19",
 ]
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.22.1",
     "fakeredis[lua]>=2.32.1",
     "mypy>=1.16.1",
     "pyright>=1.1.402",
@@ -36,11 +38,18 @@ dev = [
 venvPath = "."
 venv = ".venv"
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["UP043"]
+
 [tool.mypy]
 ignore_missing_imports = true
 
 [tool.typos.default.extend-identifiers]
 showAllChanelVideos = "showAllChanelVideos"
+
+[tool.typos.default.extend-words]
+# Literal VK Video channel handle in integration tests.
+algoritm = "algoritm"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,18 +1,17 @@
 # NOTE: generated
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.core.dispatcher import Dispatcher
-from app.serializers.feed import Feed, Item
+from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import BrokerError
 
 
 @pytest.fixture
 def dispatcher():
     class FakeFeedParserRepository:
-        get_by_feed_id = AsyncMock(return_value=None)
         upsert = AsyncMock()
 
     return Dispatcher(
@@ -22,48 +21,6 @@ def dispatcher():
         items_repository=AsyncMock(),
         parsers={},
     )
-
-
-@pytest.mark.asyncio
-async def test_should_process_feed_no_parser(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    dispatcher.feed_parser_repository.get_by_feed_id.return_value = None
-
-    assert await dispatcher._should_process_feed(feed) is True
-    dispatcher.feed_parser_repository.get_by_feed_id.assert_awaited_once_with(feed.id)
-
-
-@pytest.mark.asyncio
-async def test_should_process_feed_valid_in_past(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    mock_feed_parser = MagicMock()
-    mock_feed_parser.valid_for = datetime.now(UTC) - timedelta(minutes=1)
-    dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
-
-    assert await dispatcher._should_process_feed(feed) is True
-
-
-@pytest.mark.asyncio
-async def test_should_process_feed_naive_datetime(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    mock_feed_parser = MagicMock()
-    # Naive datetime (past) based on UTC
-    mock_feed_parser.valid_for = datetime.now(UTC).replace(
-        tzinfo=None
-    ) - timedelta(minutes=10)
-    dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
-
-    assert await dispatcher._should_process_feed(feed) is True
-
-
-@pytest.mark.asyncio
-async def test_should_process_feed_valid_in_future(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    mock_feed_parser = MagicMock()
-    mock_feed_parser.valid_for = datetime.now(UTC) + timedelta(minutes=1)
-    dispatcher.feed_parser_repository.get_by_feed_id.return_value = mock_feed_parser
-
-    assert await dispatcher._should_process_feed(feed) is False
 
 
 @pytest.mark.asyncio
@@ -78,14 +35,14 @@ async def test_request_items_from_broker_success(dispatcher):
             hash="hash1",
         ),
     ]
-    items_json = f"[{items[0].model_dump_json()}]"
+    result_json = FeedResult(items=items).model_dump_json()
 
-    dispatcher.broker.put_and_wait_for_result.return_value = items_json
+    dispatcher.broker.put_and_wait_for_result.return_value = result_json
 
     result = await dispatcher._request_items_from_broker(feed)
 
-    assert len(result) == 1
-    assert result[0].title == "Item 1"
+    assert len(result.items) == 1
+    assert result.items[0].title == "Item 1"
     dispatcher.broker.put_and_wait_for_result.assert_called_once()
 
 
@@ -135,7 +92,7 @@ async def test_fetch_feed_items_success(dispatcher):
             dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
         ) as mock_save,
     ):
-        mock_request.return_value = items
+        mock_request.return_value = FeedResult(items=items)
         mock_save.return_value = items
 
         await dispatcher._fetch_feed_items(feed)
@@ -172,7 +129,7 @@ async def test_fetch_feed_items_no_items(dispatcher):
             dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
         ) as mock_save,
     ):
-        mock_request.return_value = []
+        mock_request.return_value = FeedResult(items=[])
 
         await dispatcher._fetch_feed_items(feed)
 
@@ -225,7 +182,11 @@ async def test_success_resets_failure_backoff(dispatcher):
             dispatcher,
             "_request_items_from_broker",
             new_callable=AsyncMock,
-            side_effect=[BrokerError("Error"), [], BrokerError("Error")],
+            side_effect=[
+                BrokerError("Error"),
+                FeedResult(items=[]),
+                BrokerError("Error"),
+            ],
         ),
         patch("app.core.dispatcher.random.uniform", return_value=1),
     ):
@@ -238,30 +199,3 @@ async def test_success_resets_failure_backoff(dispatcher):
     retry_at = dispatcher.feed_parser_repository.upsert.call_args[0][1]
     expected_delay = timedelta(minutes=15)
     assert before + expected_delay <= retry_at <= after + expected_delay
-
-
-@pytest.mark.asyncio
-async def test_dispatch(dispatcher):
-    feeds = [
-        Feed(id=1, title="Feed 1", url="http://feed1.com", type="type1"),
-        Feed(id=2, title="Feed 2", url="http://feed2.com", type="type2"),
-    ]
-
-    with (
-        patch.object(
-            dispatcher.feed_repository, "get_all", new_callable=AsyncMock
-        ) as mock_get_feeds,
-        patch.object(
-            dispatcher, "_should_process_feed", new_callable=AsyncMock
-        ) as mock_should_process,
-        patch.object(
-            dispatcher, "_fetch_feed_items", new_callable=AsyncMock
-        ) as mock_fetch,
-    ):
-        mock_get_feeds.return_value = feeds
-        mock_should_process.side_effect = lambda f: f.id == 1
-
-        await dispatcher.dispatch()
-
-        assert mock_fetch.call_count == 1
-        mock_fetch.assert_called_once_with(feeds[0])

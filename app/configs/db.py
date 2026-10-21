@@ -1,29 +1,18 @@
-from sqlalchemy import event
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401
-from app.utils.db_url import normalize_db_url
+from app.utils.db_url import build_postgres_asyncpg_url
 
 from .env import DB_URL as ENV_DB_URL
 
-DB_URL = normalize_db_url(ENV_DB_URL)
+configured_url = make_url(ENV_DB_URL)
+if configured_url.drivername in {"sqlite", "sqlite+aiosqlite"}:
+    DB_URL = configured_url.set(drivername="sqlite+aiosqlite")
+else:
+    DB_URL = build_postgres_asyncpg_url(ENV_DB_URL)
 
-
-connect_args = {}
-if DB_URL.startswith("sqlite"):
-    connect_args["timeout"] = 30
-
-engine = create_async_engine(DB_URL, connect_args=connect_args)
-
-
-@event.listens_for(engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    if DB_URL.startswith("sqlite"):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.close()
-
+engine = create_async_engine(DB_URL)
 
 session_factory = async_sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession

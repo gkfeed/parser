@@ -1,19 +1,33 @@
 from datetime import datetime, timedelta
 from typing import override
+from urllib.parse import urlsplit, urlunsplit
 
+from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from app.core.worker_kind import WorkerKind
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import convert_datetime
+from app.utils.html import require_tag, required_text
 
 
 class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     worker_kind = WorkerKind.LIGHT
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.select_one("#cf-error-details") is not None:
+            raise FeedUnavailable(self.feed.url, "cloudflare_error")
+        if soup.select_one("#challenge-form, #challenge-running") is not None:
+            raise FeedUnavailable(self.feed.url, "cloudflare_challenge")
+        required_text(require_tag(soup.find("h1"), "Shiki title"), "Shiki title")
+        require_tag(soup.find(class_="b-menu-links"), "Shiki episode history")
 
     @property
     @override
@@ -53,12 +67,10 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         span_tag = post.find("span")
-        if isinstance(span_tag, Tag):
-            time_tag = span_tag.find("time")
-            if isinstance(time_tag, Tag):
-                datetime_str = time_tag.get("datetime")
-                if isinstance(datetime_str, str):
-                    return convert_datetime(datetime_str)
+        time_tag = span_tag.find("time") if isinstance(span_tag, Tag) else None
+        datetime_str = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
+        if isinstance(datetime_str, str):
+            return convert_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @property
@@ -75,7 +87,10 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
 
     @property
     def _url(self) -> str:
-        return self.feed.url.replace("shikimori.me", "shikimori.one")
+        url = urlsplit(self.feed.url)
+        if url.hostname in {"shikimori.me", "shikimori.one"}:
+            return urlunsplit(url._replace(netloc="shikimori.io"))
+        return self.feed.url
 
     def _get_item_status(self, item: Tag) -> str:
         span_tag = item.find_all("span")[-1]

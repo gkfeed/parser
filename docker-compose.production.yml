@@ -14,7 +14,7 @@ services:
       - default
       - gkfeed-db
   chrome:
-    image: seleniarm/standalone-chromium:latest
+    image: selenium/standalone-chromium:4.48.0-20260905@sha256:fcf9eef47b9546a2252937481a8298ce0958d20c9d91e040d480184e80b41c76
     profiles:
       - heavy
 

@@ -1,19 +1,21 @@
 from datetime import timedelta
 
+from app.core.worker_kind import WorkerKind
 from app.serializers.feed import Item
+from app.services.rss import RSSParser
 
-from ..web import WebFeed
 from ._base import BaseTikTokFeed
 
 
-class TikTokFeed(BaseTikTokFeed, WebFeed):
+class TikTokFeed(BaseTikTokFeed):
+    worker_kind = WorkerKind.LIGHT
     __base_url = "https://tok.adminforge.de"
     _cache_storage_time_if_success = timedelta(hours=2)
 
     @property
     async def _video_links(self) -> list[str]:
         url = f"{self.__base_url}/@{self._user_name}/rss"
-        items = await self._get_items_from_web(url)
+        items = await RSSParser.parse_items(url)
 
         links = []
         for item in items:

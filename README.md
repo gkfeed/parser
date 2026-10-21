@@ -17,6 +17,16 @@ This command executes `.venv/bin/alembic upgrade head`.
 
 The application requires several environment variables to be set (typically in a `.env` file).
 
+Logging is configured with two optional variables:
+
+- `LOG_LEVEL` controls application verbosity and defaults to `INFO`. Supported
+  values are `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL`.
+- `LOG_FORMAT` controls the output renderer and defaults to `logfmt`. Supported
+  values are `logfmt` and `json`.
+
+Invalid values stop the application during startup rather than silently falling
+back to a different logging configuration.
+
 ## Worker Parser Configuration
 
 Worker parser types are configured in `app/configs/workers.py`.
@@ -45,7 +55,22 @@ WORKER_LOG_DIR=/path/to/logs docker compose up -d
 
 Production combines `docker-compose.yml` with
 `docker-compose.production.yml`. The production overlay connects the parser to
-the external `gkfeed-infra_default` network and uses an ARM64 Chromium image.
+the external `gkfeed-infra_default` network and uses the official multi-architecture
+Chromium image. Chrome and Chromium are pinned to release `4.48.0-20260905` and
+their image digests. `make docker-update` pulls the pinned browser image before
+recreating containers.
+
+Remote Selenium commands do not retry transport failures. Session cleanup waits
+up to 10 seconds for `quit()`. If it fails, the heavy worker requests recovery
+through the shared `selenium_recovery` volume and waits up to 30 seconds for Grid
+readiness. Chrome's watchdog restarts the container if the failed session still
+occupies a slot, or Grid is unreachable. It ignores requests for sessions that
+have already ended. This does not require access to the Docker socket.
+
+Cleanup and recovery emit `selenium_quit_failed`, `selenium_grid_recovered`,
+`selenium_grid_recovery_failed`, and `selenium_grid_restart_requested` events with
+the session ID. Stories blocks `player.avplayer.com` before loading the page as
+a temporary workaround for the advertising iframe hang.
 
 `make docker-update` pulls the current branch, recreates the Compose project,
 and starts the dispatcher, light worker, and Redis. The heavy worker and Chrome
@@ -59,17 +84,15 @@ make docker-heavy-start
 make docker-heavy-stop
 ```
 
-### Database Configuration
+### Database configuration
 
-`DB_URL` must use an asynchronous driver.
+`DB_URL` must point to PostgreSQL. The parser normalizes the standard PostgreSQL
+schemes to use the asyncpg driver.
 
-#### PostgreSQL
-You can use either:
+Accepted formats:
+
+- `postgres://user:password@host:port/dbname`
+- `postgresql://user:password@host:port/dbname`
 - `postgresql+asyncpg://user:password@host:port/dbname`
-- `postgres://user:password@host:port/dbname` (automatically converted to `asyncpg`)
 
-#### SQLite
-For SQLite, you **must** use `sqlite+aiosqlite:///` followed by the path to the database file (note the three slashes for a relative path):
-- `sqlite+aiosqlite:///data/db.sqlite`
-
-*Note: `sqlite://data/db.sqlite` will not work as it lacks the required async driver and correct URI format.*
+SQLite URLs are rejected.

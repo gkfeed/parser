@@ -8,7 +8,6 @@ from dataclasses import asdict
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
-import app.configs  # noqa: F401
 from app.configs.selenium import SELENIUM_COOKIES_PATH
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
 from app.utils.inject import inject
@@ -28,8 +27,14 @@ async def _get_html(
     make_actions_function: Callable[[WebDriver], None] | None,
     selenium_wait_timeout_seconds: int,
     page_load_timeout_seconds: int | None,
+    blocked_url_patterns: tuple[str, ...],
 ) -> str:
     try:
+        if blocked_url_patterns:
+            driver.execute_cdp_cmd("Network.enable", {})
+            driver.execute_cdp_cmd(
+                "Network.setBlockedURLs", {"urls": list(blocked_url_patterns)}
+            )
         if page_load_timeout_seconds is not None:
             driver.set_page_load_timeout(page_load_timeout_seconds)
 
@@ -56,17 +61,12 @@ async def _get_html(
 
         if should_save_cookies:
             await asyncio.to_thread(_save_cookies, driver.get_cookies())
-
-    except BaseException:
-        # Preserve the original parsing/cancellation error if session cleanup also
-        # fails. Calling close() first can prevent quit() from ever reaching the
-        # remote Selenium server, leaving its temporary Chrome profile behind.
+        return html
+    finally:
+        # A failed quit must not replace a parsing error or discard fetched HTML.
+        # GridWebDriver bounds quit and recovers its slot if Chrome stops responding.
         with contextlib.suppress(Exception):
             driver.quit()
-        raise
-
-    driver.quit()
-    return html
 
 
 def _load_cookies():

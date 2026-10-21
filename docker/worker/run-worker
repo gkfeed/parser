@@ -1,9 +1,32 @@
-#!/bin/sh
+#!/usr/bin/env python3
 
-set -eu
-set -o pipefail
+import signal
+import subprocess
+import sys
+from pathlib import Path
 
-worker_name="${1:?worker name is required}"
+worker_name = sys.argv[1]
+log_path = Path("/logs") / f"{worker_name}.txt"
 
-python -u -m "app.run.${worker_name}" 2>&1 |
-    tee -a "/logs/${worker_name}.txt"
+with (
+    log_path.open("ab", buffering=0) as log,
+    subprocess.Popen(
+        [sys.executable, "-u", "-m", f"app.run.{worker_name}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    ) as worker,
+):
+
+    def forward_signal(signum: int, _frame: object) -> None:
+        worker.send_signal(signum)
+
+    signal.signal(signal.SIGTERM, forward_signal)
+    signal.signal(signal.SIGINT, forward_signal)
+    assert worker.stdout is not None
+    for line in worker.stdout:
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+        log.write(line)
+    exit_code = worker.wait()
+
+sys.exit(exit_code if exit_code >= 0 else 128 - exit_code)

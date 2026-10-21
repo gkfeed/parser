@@ -28,6 +28,7 @@ from .stories import InstagramStoriesFeed
 from .tiktok import TikTokFeed
 from .twitch import TwitchFeed
 from .vk import VkFeed
+from .vkvideo import VkVideoFeed
 from .web import WebFeed
 from .x import XFeed
 from .youtube import YoutubeFeed
@@ -53,6 +54,7 @@ class Parser(Enum):
     SHIKI = ParserConfig("shiki", ShikiFeed)
     REDDIT = ParserConfig("reddit", RedditFeed)
     VK = ParserConfig("vk", VkFeed)
+    VKVIDEO = ParserConfig("vkvideo", VkVideoFeed)
     YT = ParserConfig("yt", YoutubeFeed)
     RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed)
     SPOTI = ParserConfig("spoti", SpotifyFeed)
