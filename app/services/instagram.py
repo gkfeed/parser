@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from time import monotonic
 from typing import ClassVar, Literal
+from urllib.parse import urlsplit
 
 import structlog
 from bs4 import BeautifulSoup
@@ -129,15 +130,15 @@ class InstagramService:
             )
             return None
         content_type = response.headers.get("content-type", "").split(";", 1)[0]
-        self._source_details[source] = {
-            "status": response.status,
-            "response_bytes": len(response.content),
-            "content_type": content_type
+        self._source_details.setdefault(source, {}).update(
+            status=response.status,
+            response_bytes=len(response.content),
+            content_type=content_type
             if content_type in ("application/json", "text/html", "text/plain")
             else "other",
-            "request_seconds": round(monotonic() - started, 3),
-            "retry_after_present": "retry-after" in response.headers,
-        }
+            request_seconds=round(monotonic() - started, 3),
+            retry_after_present="retry-after" in response.headers,
+        )
         return response
 
     async def _extract_media(self, nodes: list[dict]) -> list[InstagramMedia]:
@@ -198,20 +199,39 @@ class InstagramService:
             is not None,
             **self._crawler_root_details(objects),
         )
+        page_state = self._crawler_page_state(soup, self._source_details["crawler"])
+        self._source_details["crawler"]["page_state"] = page_state
         timeline_ids = {
             str(value["id"])
             for value in objects
             if value.get("id") is not None
             and isinstance(value.get("polaris_timeline_connection"), dict)
         }
+        matching = [value for value in objects if self._matches_username(value)]
         users = [
             value
-            for value in objects
-            if self._matches_username(value)
-            and isinstance(value.get("is_private"), bool)
+            for value in matching
+            if isinstance(value.get("is_private"), bool)
             and any(value.get(key) is not None for key in ("id", "pk"))
         ]
-        self._source_details["crawler"]["matching_profiles"] = len(users)
+        self._source_details["crawler"].update(
+            matching_profiles=len(users),
+            matching_username_objects=len(matching),
+            matching_id_profiles=sum(
+                any(value.get(key) is not None for key in ("id", "pk"))
+                for value in matching
+            ),
+            matching_privacy_profiles=sum(
+                isinstance(value.get("is_private"), bool) for value in matching
+            ),
+            timeline_objects=sum(
+                isinstance(value.get("polaris_timeline_connection"), dict)
+                for value in objects
+            ),
+        )
+        if page_state not in ("profile_page", "unknown"):
+            self._log_failure("crawler", page_state)
+            return None
         user = max(
             users,
             key=lambda value: (
@@ -273,12 +293,57 @@ class InstagramService:
                     "PolarisErrorRoot.react",
                     "PolarisProfilePostsLoggedOutTabGridRoot.react",
                     "PolarisLoggedOutMobileProfileRoot.react",
+                    "PolarisLoggedOutMobileGatedBlockRoot.react",
                 )
                 else "other",
                 "root_failure_reason_present": props.get("failure_reason") is not None,
                 "restricted_age_present": props.get("restricted_age") is not None,
+                "age_restricted": type(props.get("restricted_age")) is int
+                and props["restricted_age"] > 0,
             }
         return {"root_component": "missing"}
+
+    @staticmethod
+    def _crawler_page_state(soup: BeautifulSoup, details: dict[str, object]) -> str:
+        # Inspect form destinations, never login links or translated page text.
+        # Navigation links and bundled login code also occur on valid profiles.
+        form_paths = {
+            InstagramService._form_path(form.get("action"))
+            for form in soup.find_all("form")
+            if isinstance(form, Tag)
+        }
+        if any(
+            path in ("/challenge", "/checkpoint")
+            or path.startswith(("/challenge/", "/checkpoint/"))
+            for path in form_paths
+        ):
+            return "challenge_page"
+        if details.get("age_restricted") is True:
+            return "age_restricted"
+        if "/accounts/login" in form_paths:
+            return "login_page"
+        component = details.get("root_component")
+        if component == "PolarisLoggedOutMobileGatedBlockRoot.react":
+            return "logged_out_gate"
+        if component == "PolarisErrorRoot.react":
+            # Instagram's generic error root does not prove account deletion.
+            return "error_page"
+        if component in (
+            "PolarisProfilePostsLoggedOutTabGridRoot.react",
+            "PolarisLoggedOutMobileProfileRoot.react",
+        ):
+            return "profile_page"
+        return "unknown"
+
+    @staticmethod
+    def _form_path(action: object) -> str:
+        if not isinstance(action, str):
+            return ""
+        try:
+            return urlsplit(action).path.rstrip("/")
+        except ValueError:
+            # A malformed optional form action is not evidence of a login wall.
+            return ""
 
     def _matches_username(self, user: dict) -> bool:
         username = user.get("username")
@@ -397,20 +462,31 @@ class InstagramService:
     async def _get_api_json(
         self, url: str, headers: dict[str, str], source: str
     ) -> dict | None:
-        for reason in ("rate-limited", "authentication-required"):
+        details = self._source_details.setdefault(source, {})
+        for reason, field in (
+            ("rate-limited", "rate_limit_cooldown_state"),
+            ("authentication-required", "authentication_cooldown_state"),
+        ):
             key = f"instagram:{source}:{reason}"
-            if not self._cache.has_valid_cache(key):
-                continue
             retry_at = self._cache.get_expiry(key)
-            if retry_at is not None:
-                self._retry_times.append(retry_at)
+            if retry_at is None:
+                details[field] = "missing"
+                continue
+            remaining = (retry_at - datetime.now(UTC)).total_seconds()
+            if remaining <= 0:
+                details[field] = "expired"
+                continue
+            details[field] = "active"
+            self._retry_times.append(retry_at)
             self._source_outcomes[source] = f"skipped:{reason}"
             self._logger.info(
                 "instagram_api_skipped",
                 source=source,
                 reason=reason,
-                retry_at=retry_at.isoformat() if retry_at else None,
+                retry_at=retry_at.isoformat(),
+                cooldown_remaining_seconds=round(remaining, 3),
                 cooldown_scope="source",
+                **details,
             )
             return None
 
