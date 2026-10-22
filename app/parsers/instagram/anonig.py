@@ -2,6 +2,7 @@ import asyncio
 import base64
 import re
 from datetime import timedelta
+from html import escape
 from io import BytesIO
 from typing import Literal, override
 from urllib.parse import urlparse
@@ -31,6 +32,12 @@ logger = structlog.get_logger(__name__)
 
 
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
+    """Embed still images and deduplicate by their content.
+
+    Video URL lifetimes are unverified and no durable video store is configured.
+    Explicitly marked videos are unsupported, even when a thumbnail is available.
+    """
+
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
     _cache_storage_time_if_success = timedelta(weeks=1)
     _selenium_wait_time = 0
@@ -44,10 +51,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     @override
     async def _generate_hash(self, item: Item) -> str:
-        video_match = re.search(r'<video[^>]+src="([^"]+)"', item.text)
-        if video_match:
-            return HashService.hash_str(video_match.group(1))
-
         match = re.search(r'src="data:[^;]+;base64,([^"]+)"', item.text)
         if match:
             return HashService.hash_str(match.group(1))
@@ -89,8 +92,6 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     async def _create_item_from_media(self, media: Tag) -> Item | None:
         if media.find(class_="tags__item--video") is not None:
-            # Video links expire. Skip every explicitly marked video, including
-            # links without an .mp4 suffix, rather than publishing its thumbnail.
             logger.info("anonyig_media_skipped", reason="unsupported_video")
             return None
 
@@ -117,9 +118,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             if header[5:-7].lower() != mime_type:
                 raise ValueError("Anonyig image MIME type does not match its data")
         else:
-            parsed = urlparse(src)
-            if parsed.scheme not in ("http", "https") or not parsed.hostname:
-                raise ValueError("Anonyig image has an invalid URL")
+            self._validate_image_url(src)
             try:
                 img_bytes = await get_html(src)
             except HttpRequestError as exc:
@@ -127,16 +126,35 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             mime_type = self._image_mime_type(img_bytes)
             encoded = base64.b64encode(img_bytes).decode("utf-8")
 
-        img_tag = (
-            f'<img src="data:{mime_type};base64,{encoded}" alt="{self._user_name}" />'
-        )
+        image_url = escape(f"data:{mime_type};base64,{encoded}", quote=True)
+        username = escape(self._user_name, quote=True)
+        img_tag = f'<img src="{image_url}" alt="{username}" />'
 
         return Item(
             title="inst: " + self._user_name,
-            text=f"{self._user_name}<br>{img_tag}",
+            text=f"{username}<br>{img_tag}",
             date=constant_datetime,
             link=self.feed.url,
         )
+
+    @staticmethod
+    def _validate_image_url(src: str) -> None:
+        if any(char.isspace() or ord(char) < 32 for char in src) or "\\" in src:
+            raise ValueError("Anonyig image has an invalid URL")
+        try:
+            parsed = urlparse(src)
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("Anonyig image has an invalid URL") from exc
+        if (
+            parsed.scheme not in ("http", "https")
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or port == 0
+            or any(char in src for char in '<>"\x7f')
+        ):
+            raise ValueError("Anonyig image has an invalid URL")
 
     @staticmethod
     def _image_mime_type(content: bytes) -> str:
