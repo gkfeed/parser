@@ -11,7 +11,7 @@ from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.redlib import InvalidRedlibPage, RedlibClient
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 from app.utils.html import require_tag, required_text
 
 
@@ -85,8 +85,8 @@ class RedditFeed(
         datetime_tag = post.find(class_="created")
         if isinstance(datetime_tag, Tag):
             datetime_str = datetime_tag.get("title")
-            if isinstance(datetime_str, str):
-                return convert_datetime(datetime_str)
+            if isinstance(datetime_str, str) and datetime_str.strip():
+                return parse_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @override

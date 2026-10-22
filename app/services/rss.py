@@ -2,12 +2,10 @@ from html import escape
 from typing import Literal
 from xml.etree import ElementTree
 
-from dateutil.parser import parse as parse_datetime
-
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.serializers.feed import Item
 from app.services.http import HttpRequestError, HttpService
-from app.utils.datetime import convert_datetime
+from app.utils.datetime import parse_datetime
 
 ContentSource = Literal["description", "encoded", "enclosure"]
 CONTENT_ENCODED = "{http://purl.org/rss/1.0/modules/content/}encoded"
@@ -67,7 +65,7 @@ class RSSParser:
                 title=item["title"],
                 link=item["link"],
                 text=item["description"],
-                date=convert_datetime(item["pub_date"]),
+                date=parse_datetime(item["pub_date"]),
                 guid=item.get("guid", "") if include_guid else None,
             )
             for item in feed
@@ -115,8 +113,6 @@ class RSSParser:
                 if not item[field].strip():
                     raise ValueError(f"RSS item {index}: missing or empty {field}")
             try:
-                # Validate before convert_datetime can replace a bad date with
-                # its historical constant fallback. Do not change that utility.
                 parse_datetime(item["pub_date"])
             except (ValueError, OverflowError) as exc:
                 raise ValueError(f"RSS item {index}: invalid pubDate: {exc}") from exc
