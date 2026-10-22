@@ -76,14 +76,8 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     @property
     async def _show_title(self) -> str:
         soup = await self.get_soup(self._url)
-        h1 = soup.find("h1")
-
-        if not isinstance(h1, Tag):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "h1 tag not found or not a Tag instance."
-            )
-
-        return " ".join(h1.stripped_strings)
+        h1 = require_tag(soup.find("h1"), "Shiki title")
+        return required_text(h1, "Shiki title", separator=" ")
 
     @property
     def _url(self) -> str:
@@ -93,7 +87,6 @@ class ShikiFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
         return self.feed.url
 
     def _get_item_status(self, item: Tag) -> str:
-        span_tag = item.find_all("span")[-1]
-        if isinstance(span_tag, Tag):
-            return span_tag.text
-        raise ValueError
+        spans = item.find_all("span")
+        status = require_tag(spans[-1] if spans else None, "Shiki episode status")
+        return required_text(status, "Shiki episode status")

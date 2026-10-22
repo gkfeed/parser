@@ -8,6 +8,7 @@ from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import constant_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
@@ -35,19 +36,15 @@ class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        title_tag = post.find("span", class_="name-en")
-        if isinstance(title_tag, Tag):
-            return title_tag.text
-        raise ValueError("Title not found")
+        title_tag = require_tag(
+            post.find("span", class_="name-en"), "Shiki ongoing title"
+        )
+        return required_text(title_tag, "Shiki ongoing title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        link_tag = post.find("a")
-        if isinstance(link_tag, Tag):
-            href = link_tag.get("href")
-            if isinstance(href, str):
-                return href
-        raise ValueError("Link not found")
+        link_tag = require_tag(post.find("a"), "Shiki ongoing link")
+        return required_attr(link_tag, "href", "Shiki ongoing link")
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:

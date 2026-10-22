@@ -16,6 +16,7 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.utils.html import require_tag, required_attr, required_text
 
 logger = structlog.get_logger(__name__)
 
@@ -79,10 +80,10 @@ class HltvFeed(
             raise ValueError("Upcoming matches headline not found.")
 
         headline_container = upcoming_matches_headline_tag
-        if (
-            isinstance(upcoming_matches_headline_tag.parent, Tag)
-            and "headline-with-action"
-            in (upcoming_matches_headline_tag.parent.get("class") or [])
+        if isinstance(
+            upcoming_matches_headline_tag.parent, Tag
+        ) and "headline-with-action" in (
+            upcoming_matches_headline_tag.parent.get("class") or []
         ):
             headline_container = upcoming_matches_headline_tag.parent
 
@@ -116,15 +117,14 @@ class HltvFeed(
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        match_link_tag = post.select_one(
-            "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
+        match_link_tag = require_tag(
+            post.select_one(
+                "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
+            ),
+            "HLTV match link",
         )
-        if not isinstance(match_link_tag, Tag):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Link tag not found"
-            )
-
-        return urljoin("https://www.hltv.org", str(match_link_tag["href"]))
+        href = required_attr(match_link_tag, "href", "HLTV match link")
+        return urljoin("https://www.hltv.org", href)
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
@@ -162,4 +162,7 @@ class HltvFeed(
         if not isinstance(team1_name_tag, Tag) or not isinstance(team2_name_tag, Tag):
             return None
 
-        return team1_name_tag.get_text(strip=True), team2_name_tag.get_text(strip=True)
+        return (
+            required_text(team1_name_tag, "HLTV first team name"),
+            required_text(team2_name_tag, "HLTV second team name"),
+        )
