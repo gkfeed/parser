@@ -37,7 +37,10 @@ def video_link(video: dict[str, Any]) -> str:
 
 
 def _validate_extraction(
-    url: str, info: dict[str, Any] | None, error: str | None
+    url: str,
+    info: dict[str, Any] | None,
+    error: str | None,
+    warnings: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     if not isinstance(info, dict):
         raise _InvalidVkVideoMetadata("VK Video extraction did not return metadata")
