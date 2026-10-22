@@ -38,11 +38,6 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
     async def _parse_releases_links(self, soup) -> list[Tag]:
         return list(soup.select('a[href^="/album"]'))
 
-    @property
-    async def _releases_links(self) -> list[Tag]:
-        soup = await self._get_discography_soup()
-        return await self._parse_releases_links(soup)
-
     async def _parse_artist_name(self, soup) -> str:
         meta_title = soup.find("meta", property="og:title")
         if meta_title and isinstance(meta_title, Tag) and meta_title.get("content"):
@@ -79,8 +74,3 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         if isinstance(href, str) and href.startswith("/album"):
             return f"https://open.spotify.com{href}"
         raise ValueError("Link href not found or not valid")
-
-    @property
-    async def _artist_name(self) -> str:
-        soup = await self._get_discography_soup()
-        return await self._parse_artist_name(soup)
