@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import Enum
 
 from app.core.worker_kind import WorkerKind
@@ -36,6 +37,15 @@ from .yummyanime import YummyAnimeFeed
 
 
 @dataclass(frozen=True)
+class ParserSchedulingPolicy:
+    empty_delay: timedelta
+    success_delay: timedelta
+
+    def delay_for_result(self, *, has_items: bool) -> timedelta:
+        return self.success_delay if has_items else self.empty_delay
+
+
+@dataclass(frozen=True)
 class ParserConfig:
     id: str
     handler: type[BaseFeed]
@@ -43,6 +53,18 @@ class ParserConfig:
     @property
     def worker_kind(self) -> WorkerKind:
         return self.handler.worker_kind
+
+    @property
+    def scheduling_policy(self) -> ParserSchedulingPolicy:
+        """Expose existing cache-backed delays, including inherited overrides."""
+        return ParserSchedulingPolicy(
+            empty_delay=getattr(
+                self.handler, "_cache_storage_time", timedelta(hours=1)
+            ),
+            success_delay=getattr(
+                self.handler, "_cache_storage_time_if_success", timedelta(days=1)
+            ),
+        )
 
 
 class Parser(Enum):

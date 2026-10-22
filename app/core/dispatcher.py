@@ -9,7 +9,7 @@ from structlog.contextvars import bound_contextvars
 
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
-from app.parsers import PARSERS
+from app.parsers import PARSERS, ParserConfig
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import (
     BrokerError,
@@ -22,7 +22,7 @@ logger = structlog.get_logger(__name__)
 
 
 class FeedParserRepositoryProtocol(Protocol):
-    async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
+    async def upsert(self, feed_id: int, next_run_at: datetime) -> FeedParser: ...
 
 
 class FeedRepositoryProtocol(Protocol):
@@ -109,26 +109,23 @@ class Dispatcher:
         self._failure_counts.pop(feed.id, None)
         items = result.items
         received = len(items)
+        policy = ParserConfig(feed.type, parser_cls).scheduling_policy
+        delta = policy.delay_for_result(has_items=bool(items))
 
         if items:
-            delta = getattr(
-                parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
-            )
             items = await self.items_repository.add_items_to_feed(feed, items)
-        else:
-            delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
         now = datetime.now(UTC)
         if result.retry_at is None:
-            new_valid_for = now + delta
+            next_run_at = now + delta
         else:
-            new_valid_for = max(result.retry_at, now + timedelta(seconds=1))
+            next_run_at = max(result.retry_at, now + timedelta(seconds=1))
             logger.info(
                 "feed_retry_scheduled",
                 reason="parser_requested_retry",
-                next_retry=new_valid_for.isoformat(),
+                next_retry=next_run_at.isoformat(),
             )
-        await self.feed_parser_repository.upsert(feed.id, new_valid_for)
+        await self.feed_parser_repository.upsert(feed.id, next_run_at)
         logger.info("feed_items_received", received=received, returned=len(items))
 
     async def _schedule_failure(self, feed_id: int) -> None:
