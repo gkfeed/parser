@@ -7,6 +7,7 @@ from dateutil.parser import parse as parse_datetime
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.serializers.feed import Item
 from app.services.http import HttpRequestError, HttpService
+from app.services.rss_http import http_unavailable
 from app.utils.datetime import convert_datetime
 
 ContentSource = Literal["description", "encoded", "enclosure"]
@@ -51,7 +52,7 @@ class RSSParser:
         except HttpRequestError as exc:
             raise FeedUnavailable(url, "http_request_failed") from exc
         if not 200 <= response.status < 300:
-            raise FeedUnavailable(url, f"http_status_{response.status}")
+            raise http_unavailable(url, response)
         return response.content
 
     @staticmethod
