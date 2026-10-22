@@ -1,4 +1,6 @@
 import asyncio
+import re
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Never, override
 from urllib.parse import urlsplit
@@ -6,7 +8,7 @@ from urllib.parse import urlsplit
 import structlog
 from bs4 import Tag
 from requests.exceptions import RequestException
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -119,11 +121,12 @@ class InstagramStoriesFeed(
         if dismiss_buttons:
             self._click(driver, dismiss_buttons[0])
 
-        wait = WebDriverWait(driver, self._results_wait_time)
-        links = wait.until(
+        links = self._wait_for(
+            driver,
+            "search_form",
             EC.visibility_of_any_elements_located(
                 (By.CSS_SELECTOR, "form.search-form input.search-form__input")
-            )
+            ),
         )
         driver.execute_script(
             """
@@ -134,10 +137,12 @@ class InstagramStoriesFeed(
             self._user_name,
         )
 
-        button = wait.until(
+        button = self._wait_for(
+            driver,
+            "search_submit",
             EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "form.search-form .search-form__button")
-            )
+            ),
         )
         self._click(driver, button)
 
@@ -146,21 +151,25 @@ class InstagramStoriesFeed(
             "and normalize-space(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', "
             "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
         )
-        result = wait.until(
+        result = self._wait_for(
+            driver,
+            "search_result",
             EC.any_of(
                 EC.presence_of_element_located((By.XPATH, stories_button)),
                 self._loaded_error,
-            )
+            ),
         )
         result_classes = (result.get_attribute("class") or "").split()
         if "error-message__text" in result_classes:
-            self._check_error(result)
+            self._check_error(driver, result, "search_result")
         if (
             "tabs-component__button--disabled" in result_classes
             or not result.is_enabled()
             or result.get_attribute("aria-disabled") == "true"
         ):
-            raise self._unavailable("private")
+            raise self._browser_unavailable(
+                driver, "stories_tab_disabled", "stories_tab"
+            )
         self._click(driver, result)
         media_ready = EC.all_of(
             EC.presence_of_element_located(
@@ -184,9 +193,11 @@ class InstagramStoriesFeed(
                 )
             ),
         )
-        stories_result = wait.until(EC.any_of(self._loaded_error, media_ready))
+        stories_result = self._wait_for(
+            driver, "stories_media", EC.any_of(self._loaded_error, media_ready)
+        )
         if isinstance(stories_result, WebElement):
-            self._check_error(stories_result)
+            self._check_error(driver, stories_result, "stories_media")
 
         self._dismiss_subscription_landing(driver)
         self._load_all_media(driver)
@@ -201,14 +212,13 @@ class InstagramStoriesFeed(
         # Anonyig hides loaded results behind its subscription landing. Use its
         # browser-download button so pagination can inspect the visible list.
         self._click(driver, buttons[0])
-        try:
-            WebDriverWait(driver, self._results_wait_time).until(
-                EC.none_of(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".tz-landing-exp"))
-                )
-            )
-        except TimeoutException as exc:
-            raise self._unavailable("media_loading_unverified") from exc
+        self._wait_for(
+            driver,
+            "subscription_landing",
+            EC.none_of(
+                EC.presence_of_element_located((By.CSS_SELECTOR, ".tz-landing-exp"))
+            ),
+        )
 
     def _load_all_media(self, driver: WebDriver) -> None:
         try:
@@ -218,9 +228,13 @@ class InstagramStoriesFeed(
                 trigger_selector=".search-result .profile-media-list .trigger",
             ).load(self._results_wait_time)
         except LazyListUnavailableError as exc:
-            raise self._unavailable("media_loading_unverified") from exc
+            raise self._browser_unavailable(
+                driver, "media_loading_unverified", "pagination"
+            ) from exc
         except LazyListTimeoutError as exc:
-            raise self._unavailable("media_loading_timeout") from exc
+            raise self._browser_unavailable(
+                driver, "media_loading_timeout", "pagination"
+            ) from exc
 
     @staticmethod
     def _loaded_error(driver: WebDriver) -> WebElement | Literal[False]:
@@ -235,20 +249,149 @@ class InstagramStoriesFeed(
                 return error
         return False
 
-    def _check_error(self, error: WebElement) -> Never:
-        message = (error.get_attribute("textContent") or "").lower()
+    def _wait_for[T](
+        self,
+        driver: WebDriver,
+        stage: str,
+        condition: Callable[[WebDriver], T | Literal[False]],
+    ) -> T:
+        try:
+            return WebDriverWait(driver, self._results_wait_time).until(condition)
+        except TimeoutException as exc:
+            raise self._browser_unavailable(driver, f"{stage}_timeout", stage) from exc
+
+    def _check_error(self, driver: WebDriver, error: WebElement, stage: str) -> Never:
+        message = error.get_attribute("textContent") or ""
+        raise self._browser_unavailable(
+            driver, self._error_reason(message), stage, message=message
+        )
+
+    @staticmethod
+    def _error_http_status(message: str) -> int | None:
+        # Only explicit HTTP/error syntax or standard status titles count.
+        match = re.search(
+            r"\b(?:http(?: error)?|status(?: code)?|error)\s*[:=-]?\s*([45]\d{2})\b"
+            r"|\b([45]\d{2})\s+(?:bad gateway|service unavailable|forbidden|"
+            r"too many requests|unauthorized|internal server error|gateway timeout)\b",
+            message.lower(),
+        )
+        return int(match.group(1) or match.group(2)) if match else None
+
+    @classmethod
+    def _error_reason(cls, message: str) -> str:
+        message = message.lower()
+        if any(
+            text in message
+            for text in (
+                "captcha",
+                "verify you are human",
+                "challenge-platform",
+                "just a moment",
+            )
+        ):
+            return "challenge_required"
+        if any(
+            text in message
+            for text in (
+                "log in",
+                "login required",
+                "sign in",
+                "authentication required",
+            )
+        ):
+            return "authentication_required"
+        status = cls._error_http_status(message)
+        if status == 401:
+            return "authentication_required"
+        if "too many requests" in message or status == 429:
+            return "rate_limited"
+        if status is not None:
+            return "upstream_http_error"
+        if any(
+            text in message
+            for text in (
+                "bad gateway",
+                "service unavailable",
+                "internal server error",
+                "<!doctype html",
+                "<html",
+            )
+        ):
+            return "upstream_error_page"
         if "no stories" in message:
-            # Anonyig also uses this message for upstream failures.
-            logger.warning("stories_empty_unverified")
-            raise self._unavailable("empty_unverified")
+            # The source also uses this message for upstream failures.
+            return "empty_unverified"
         if "private" in message:
-            raise self._unavailable("private")
+            return "private"
         if any(
             text in message
             for text in ("user not found", "profile not found", "account not found")
         ):
-            raise self._unavailable("not_found")
-        raise self._unavailable("upstream_error")
+            return "not_found"
+        return "upstream_error"
+
+    def _browser_unavailable(
+        self, driver: WebDriver, reason: str, stage: str, *, message: str = ""
+    ) -> FeedUnavailable:
+        context: dict = {}
+        try:
+            context = driver.execute_script(
+                """
+                const count = s => document.querySelectorAll(s).length;
+                const triggers = [...document.querySelectorAll(
+                    '.search-result .profile-media-list .trigger')];
+                const forms = count('form.search-form');
+                const results = count('.search-result');
+                return {
+                    document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                    search_forms: forms,
+                    search_results: results,
+                    loaders: count('.search-result .loader-component'),
+                    media_cards: count('.search-result .profile-media-list__item'),
+                    download_links: count('.search-result a.download-btn[href]'),
+                    subscription_landings: count('.tz-landing-exp'),
+                    pagination_triggers: triggers.length,
+                    visible_pagination_triggers: triggers.filter(e =>
+                        e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})).length,
+                    source_message: document.querySelector(
+                        '.search-result .error-message__text')?.textContent || '',
+                    // Full-page failures have no search UI. Never log this text.
+                    page_message: !forms && !results ?
+                        document.title + ' ' + (document.body?.innerText || '') : ''
+                };
+                """
+            )
+        except WebDriverException as exc:
+            # Diagnostics must preserve the actual source failure.
+            context["diagnostic_error"] = type(exc).__name__
+        page_message = context.pop("page_message", "")
+        source_message = context.pop("source_message", "")
+        message = message or source_message or page_message
+        error_kind = self._error_reason(message) if message else None
+        document_status = context.get("document_status")
+        if error_kind in ("challenge_required", "authentication_required"):
+            reason = error_kind
+        elif document_status == 401:
+            reason = "authentication_required"
+        elif isinstance(document_status, int) and document_status >= 400:
+            reason = "rate_limited" if document_status == 429 else "upstream_http_error"
+        elif page_message and error_kind in (
+            "rate_limited",
+            "upstream_http_error",
+            "upstream_error_page",
+        ):
+            reason = error_kind
+        logger.warning(
+            "stories_source_unavailable",
+            stage=stage,
+            reason=reason,
+            error_kind=error_kind,
+            error_http_status=self._error_http_status(message),
+            message_length=len(message),
+            message_hash=HashService.hash_str(message) if message else None,
+            **context,
+        )
+        return self._unavailable(reason)
 
     def _unavailable(self, reason: str) -> FeedUnavailable:
         delay = (
