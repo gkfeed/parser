@@ -127,8 +127,9 @@ the old workers, then `make docker-browser-start` if browser processing is neede
 
 ### Database configuration
 
-`DB_URL` must point to PostgreSQL. The parser normalizes the standard PostgreSQL
-schemes to use the asyncpg driver.
+Set `DB_URL` in the parser's local `.env` to the externally managed PostgreSQL
+database. The parser normalizes the standard PostgreSQL schemes to use the
+asyncpg driver.
 
 Accepted formats:
 
@@ -136,4 +137,61 @@ Accepted formats:
 - `postgresql://user:password@host:port/dbname`
 - `postgresql+asyncpg://user:password@host:port/dbname`
 
-SQLite URLs are rejected.
+Use the parser LOGIN identity provisioned by the operator, with inherited
+membership in the `gkfeed_parser` NOLOGIN group. The group permits reads of
+feeds and the migration registry, inserts of items, and writes of parser state
+and item hashes. It does not permit schema creation or migration, feed writes,
+or item deletion. The LOGIN identity must own no database objects and have no
+extra grants or elevated role attributes. Do not use the migration owner or a
+superuser for `DB_URL`. See the infra
+[application role contract](https://github.com/gkfeed/infra/blob/master/docs/application-roles.md).
+
+Percent-encode special characters in URL credentials. Keep real connection URLs,
+passwords, and LOGIN-role provisioning outside Git. Inside the production
+Compose network, use the infra service hostname `postgres` and port `5432`.
+`localhost` inside a parser container refers to that container, not the database.
+
+SQLite is only supported by local test fixtures. Deployment must use PostgreSQL;
+parser Compose has no database service or SQLite data volume.
+
+### Database deployment order
+
+The operator must migrate infra before starting or updating the parser:
+
+1. In the `gkfeed/infra` checkout, start the managed PostgreSQL service and apply
+   merged migrations with the operator's connection configuration:
+
+   ```bash
+   make postgres-up
+   make status
+   make migrate
+   make status
+   ```
+
+   The final status must show no pending migrations. Infra owns the schema and
+   grants; parser deployment must not run DDL. Follow the infra
+   [migration policy](https://github.com/gkfeed/infra/blob/master/docs/migrations.md).
+2. Ensure the parser LOGIN identity has the role described above, and configure
+   the parser's `.env`. The infra Compose project must provide the external
+   `gkfeed-infra_default` network used by the production overlay.
+3. In the parser checkout, build the images and run the read-only schema check
+   with the same environment and network as the dispatcher:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.production.yml build
+   docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm --no-deps dispatcher python -m app.run.check_schema_compatibility
+   ```
+
+   The check reads `public.schema_migrations` and requires migration
+   `20260904184133` or a later ID. It exits unsuccessfully if the registry is
+   missing, too old, or inaccessible. Resolve the error in infra before starting
+   the parser; the check does not create or migrate the schema.
+4. Start the parser only after the check succeeds:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+   ```
+
+For subsequent updates, complete the infra migration and schema check before
+running `make docker-update`. Enable the optional browser worker afterward with
+`make docker-browser-start` on the local host.
