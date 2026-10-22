@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-import aiohttp
+from .lifecycle import HttpSessionScope
 from aiohttp.client_exceptions import ClientConnectorError, ClientError, InvalidURL
 
 _headers = {
@@ -27,7 +27,7 @@ class HttpResponse:
     headers: dict[str, str]
 
 
-class HttpService:
+class HttpService(HttpSessionScope):
     headers = _headers
 
     @classmethod
@@ -50,7 +50,7 @@ class HttpService:
     async def get_response(
         cls, url: str, headers: dict = headers, max_bytes: int | None = None
     ) -> HttpResponse:
-        async with aiohttp.ClientSession() as session:
+        async with cls.session() as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     if max_bytes is None:
@@ -74,7 +74,7 @@ class HttpService:
 
     @classmethod
     async def post(cls, url: str, body: dict, headers: dict | None = headers) -> bytes:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with cls.session() as session:
             try:
                 async with session.post(url, data=body, headers=headers) as response:
                     return await response.content.read()
@@ -83,7 +83,7 @@ class HttpService:
 
     @classmethod
     async def delete(cls, url: str, headers: dict = headers) -> bytes:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with cls.session() as session:
             try:
                 async with session.delete(url, headers=headers) as response:
                     return await response.content.read()
@@ -92,7 +92,7 @@ class HttpService:
 
     @classmethod
     async def get_json(cls, url: str, headers: dict = headers) -> dict:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with cls.session() as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     return await response.json()
@@ -103,7 +103,7 @@ class HttpService:
     async def post_json(
         cls, url: str, json: dict, headers: dict | None = headers
     ) -> dict:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with cls.session() as session:
             try:
                 async with session.post(url, json=json, headers=headers) as response:
                     response.raise_for_status()
@@ -113,7 +113,7 @@ class HttpService:
 
     @classmethod
     async def get_status(cls, url: str, headers: dict | None = headers) -> int:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with cls.session() as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     return response.status
