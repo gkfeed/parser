@@ -11,6 +11,12 @@ Run this check automatically after any code change, including features, fixes, a
 
 Review the diff for the current task, including staged and unstaged changes. Read affected functions, callers, and inherited parser hooks. Keep unrelated existing changes intact. Expand the review only where needed to understand the fix's behavior.
 
+### Keep parsers readable
+
+Readability takes priority over DOM reuse, deduplication, and lower nesting counts. Keep parsers compact and reject refactors that make the parsing path harder to follow. Preserve validation, selectors, fallback order, item identity, and failure behavior.
+
+Reuse an already extracted DOM node through a local variable when it makes the code clearer. A small repeated lookup can be preferable to extra state, cleanup, parameter plumbing, or a parallel parsing path. Byte caching does not cache DOM trees, and calling a helper twice does not reuse its result; neither fact alone justifies a refactor.
+
 ### Keep control flow flat
 
 Avoid three nested control-flow blocks. Prefer guard clauses, early returns, and `continue`. Extract a complete operation into a named method when that makes the caller easier to understand. Preserve transaction boundaries, resource lifetimes, retries, cancellation, and cleanup.
@@ -23,7 +29,7 @@ python <skill-dir>/scripts/check_nesting.py <changed-python-files>
 
 Replace the placeholders with this skill's directory and actual file paths. The scanner counts `if`, loops, `try`, `with`, `match`, and their async variants. It treats `elif` as the same level and starts a new count inside each function. It lists the first point reaching depth 3 in each branch. Review those candidates manually, including pre-existing nesting affected by the change. Also inspect comprehensions, conditional expressions, and callbacks, which the scanner does not measure. A successful scanner exit does not mean the code passed verification.
 
-Flatten nesting introduced or made harder to follow by the change. If a third level must remain to preserve behavior, keep the reason explicit. Do not replace readable blocks with dense expressions to reduce indentation.
+Flatten nesting introduced or made harder to follow by the change. If a third level is clearer or must remain to preserve behavior, keep the reason explicit. Do not replace readable blocks with dense expressions to reduce indentation.
 
 ### Raise on failure
 
