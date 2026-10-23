@@ -16,4 +16,5 @@ def _filter_by_worker_type(worker_kind: WorkerKind, ignore: set[Parser]) -> list
 
 
 light_parsers = _filter_by_worker_type(WorkerKind.LIGHT, ignored_parser_types)
-heavy_parsers = _filter_by_worker_type(WorkerKind.HEAVY, ignored_parser_types)
+http_parsers = _filter_by_worker_type(WorkerKind.HTTP, ignored_parser_types)
+browser_parsers = _filter_by_worker_type(WorkerKind.BROWSER, ignored_parser_types)
