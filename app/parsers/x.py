@@ -1,17 +1,30 @@
 from datetime import datetime
 from typing import override
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import convert_datetime
+from app.utils.html import require_tag
 
 
 class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
     _base_url = "https://nitter.esmailelbob.xyz/"
     _x_url = "https://x.com"
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        require_tag(soup.select_one(".profile-card"), "Nitter profile")
+        timeline = require_tag(soup.select_one(".timeline"), "Nitter timeline")
+        if timeline.select_one(".timeline-item") is not None:
+            return
+        empty = timeline.select_one(".timeline-none")
+        if empty and empty.get_text(" ", strip=True) == "No items found":
+            return
+        raise ValueError("Missing Nitter posts or empty timeline result")
 
     @property
     @override

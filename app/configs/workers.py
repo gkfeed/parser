@@ -3,6 +3,7 @@ from app.parsers import Parser
 
 ignored_parser_types: set[Parser] = {
     Parser.X,
+    Parser.MATRESHKA,  # The site has closed.
 }
 
 

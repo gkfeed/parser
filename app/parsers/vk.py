@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urlparse
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
+from dateutil.parser import parse
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -13,24 +14,37 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.utils.datetime import constant_datetime, convert_datetime
 
 
 class VkFeed(
     PostToItemsMixin,
-    ItemsHashExtension,
+    ItemLinkHashExtension,
     SeleniumParserExtension,
     CacheFeedExtension,
 ):
     _cache_storage_time = timedelta(hours=1)
     _selenium_wait_time = 5
     _post_selector = '[data-testid="post"][data-post-id]'
+    _empty_selector = (
+        '#page-wall [data-testid="feed-empty-result"], '
+        '#page-wall [data-testid="empty_wall"]'
+    )
     _challenge_attempts = 3
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.select_one(f"{self._post_selector}, .wall_post_cont") is not None:
+            return
+        if soup.select_one("button.start") is not None:
+            raise FeedUnavailable(url, "browser_challenge")
+        if soup.select_one(self._empty_selector) is not None:
+            return
+        raise FeedUnavailable(url, "missing_wall")
 
     @property
     @override
@@ -44,48 +58,49 @@ class VkFeed(
             for post in soup.find_all(class_="wall_post_cont")
             if isinstance(post, Tag)
         ]
-        if legacy_posts:
-            return legacy_posts
-
-        if soup.select_one("button.start"):
-            raise FeedUnavailable(self.feed.url, "browser_challenge")
-
-        return []
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
+        return legacy_posts
 
     @override
     def make_actions(self, driver: WebDriver):
+        for _ in range(self._challenge_attempts):
+            if self._attempt_challenge(driver):
+                return
+
+        raise FeedUnavailable(self.feed.url, "browser_challenge")
+
+    def _attempt_challenge(self, driver: WebDriver) -> bool:
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
+        empty = ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector))
+        page_ready = ec.any_of(posts, empty)
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
         wait = WebDriverWait(driver, 30)
         try:
-            for _ in range(self._challenge_attempts):
-                if posts(driver):
-                    return
+            if page_ready(driver):
+                return True
 
-                buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
-                if not buttons:
-                    return
+            buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
+            if not buttons:
+                wait.until(page_ready)
+                return True
 
-                button = wait.until(start)
-                button.click()
-                # Hiding the button starts the challenge; it does not finish it.
-                wait.until(
-                    ec.any_of(posts, challenge_error, ec.invisibility_of_element(button))
+            button = wait.until(start)
+            button.click()
+            # Hiding the button starts the challenge; it does not finish it.
+            wait.until(
+                ec.any_of(
+                    page_ready, challenge_error, ec.invisibility_of_element(button)
                 )
-                wait.until(ec.any_of(posts, challenge_error, start))
-                if posts(driver):
-                    return
-                if not start(driver):
-                    raise FeedUnavailable(self.feed.url, "browser_challenge")
+            )
+            wait.until(ec.any_of(page_ready, challenge_error, start))
+            if page_ready(driver):
+                return True
+            if not start(driver):
+                raise FeedUnavailable(self.feed.url, "browser_challenge")
 
-            raise FeedUnavailable(self.feed.url, "browser_challenge")
+            return False
         except (TimeoutException, WebDriverException) as error:
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
 
@@ -133,16 +148,18 @@ class VkFeed(
             'a[href*="photo-"][style*="background-image"], '
             '.page_post_thumb_wrap[style*="background-image"]'
         )
-        if isinstance(thumbnail, Tag):
-            style = thumbnail.get("style")
-            if isinstance(style, str):
-                match = re.search(
-                    r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style
-                )
-                if match and self._is_http_url(match.group(2)):
-                    return match.group(2)
+        if not isinstance(thumbnail, Tag):
+            return None
 
-        return None
+        style = thumbnail.get("style")
+        if not isinstance(style, str):
+            return None
+
+        match = re.search(r'background-image\s*:\s*url\((["\']?)(.*?)\1\)', style)
+        if not match or not self._is_http_url(match.group(2)):
+            return None
+
+        return match.group(2)
 
     @staticmethod
     def _is_http_url(value: str) -> bool:
@@ -150,15 +167,31 @@ class VkFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        time_tag = post.find("time")
-        if not isinstance(time_tag, Tag):
+        for time_tag in post.select('[data-testid="post_date_block_preview"], time'):
+            owner = time_tag.find_parent(attrs={"data-testid": "post"})
+            if owner is None or owner is post:
+                break
+        else:
             return constant_datetime
 
-        datetime_str = time_tag.text.strip()
+        datetime_str = time_tag.get_text(" ", strip=True)
+        if time_tag.get("data-testid") == "post_date_block_preview":
+            return self._parse_post_day(datetime_str)
         if not datetime_str:
             return constant_datetime
-
         return self._parse_datetime(datetime_str)
+
+    @staticmethod
+    def _parse_post_day(value: str) -> datetime:
+        # Relative previews cannot reliably identify a calendar day. Keep the
+        # constant rather than guessing from the current time or browser state.
+        if re.fullmatch(r"just now|\d+\s+(min|h|d)\s+ago", value, re.IGNORECASE):
+            return constant_datetime
+        try:
+            parsed = parse(value)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid VK post date: {value!r}") from error
+        return parsed.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
 
     def _parse_datetime(self, datetime_str: str) -> datetime:
         if datetime_str.startswith("today"):

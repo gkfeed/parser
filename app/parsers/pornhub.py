@@ -4,14 +4,12 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
 
 
-class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
+class PornHubFeed(PostToItemsMixin, ItemLinkHashExtension, SeleniumParserExtension):
     _base_url = "https://www.pornhub.com"
     _video_section_ids = (
         "claimedUploadedVideoSection",
@@ -22,10 +20,6 @@ class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension)
         "pornstarsVideoSection",
         "showAllChanelVideos",
     )
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
 
     @property
     @override
@@ -56,37 +50,40 @@ class PornHubFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension)
             if not isinstance(post, Tag):
                 continue
 
-            if "href" not in post.attrs:
-                continue
-
-            try:
-                await self._get_post_title(post)
-            except ValueError:
-                continue
-
+            # Validate every card, including duplicates, before returning a feed.
+            # A partial result would hide broken markup and silently lose videos.
+            await self._get_post_title(post)
             link = await self._get_post_link(post)
             if link in seen_links:
                 continue
 
             posts.append(post)
             seen_links.add(link)
+
+        if not posts:
+            raise ValueError("No video cards found in video sections")
         return posts
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
         image = post.find("img")
-        if isinstance(image, Tag):
-            for attribute in ("title", "data-title", "alt"):
-                title = image.attrs.get(attribute)
-                if title and str(title).strip():
-                    return str(title).strip()
+        if not isinstance(image, Tag):
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "No title found in post"
+            )
+
+        for attribute in ("title", "data-title", "alt"):
+            title = image.attrs.get(attribute)
+            if title and str(title).strip():
+                return str(title).strip()
         raise ValueError("No title found in post")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        if "href" in post.attrs:
-            return self._get_base_url() + str(post["href"])
-        raise ValueError("No link found in post")
+        href = post.attrs.get("href")
+        if not isinstance(href, str) or not href.strip():
+            raise ValueError("No link found in post: missing or empty href")
+        return self._get_base_url() + href.strip()
 
     def _get_posts_url(self) -> str:
         url = self.feed.url.rstrip("/")
