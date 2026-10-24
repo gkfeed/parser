@@ -1,12 +1,13 @@
 from datetime import UTC, datetime, timedelta
 from typing import override
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class RanobeMeFeed(
@@ -14,6 +15,29 @@ class RanobeMeFeed(
 ):
     _base_url = "https://ranobe.me"
     _cache_storage_time = timedelta(hours=1)
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if url == self._base_url + "/news":
+            self._validate_news(soup)
+            return
+        self._get_chapter_text(soup)
+
+    def _validate_news(self, soup: BeautifulSoup) -> None:
+        cards = soup.select(".news_item")
+        if not cards:
+            raise ValueError("RanobeMe news cards are missing")
+        # Validate every card before filtering by book, including cached pages.
+        for card in cards:
+            title_link = require_tag(
+                card.select_one(".FicTable_Title a"), "RanobeMe news book"
+            )
+            href = required_attr(title_link, "href", "RanobeMe news book")
+            if not href.strip():
+                raise ValueError("RanobeMe news book has no usable link")
+            required_text(title_link, "RanobeMe news book")
+            self._get_chapter_links(title_link)
 
     @property
     @override
@@ -58,13 +82,14 @@ class RanobeMeFeed(
     @override
     async def _get_post_text(self, post: Tag) -> str:
         soup = await self.get_soup(await self._get_post_link(post))
-        chapter_div = soup.find(class_="chapter")
-        if chapter_div and isinstance(chapter_div, Tag):
-            paragraphs = [
-                p.text for p in chapter_div.find_all("p") if isinstance(p, Tag)
-            ]
-            return "<br/><br/>".join(paragraphs)
-        raise ValueError("Could not find post text.")
+        return self._get_chapter_text(soup)
+
+    def _get_chapter_text(self, soup: BeautifulSoup) -> str:
+        chapter = require_tag(soup.find(class_="chapter"), "RanobeMe chapter")
+        paragraphs = chapter.select("p")
+        if not any(p.get_text(strip=True) for p in paragraphs):
+            raise ValueError("RanobeMe chapter has no paragraph text")
+        return "<br/><br/>".join(p.text for p in paragraphs)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
