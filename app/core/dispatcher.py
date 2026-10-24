@@ -7,6 +7,7 @@ from typing import Protocol
 import structlog
 from structlog.contextvars import bound_contextvars
 
+from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
@@ -29,7 +30,7 @@ class FeedParserRepositoryProtocol(Protocol):
 
 
 class FeedRepositoryProtocol(Protocol):
-    async def get_eligible(self, parser_types: Collection[str]) -> list[Feed]: ...
+    async def get_eligible(self, parser_types: Collection[ParserId]) -> list[Feed]: ...
 
 
 class ItemsRepositoryProtocol(Protocol):
@@ -48,7 +49,8 @@ class Dispatcher:
         self,
         broker: BrokerService,
         feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
-        parsers: Mapping[str, type[BaseFeed]] = PARSERS,
+        parsers: Mapping[ParserId, type[BaseFeed]]
+        | Mapping[str, type[BaseFeed]] = PARSERS,
         feed_repository: FeedRepositoryProtocol = FeedRepository,
         items_repository: ItemsRepositoryProtocol = ItemsRepository,
         broker_wait_timeout: int = 300,
@@ -57,7 +59,9 @@ class Dispatcher:
         self.feed_parser_repository = feed_parser_repository
         self.feed_repository = feed_repository
         self.items_repository = items_repository
-        self.parsers = parsers
+        self.parsers = {
+            ParserId(parser_id): parser for parser_id, parser in parsers.items()
+        }
         self.broker_wait_timeout = broker_wait_timeout
         self._failure_counts: dict[int, int] = {}
 
@@ -151,7 +155,7 @@ class Dispatcher:
 
     async def _request_items_from_broker(self, feed: Feed) -> FeedResult:
         items_json = await self.broker.put_and_wait_for_result(
-            f"gkfeed.process_feed_{feed.type}",
+            feed.type.task_name,
             (feed.model_dump_json(),),
             timeout=self.broker_wait_timeout,
             task_key=f"feed:{feed.id}",

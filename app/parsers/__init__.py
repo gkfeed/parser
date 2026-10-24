@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
+from app.core.parser_id import ParserId
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
 
@@ -37,7 +38,7 @@ from .yummyanime import YummyAnimeFeed
 
 @dataclass(frozen=True)
 class ParserConfig:
-    id: str
+    id: ParserId
     handler: type[BaseFeed]
 
     @property
@@ -46,40 +47,40 @@ class ParserConfig:
 
 
 class Parser(Enum):
-    WEB = ParserConfig("web", WebFeed)
-    TIKTOK = ParserConfig("tiktok", TikTokFeed)
-    KINOGO = ParserConfig("kinogo", KinogoFeed)
-    TWITCH = ParserConfig("twitch", TwitchFeed)
-    YUMMYANIME = ParserConfig("yummyanime", YummyAnimeFeed)
-    SHIKI = ParserConfig("shiki", ShikiFeed)
-    REDDIT = ParserConfig("reddit", RedditFeed)
-    VK = ParserConfig("vk", VkFeed)
-    VKVIDEO = ParserConfig("vkvideo", VkVideoFeed)
-    YT = ParserConfig("yt", YoutubeFeed)
-    RANOBE_ME = ParserConfig("ranobe.me", RanobeMeFeed)
-    SPOTI = ParserConfig("spoti", SpotifyFeed)
-    REZKA = ParserConfig("rezka", RezkaFeed)
-    INST = ParserConfig("inst", InstagramFeed)
-    STORIES = ParserConfig("stories", InstagramStoriesFeed)
-    INSOLARANCE = ParserConfig("insolarance", InsolaranceFeed)
-    MANGALIB = ParserConfig("mangalib", MangaLibFeed)
-    X = ParserConfig("x", XFeed)
-    SPOTI_PLAYLIST = ParserConfig("spoti:playlist", SpotifyPlaylistFeed)
-    ONEFOOTBALL = ParserConfig("onefootball", OneFootballFeed)
-    RTL = ParserConfig("rtl", RTLSeriesFeed)
-    REZKA_COLLECTION = ParserConfig("rezka:collection", RezkaCollectionFeed)
-    MATRESHKA = ParserConfig("matreshka", MatreshkaFeed)
-    SHIKI_ONGOING = ParserConfig("shiki:ongoing", ShikiOngoingFeed)
-    ANILIBRIA = ParserConfig("anilibria", AnilibriaFeed)
-    PORNHUB = ParserConfig("pornhub", PornHubFeed)
-    HLTV = ParserConfig("hltv", HltvFeed)
-    LIQUIDPEDIA = ParserConfig("liquidpedia", LiquidpediaFeed)
-    SASFLIX = ParserConfig("sasflix", SasflixFeed)
-    PORNO365 = ParserConfig("porno365", Porno365Feed)
-    AUTHOR_TODAY = ParserConfig("author.today", AuthorTodayFeed)
+    WEB = ParserConfig(ParserId.WEB, WebFeed)
+    TIKTOK = ParserConfig(ParserId.TIKTOK, TikTokFeed)
+    KINOGO = ParserConfig(ParserId.KINOGO, KinogoFeed)
+    TWITCH = ParserConfig(ParserId.TWITCH, TwitchFeed)
+    YUMMYANIME = ParserConfig(ParserId.YUMMYANIME, YummyAnimeFeed)
+    SHIKI = ParserConfig(ParserId.SHIKI, ShikiFeed)
+    REDDIT = ParserConfig(ParserId.REDDIT, RedditFeed)
+    VK = ParserConfig(ParserId.VK, VkFeed)
+    VKVIDEO = ParserConfig(ParserId.VKVIDEO, VkVideoFeed)
+    YT = ParserConfig(ParserId.YT, YoutubeFeed)
+    RANOBE_ME = ParserConfig(ParserId.RANOBE_ME, RanobeMeFeed)
+    SPOTI = ParserConfig(ParserId.SPOTI, SpotifyFeed)
+    REZKA = ParserConfig(ParserId.REZKA, RezkaFeed)
+    INST = ParserConfig(ParserId.INST, InstagramFeed)
+    STORIES = ParserConfig(ParserId.STORIES, InstagramStoriesFeed)
+    INSOLARANCE = ParserConfig(ParserId.INSOLARANCE, InsolaranceFeed)
+    MANGALIB = ParserConfig(ParserId.MANGALIB, MangaLibFeed)
+    X = ParserConfig(ParserId.X, XFeed)
+    SPOTI_PLAYLIST = ParserConfig(ParserId.SPOTI_PLAYLIST, SpotifyPlaylistFeed)
+    ONEFOOTBALL = ParserConfig(ParserId.ONEFOOTBALL, OneFootballFeed)
+    RTL = ParserConfig(ParserId.RTL, RTLSeriesFeed)
+    REZKA_COLLECTION = ParserConfig(ParserId.REZKA_COLLECTION, RezkaCollectionFeed)
+    MATRESHKA = ParserConfig(ParserId.MATRESHKA, MatreshkaFeed)
+    SHIKI_ONGOING = ParserConfig(ParserId.SHIKI_ONGOING, ShikiOngoingFeed)
+    ANILIBRIA = ParserConfig(ParserId.ANILIBRIA, AnilibriaFeed)
+    PORNHUB = ParserConfig(ParserId.PORNHUB, PornHubFeed)
+    HLTV = ParserConfig(ParserId.HLTV, HltvFeed)
+    LIQUIDPEDIA = ParserConfig(ParserId.LIQUIDPEDIA, LiquidpediaFeed)
+    SASFLIX = ParserConfig(ParserId.SASFLIX, SasflixFeed)
+    PORNO365 = ParserConfig(ParserId.PORNO365, Porno365Feed)
+    AUTHOR_TODAY = ParserConfig(ParserId.AUTHOR_TODAY, AuthorTodayFeed)
 
 
 # NOTE: inconsistent api
-PARSERS: dict[str, type[BaseFeed]] = {
+PARSERS: dict[ParserId, type[BaseFeed]] = {
     parser.value.id: parser.value.handler for parser in Parser
 }
