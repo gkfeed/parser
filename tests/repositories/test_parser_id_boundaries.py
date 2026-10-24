@@ -16,9 +16,6 @@ from app.models.feed import Feed as StoredFeed
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, FeedResult
 from app.services.broker import BrokerService
-from app.services.container import Container
-from app.services.repositories.feed import FeedRepository
-from app.services.repositories.feed_parser import FeedParserRepository
 
 # Existing DB values and broker suffixes are an external compatibility contract.
 PERSISTED_IDS = (
@@ -57,8 +54,10 @@ PERSISTED_IDS = (
 
 
 @pytest.mark.parametrize("persisted_id", PERSISTED_IDS)
-async def test_existing_parser_ids_round_trip_through_db_and_json(persisted_id):
-    async with Container.get_data().db_session() as session, session.begin():
+async def test_existing_parser_ids_round_trip_through_db_and_json(
+    persisted_id, session_factory, feed_repository
+):
+    async with session_factory() as session, session.begin():
         await session.execute(
             text(
                 "INSERT INTO feed (id, title, url, type) VALUES (1, :title, :url, :type)"
@@ -66,27 +65,27 @@ async def test_existing_parser_ids_round_trip_through_db_and_json(persisted_id):
             {"title": "Feed", "url": "https://example.com/feed", "type": persisted_id},
         )
 
-    feed = await FeedRepository.get_by_id(1)
+    feed = await feed_repository.get_by_id(1)
     assert isinstance(feed.type, ParserId)
     assert feed.type in PARSERS
     assert feed.type.task_name == f"gkfeed.process_feed_{persisted_id}"
     assert json.loads(feed.model_dump_json())["type"] == persisted_id
     assert Feed.model_validate_json(feed.model_dump_json()) == feed
-    assert await FeedRepository.get_eligible({feed.type}) == [feed]
+    assert await feed_repository.get_eligible({feed.type}) == [feed]
 
-    copied = await FeedRepository.create(feed)
-    async with Container.get_data().db_session() as session:
+    copied = await feed_repository.create(feed)
+    async with session_factory() as session:
         stored = await session.scalar(
             text("SELECT type FROM feed WHERE id = :id"), {"id": copied.id}
         )
     assert stored == persisted_id
-    assert await FeedRepository.get_by_id(copied.id) == copied
+    assert await feed_repository.get_by_id(copied.id) == copied
 
 
 @pytest.mark.parametrize(
     "unsupported", ["test", "unknown", "ranobeme", "WEB", "", None, 1]
 )
-async def test_json_rejects_unsupported_parser_ids(unsupported):
+async def test_json_rejects_unsupported_parser_ids(unsupported, feed_repository):
     payload = {
         "id": 1,
         "title": "Feed",
@@ -95,11 +94,13 @@ async def test_json_rejects_unsupported_parser_ids(unsupported):
     }
     with pytest.raises(ValidationError, match="type"):
         Feed.model_validate_json(json.dumps(payload))
-    assert await FeedRepository.get_all() == []
+    assert await feed_repository.get_all() == []
 
 
-async def test_existing_invalid_db_value_is_rejected_on_read():
-    async with Container.get_data().db_session() as session, session.begin():
+async def test_existing_invalid_db_value_is_rejected_on_read(
+    session_factory, feed_repository
+):
+    async with session_factory() as session, session.begin():
         await session.execute(
             text(
                 "INSERT INTO feed (id, title, url, type) VALUES (1, 'Feed', '', 'unknown')"
@@ -107,15 +108,17 @@ async def test_existing_invalid_db_value_is_rejected_on_read():
         )
 
     with pytest.raises(LookupError, match="unknown"):
-        await FeedRepository.get_by_id(1)
+        await feed_repository.get_by_id(1)
 
 
-async def test_orm_rejects_unsupported_id_before_persistence():
+async def test_orm_rejects_unsupported_id_before_persistence(
+    session_factory, feed_repository
+):
     with pytest.raises(StatementError, match="unknown"):
-        async with Container.get_data().db_session() as session, session.begin():
+        async with session_factory() as session, session.begin():
             session.add(StoredFeed(id=1, title="Feed", url="", type="unknown"))
             await session.flush()
-    assert await FeedRepository.get_all() == []
+    assert await feed_repository.get_all() == []
 
 
 async def test_feed_rejects_invalid_parser_assignment():
@@ -183,12 +186,19 @@ async def broker_boundary(monkeypatch):
         yield url, tasks, results, errors, feed_requests
 
 
-async def test_db_dispatch_worker_and_broker_keep_existing_wire_values(broker_boundary):
+async def test_db_dispatch_worker_and_broker_keep_existing_wire_values(
+    broker_boundary, feed_repository, feed_parser_repository, items_repository
+):
     url, tasks, results, errors, feed_requests = broker_boundary
-    feed = await FeedRepository.create(
+    feed = await feed_repository.create(
         Feed(id=0, title="Feed", url=url + "feed", type=ParserId.WEB)
     )
-    dispatcher = Dispatcher(broker=BrokerService(url))
+    dispatcher = Dispatcher(
+        broker=BrokerService(url),
+        feed_repository=feed_repository,
+        feed_parser_repository=feed_parser_repository,
+        items_repository=items_repository,
+    )
 
     await asyncio.wait_for(
         asyncio.gather(dispatcher.dispatch(), run_worker(parser_id=ParserId.WEB)),
@@ -204,7 +214,7 @@ async def test_db_dispatch_worker_and_broker_keep_existing_wire_values(broker_bo
     assert result.items[0].hash is not None
     assert errors == []
     assert feed_requests == ["/feed"]
-    assert await FeedParserRepository.get_by_feed_id(feed.id) is not None
+    assert await feed_parser_repository.get_by_feed_id(feed.id) is not None
 
 
 @pytest.mark.parametrize("parser_id", ["unknown", "spoti:playlist"])
