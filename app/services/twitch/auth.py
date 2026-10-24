@@ -17,5 +17,5 @@ class TwitchAuthenticator:
         try:
             response = await HttpService.post_json(cls.__base_url, body)
             return response["access_token"]
-        except HttpRequestError:
-            raise TwitchAuthenticationFailed
+        except HttpRequestError as exc:
+            raise TwitchAuthenticationFailed from exc
