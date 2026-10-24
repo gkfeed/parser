@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -51,6 +52,24 @@ async def extract_info(
     opts: Any,
     keys: list[str] | None = None,
     result_handler: InfoResultHandler | None = None,
+) -> dict[str, Any]:
+    # A cancelled await cannot stop a Python thread. Keep its caller alive until
+    # YoutubeDL has exited so shutdown never abandons an open extractor.
+    extraction = asyncio.create_task(
+        asyncio.to_thread(_extract_info, url, opts, keys, result_handler)
+    )
+    try:
+        return await asyncio.shield(extraction)
+    except asyncio.CancelledError:
+        await extraction
+        raise
+
+
+def _extract_info(
+    url: str,
+    opts: Any,
+    keys: list[str] | None,
+    result_handler: InfoResultHandler | None,
 ) -> dict[str, Any]:
     extraction_logger = _YtdlpLogger(url)
     with yt_dlp.YoutubeDL({**opts, "logger": extraction_logger}) as ydl:

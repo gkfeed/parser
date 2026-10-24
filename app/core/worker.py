@@ -29,6 +29,13 @@ async def run_worker(parser_id: ParserId):
     if not task:
         return
 
+    await run_task(task, parser_id, broker)
+
+
+async def run_task(task: Task, parser_id: ParserId, broker: BrokerService) -> None:
+    """Validate and process a claimed task through terminal broker submission."""
+    parser_id = ParserId(parser_id)
+    clear_contextvars()
     try:
         feed = Feed.model_validate_json(task.args[0])
         if feed.type != parser_id:
@@ -118,3 +125,4 @@ async def _submit_error(broker: BrokerService, task_id: str, error: str) -> None
         await broker.submit_error(task_id, error)
     except BrokerError:
         logger.exception("feed_error_submission_failed")
+        raise
