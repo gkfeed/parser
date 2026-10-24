@@ -33,7 +33,7 @@ class Twitch:
         headers = cls.__get_headers(cls.__client_id, access_token)
 
         url = cls.__base_url + streamer_name
-        response = await cls.get_html(url, headers)
+        response = await cls.get_json(url, headers)
 
         stream_data = response.get("data")
         if not isinstance(stream_data, list):
@@ -76,15 +76,18 @@ class Twitch:
         )
 
     @classmethod
-    async def get_html(cls, url: str, headers: dict) -> dict:
+    async def get_json(cls, url: str, headers: dict) -> dict:
         try:
-            response = await HttpService.get_response(url, headers=headers)
+            payload = await HttpService.get_json(
+                url, headers=headers, content_type=None, expected_status=200
+            )
         except HttpRequestError as exc:
-            raise FeedUnavailable(url, "twitch_request_failed") from exc
-        if response.status != 200:
-            raise FeedUnavailable(url, f"twitch_http_{response.status}")
-        try:
-            payload = json.loads(response.content)
+            reason = (
+                f"twitch_http_{exc.status}"
+                if exc.status is not None
+                else "twitch_request_failed"
+            )
+            raise FeedUnavailable(url, reason) from exc
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise TwitchResponseError(
                 "Invalid Twitch API response: invalid JSON"

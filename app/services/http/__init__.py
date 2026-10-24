@@ -1,7 +1,9 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError, ClientError, InvalidURL
+from aiohttp.client_exceptions import ClientError
 
 from .lifecycle import HttpSessionScope
 
@@ -33,6 +35,34 @@ class HttpService(HttpSessionScope):
     headers = _headers
 
     @classmethod
+    @asynccontextmanager
+    async def _request(
+        cls,
+        method: str,
+        url: str,
+        *,
+        headers: dict | None,
+        data: dict | None = None,
+        json: dict | None = None,
+        raise_for_status: bool = True,
+    ) -> AsyncGenerator[aiohttp.ClientResponse]:
+        try:
+            async with (
+                cls.session() as session,
+                session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    data=data,
+                    json=json,
+                    raise_for_status=raise_for_status,
+                ) as response,
+            ):
+                yield response
+        except (ClientError, TimeoutError) as exc:
+            raise HttpRequestError(status=getattr(exc, "status", None)) from exc
+
+    @classmethod
     async def get(cls, url: str, headers: dict = headers) -> bytes:
         status, content = await cls.get_with_status(url, headers=headers)
         if status >= 400:
@@ -52,19 +82,15 @@ class HttpService(HttpSessionScope):
     async def get_response(
         cls, url: str, headers: dict = headers, max_bytes: int | None = None
     ) -> HttpResponse:
-        try:
-            async with (
-                cls.session() as session,
-                session.get(url, headers=headers) as response,
-            ):
-                content = await cls._read_content(response, max_bytes)
-                return HttpResponse(
-                    response.status,
-                    content,
-                    {key.lower(): value for key, value in response.headers.items()},
-                )
-        except (ClientError, TimeoutError) as exc:
-            raise HttpRequestError(status=getattr(exc, "status", None)) from exc
+        async with cls._request(
+            "GET", url, headers=headers, raise_for_status=False
+        ) as response:
+            content = await cls._read_content(response, max_bytes)
+            return HttpResponse(
+                response.status,
+                content,
+                {key.lower(): value for key, value in response.headers.items()},
+            )
 
     @staticmethod
     async def _read_content(
@@ -81,58 +107,40 @@ class HttpService(HttpSessionScope):
 
     @classmethod
     async def post(cls, url: str, body: dict, headers: dict | None = headers) -> bytes:
-        try:
-            async with (
-                cls.session() as session,
-                session.post(url, data=body, headers=headers) as response,
-            ):
-                return await response.content.read()
-        except ClientConnectorError:
-            raise HttpRequestError
+        async with cls._request("POST", url, headers=headers, data=body) as response:
+            return await response.read()
 
     @classmethod
     async def delete(cls, url: str, headers: dict = headers) -> bytes:
-        try:
-            async with (
-                cls.session() as session,
-                session.delete(url, headers=headers) as response,
-            ):
-                return await response.content.read()
-        except ClientError:
-            raise HttpRequestError
+        async with cls._request("DELETE", url, headers=headers) as response:
+            return await response.read()
 
     @classmethod
-    async def get_json(cls, url: str, headers: dict = headers) -> dict:
-        try:
-            async with (
-                cls.session() as session,
-                session.get(url, headers=headers) as response,
-            ):
-                return await response.json()
-        except ClientError:
-            raise HttpRequestError
+    async def get_json(
+        cls,
+        url: str,
+        headers: dict = headers,
+        *,
+        content_type: str | None = "application/json",
+        expected_status: int | None = None,
+    ) -> dict:
+        async with cls._request("GET", url, headers=headers) as response:
+            if expected_status is not None and response.status != expected_status:
+                raise HttpRequestError(
+                    f"Unexpected HTTP status {response.status}", status=response.status
+                )
+            return await response.json(content_type=content_type)
 
     @classmethod
     async def post_json(
         cls, url: str, json: dict, headers: dict | None = headers
     ) -> dict:
-        try:
-            async with (
-                cls.session() as session,
-                session.post(url, json=json, headers=headers) as response,
-            ):
-                response.raise_for_status()
-                return await response.json()
-        except (ClientError, TimeoutError) as exc:
-            raise HttpRequestError(status=getattr(exc, "status", None)) from exc
+        async with cls._request("POST", url, headers=headers, json=json) as response:
+            return await response.json()
 
     @classmethod
     async def get_status(cls, url: str, headers: dict | None = headers) -> int:
-        try:
-            async with (
-                cls.session() as session,
-                session.get(url, headers=headers) as response,
-            ):
-                return response.status
-        except (ClientConnectorError, InvalidURL):
-            raise HttpRequestError
+        async with cls._request(
+            "GET", url, headers=headers, raise_for_status=False
+        ) as response:
+            return response.status
