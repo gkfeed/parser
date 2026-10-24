@@ -1,9 +1,10 @@
 import asyncio
 import json
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, NoReturn
 
 import structlog
 from pydantic import ValidationError
@@ -44,14 +45,30 @@ class Task:
 
 
 class BrokerService:
-    def __init__(self, broker_url: str, http: type[HttpService] = HttpService):
+    def __init__(
+        self,
+        broker_url: str,
+        http: type[HttpService] = HttpService,
+        *,
+        poll_initial_interval: float = 1,
+        poll_max_interval: float = 5,
+    ):
+        if not 0 < poll_initial_interval <= poll_max_interval:
+            raise ValueError("Polling intervals must satisfy 0 < initial <= maximum")
+        if not math.isfinite(poll_max_interval):
+            raise ValueError("Polling intervals must be finite")
         self.broker_url = broker_url.rstrip("/")
         self.http = http
+        self._poll_initial_interval = poll_initial_interval
+        self._poll_max_interval = poll_max_interval
         self._active_tasks: dict[str, str] = {}
 
-    # TODO: should have background task and make batch request
     async def put_and_wait_for_result(
-        self, func: str, args: Sequence[Any], timeout: int, task_key: str | None = None
+        self,
+        func: str,
+        args: Sequence[Any],
+        timeout: float,
+        task_key: str | None = None,
     ) -> Any:
         task_id = self._active_tasks.get(task_key) if task_key else None
         if task_id is None:
@@ -61,37 +78,70 @@ class BrokerService:
 
         with bound_contextvars(task_id=task_id):
             logger.info("broker_task_queued")
-            start_time = asyncio.get_event_loop().time()
-            while True:
-                result_data = await self.get_task_data(task_id)
-                status = result_data.get("status")
+            return await self._wait_for_result(task_id, timeout, task_key)
 
-                if status == "completed":
-                    if task_key:
-                        self._active_tasks.pop(task_key, None)
-                    return result_data.get("result")
-                if status == "failed":
-                    if task_key:
-                        self._active_tasks.pop(task_key, None)
-                    result = result_data.get("result")
-                    failure = None
-                    if isinstance(result, str):
-                        try:
-                            failure = FeedFailure.model_validate_json(result)
-                        except ValidationError:
-                            pass
-                    if failure is not None:
-                        raise BrokerFeedUnavailable(failure.reason, failure.retry_at)
-                    raise BrokerError(f"Task failed: task_id={task_id}")
-                if asyncio.get_event_loop().time() - start_time > timeout:
-                    if status == "pending":
-                        raise BrokerNoWorker(task_id)
-                    await self.cancel_task(task_id)
-                    if task_key:
-                        self._active_tasks.pop(task_key, None)
-                    raise BrokerError(f"Timeout waiting for result: task_id={task_id}")
+    async def _wait_for_result(
+        self, task_id: str, timeout: float, task_key: str | None
+    ) -> Any:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        interval = self._poll_initial_interval
+        status = "pending"
+        while True:
+            if loop.time() >= deadline:
+                await self._expire_task(task_id, status, task_key)
+            try:
+                result_data = await self._poll_before_deadline(task_id, deadline)
+            except TimeoutError:
+                await self._expire_task(task_id, status, task_key)
+            next_status = result_data.get("status")
+            if not isinstance(next_status, str) or not next_status:
+                raise BrokerError(f"Missing task status: task_id={task_id}")
+            status = next_status
+            if status in {"completed", "failed"}:
+                self._forget_task(task_key)
+                return self._resolve_result(task_id, status, result_data.get("result"))
+            remaining = deadline - loop.time()
+            await asyncio.sleep(min(interval, max(0, remaining)))
+            interval = min(interval * 2, self._poll_max_interval)
 
-                await asyncio.sleep(1)
+    async def _poll_before_deadline(self, task_id: str, deadline: float) -> dict:
+        timeout = asyncio.timeout_at(deadline)
+        try:
+            async with timeout:
+                return await self.get_task_data(task_id)
+        except TimeoutError as exc:
+            if timeout.expired():
+                raise
+            raise BrokerError("Failed to get task data from broker") from exc
+
+    async def _expire_task(
+        self, task_id: str, status: str, task_key: str | None
+    ) -> NoReturn:
+        if status == "pending":
+            raise BrokerNoWorker(task_id)
+        await self.cancel_task(task_id)
+        self._forget_task(task_key)
+        raise BrokerError(f"Timeout waiting for result: task_id={task_id}")
+
+    def _forget_task(self, task_key: str | None) -> None:
+        if task_key:
+            self._active_tasks.pop(task_key, None)
+
+    @staticmethod
+    def _resolve_result(task_id: str, status: str, result: Any) -> Any:
+        if status == "completed":
+            return result
+        failure = None
+        if isinstance(result, str):
+            try:
+                failure = FeedFailure.model_validate_json(result)
+            except ValidationError:
+                # Workers may submit a plain error string rather than FeedFailure.
+                pass
+        if failure is not None:
+            raise BrokerFeedUnavailable(failure.reason, failure.retry_at)
+        raise BrokerError(f"Task failed: task_id={task_id}")
 
     async def cancel_task(self, task_id: str) -> None:
         try:

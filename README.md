@@ -119,3 +119,56 @@ Accepted formats:
 - `postgresql+asyncpg://user:password@host:port/dbname`
 
 SQLite URLs are rejected.
+
+## HTTP connections and broker result polling
+
+Wrap a persistent async application loop in `async with HttpService():`. Child
+tasks inherit its HTTP session. Nested scopes reuse the outer session, and the
+owning scope closes it on normal exit, error, or cancellation. Await or cancel
+child tasks before leaving the scope. Calls outside a scope still work and close
+their temporary session after each request.
+The dispatcher and both worker entrypoints open this scope around their
+persistent loops, including worker draining and parser cleanup.
+
+The pool allows 100 concurrent connections in total and 10 per host. Pass
+`connection_limit` and `per_host_limit` to `HttpService()` to override these bounds.
+Cookies are discarded, and authentication and other request headers are supplied
+per request. The session has no default authentication. Existing aiohttp timeout
+defaults remain unchanged.
+
+The [published broker API at 1cd7dbd](https://github.com/gakawarstone/gkbroker/blob/1cd7dbde74c888053e32abebbaea08615585474a/app/api.py)
+offers a single-task result endpoint without batching or long polling. Each job
+therefore polls immediately, then waits 1, 2, 4, and at most 5 seconds between
+requests. `BrokerService` accepts `poll_initial_interval` and `poll_max_interval`
+overrides. Once the maximum interval is reached, a waiting job makes about one
+result request per five seconds instead of one per second. Completion detection
+can take up to five seconds plus the result request's duration and event-loop
+scheduling delay.
+
+Each wait keeps its own monotonic deadline, including time spent reading result
+responses. Sleeps stop at that deadline. Expiry uses the last observed status:
+an unclaimed job raises `BrokerNoWorker` and retains its retry key; a processing
+job sends a cancellation request before raising `BrokerError`. Cancelling the
+caller stops polling but leaves the remote job and retry key available, as before. Terminal
+successes and failures clear the retry key. The deadline starts after enqueueing,
+and broker cancellation remains a separate HTTP operation during cleanup.
+The published broker reports processing tasks as already acknowledged when asked
+to cancel them. This client preserves that behavior; a local timeout does not
+guarantee that remote execution has stopped.
+
+A local HTTP server comparison against `dev@8ab45a9` produced these results:
+
+- Twelve sequential requests accepted 12 TCP connections before and 1 within an
+  HTTP scope after this change.
+- Three simultaneous jobs that became ready after 8 seconds made 27 result
+  requests over 30 connections before, and 15 result requests over 3 connections
+  after. Total requests, including enqueueing, fell from 30 to 18.
+- Result detection moved from 8.018 seconds to 12.016 seconds in that run. The
+  additional delay is the polling tradeoff, not time added to the job deadline.
+
+`tests/services/test_http_reuse.py` and `tests/services/test_broker_polling.py`
+exercise local HTTP boundaries, connection limits and cleanup, cookie/header
+isolation, concurrent successful and failed jobs, deadlines, and cancellation.
+They run with `make test` and require no external service.
+`tests/core/test_worker_http_pool.py` also starts both actual worker entrypoints
+against a local broker and checks connection reuse and closure after SIGTERM.
