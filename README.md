@@ -3,15 +3,25 @@ gkfeed parser
 
 ## Setup
 
-### Database Migration
+### Database schema
 
-To apply database migrations using Alembic, run:
+[`gkfeed/infra`](https://github.com/gkfeed/infra) owns and prepares the PostgreSQL
+schema. An operator must apply its migrations before deploying the parser,
+following the [infra migration policy](https://github.com/gkfeed/infra/blob/master/docs/migrations.md).
+The parser has no schema migration commands and does not execute DDL.
+
+With the application environment configured, check schema compatibility before
+starting the parser:
 
 ```bash
-make migrate
+.venv/bin/python -m app.run.check_schema_compatibility
 ```
 
-This command executes `.venv/bin/alembic upgrade head`.
+This read-only check queries `public.schema_migrations` for the parser's minimum
+migration ID, currently `20260904184133`, or a later ID. It accepts later
+compatible migrations and exits with status 1 if the registry is missing,
+unreadable, or too old. It never applies migrations or repairs the schema.
+Use a database identity with the `gkfeed_parser` role provisioned by infra.
 
 ## Environment Variables
 
@@ -36,6 +46,19 @@ To skip parser types in both light and heavy workers, add them to `ignored_parse
 ```python
 ignored_parser_types = ["yt", "rezka:collection"]
 ```
+
+The light worker runs one persistent event loop and accepts up to
+`LIGHT_WORKER_CONCURRENCY` feed jobs at once. The default is `4`; values below
+`1` fail startup. Slots remain occupied until parsing and broker submission
+finish. Queues are polled in round-robin order. A complete empty sweep triggers
+an idle delay that grows from 0.1 seconds to at most 1 second, and finding a job
+resets the delay. Heavy browser work remains sequential.
+
+On SIGTERM or SIGINT, the light worker stops taking new jobs. It waits for an
+in-progress claim and every accepted job, including broker submissions, before
+exiting. yt-dlp extraction runs in a thread and finishes before its resources
+are released. Graceful shutdown has no application deadline, so allow enough
+time for slow sources and extraction retries before forcing the process to stop.
 
 ## Docker worker logs
 

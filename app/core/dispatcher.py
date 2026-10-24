@@ -7,6 +7,7 @@ from typing import Protocol
 import structlog
 from structlog.contextvars import bound_contextvars
 
+from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
@@ -17,9 +18,6 @@ from app.services.broker import (
     BrokerNoWorker,
     BrokerService,
 )
-from app.services.repositories.feed import FeedRepository
-from app.services.repositories.feed_parser import FeedParserRepository
-from app.services.repositories.item import ItemsRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -29,7 +27,7 @@ class FeedParserRepositoryProtocol(Protocol):
 
 
 class FeedRepositoryProtocol(Protocol):
-    async def get_eligible(self, parser_types: Collection[str]) -> list[Feed]: ...
+    async def get_eligible(self, parser_types: Collection[ParserId]) -> list[Feed]: ...
 
 
 class ItemsRepositoryProtocol(Protocol):
@@ -47,17 +45,20 @@ class Dispatcher:
     def __init__(
         self,
         broker: BrokerService,
-        feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
-        parsers: Mapping[str, type[BaseFeed]] = PARSERS,
-        feed_repository: FeedRepositoryProtocol = FeedRepository,
-        items_repository: ItemsRepositoryProtocol = ItemsRepository,
+        feed_parser_repository: FeedParserRepositoryProtocol,
+        feed_repository: FeedRepositoryProtocol,
+        items_repository: ItemsRepositoryProtocol,
+        parsers: Mapping[ParserId, type[BaseFeed]]
+        | Mapping[str, type[BaseFeed]] = PARSERS,
         broker_wait_timeout: int = 300,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
         self.feed_repository = feed_repository
         self.items_repository = items_repository
-        self.parsers = parsers
+        self.parsers = {
+            ParserId(parser_id): parser for parser_id, parser in parsers.items()
+        }
         self.broker_wait_timeout = broker_wait_timeout
         self._failure_counts: dict[int, int] = {}
 
@@ -117,7 +118,7 @@ class Dispatcher:
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
-            items = await self._save_items(feed, items)
+            items = await self.items_repository.add_items_to_feed(feed, items)
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
@@ -151,13 +152,10 @@ class Dispatcher:
 
     async def _request_items_from_broker(self, feed: Feed) -> FeedResult:
         items_json = await self.broker.put_and_wait_for_result(
-            f"gkfeed.process_feed_{feed.type}",
+            feed.type.task_name,
             (feed.model_dump_json(),),
             timeout=self.broker_wait_timeout,
             task_key=f"feed:{feed.id}",
         )
 
         return FeedResult.model_validate_json(items_json)
-
-    async def _save_items(self, feed: Feed, items: list[Item]) -> list[Item]:
-        return await self.items_repository.add_items_to_feed(feed, items)
