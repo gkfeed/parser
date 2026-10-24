@@ -23,7 +23,7 @@ class TikTokFeed(BaseTikTokFeed):
 
     @property
     async def _video_links(self) -> list[str]:
-        self.data.pop("retry_at", None)
+        self.retry_at = None
         self._entries_by_url = {}
         info = await YtdlpInfoExtractor.extract_channel_videos_info(
             self.feed.url, TikTokProfileExtractionMode(), self._max_videos
