@@ -127,6 +127,8 @@ tasks inherit its HTTP session. Nested scopes reuse the outer session, and the
 owning scope closes it on normal exit, error, or cancellation. Await or cancel
 child tasks before leaving the scope. Calls outside a scope still work and close
 their temporary session after each request.
+The dispatcher and both worker entrypoints open this scope around their
+persistent loops, including worker draining and parser cleanup.
 
 The pool allows 100 concurrent connections in total and 10 per host. Pass
 `connection_limit` and `per_host_limit` to `HttpService()` to override these bounds.
@@ -146,8 +148,8 @@ scheduling delay.
 Each wait keeps its own monotonic deadline, including time spent reading result
 responses. Sleeps stop at that deadline. Expiry uses the last observed status:
 an unclaimed job raises `BrokerNoWorker` and retains its retry key; a processing
-job sends a cancellation request before raising `BrokerError`. Cancelling the caller stops its
-polling but leaves the remote job and retry key available, as before. Terminal
+job sends a cancellation request before raising `BrokerError`. Cancelling the
+caller stops polling but leaves the remote job and retry key available, as before. Terminal
 successes and failures clear the retry key. The deadline starts after enqueueing,
 and broker cancellation remains a separate HTTP operation during cleanup.
 The published broker reports processing tasks as already acknowledged when asked
@@ -168,3 +170,5 @@ A local HTTP server comparison against `dev@8ab45a9` produced these results:
 exercise local HTTP boundaries, connection limits and cleanup, cookie/header
 isolation, concurrent successful and failed jobs, deadlines, and cancellation.
 They run with `make test` and require no external service.
+`tests/core/test_worker_http_pool.py` also starts both actual worker entrypoints
+against a local broker and checks connection reuse and closure after SIGTERM.

@@ -11,6 +11,7 @@ from app.core.parser_id import ParserId
 from app.core.worker import run_worker
 from app.core.worker_kind import WorkerKind
 from app.parsers import PARSERS
+from app.services.http import HttpService
 from app.utils.is_in_docker import IS_IN_DOCKER
 from app.utils.logging import configure_logging
 from app.utils.selenium import cleanup_grid
@@ -58,7 +59,8 @@ async def run_workers(parser_ids: Sequence[ParserId]) -> None:
         loop.add_signal_handler(signum, stop)
 
     try:
-        await _run_workers(parser_ids, kind)
+        async with HttpService():
+            await _run_workers(parser_ids, kind)
     finally:
         for signum in (signal.SIGTERM, signal.SIGINT):
             loop.remove_signal_handler(signum)
