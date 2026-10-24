@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
@@ -76,7 +76,7 @@ class HttpSessionScope:
 
     @classmethod
     @asynccontextmanager
-    async def session(cls) -> AsyncIterator[aiohttp.ClientSession]:
+    async def session(cls) -> AsyncGenerator[aiohttp.ClientSession]:
         current = _session.get()
         if current is not None:
             cls._validate_session(current)
