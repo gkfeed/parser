@@ -24,7 +24,6 @@ services:
     command: ["worker_light"]
     tty: True
     restart: on-failure
-    stop_grace_period: 120s
     volumes:
       - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
@@ -44,7 +43,6 @@ services:
     command: ["worker_http"]
     tty: True
     restart: on-failure
-    stop_grace_period: 120s
     volumes:
       - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
