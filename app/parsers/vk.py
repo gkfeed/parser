@@ -33,6 +33,13 @@ class VkFeed(
         '#page-wall [data-testid="feed-empty-result"], '
         '#page-wall [data-testid="empty_wall"]'
     )
+    _empty_card_selector = (
+        "#page_wall_posts > .no_rows, "
+        # The SPA group page uses an empty newsfeed card without a wall test ID.
+        '#spa_layout_content:has([data-testid="group-header"]) '
+        "section:has(.vkuiIcon--newsfeed_outline_56)"
+    )
+    _empty_card_messages = frozenset({"No results found", "The wall is empty."})
     _challenge_attempts = 3
 
     @override
@@ -43,6 +50,11 @@ class VkFeed(
         if soup.select_one("button.start") is not None:
             raise FeedUnavailable(url, "browser_challenge")
         if soup.select_one(self._empty_selector) is not None:
+            return
+        if any(
+            card.get_text(" ", strip=True) in self._empty_card_messages
+            for card in soup.select(self._empty_card_selector)
+        ):
             return
         raise FeedUnavailable(url, "missing_wall")
 
@@ -72,7 +84,10 @@ class VkFeed(
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
-        empty = ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector))
+        empty = ec.any_of(
+            ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector)),
+            self._empty_wall_card,
+        )
         page_ready = ec.any_of(posts, empty)
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
@@ -103,6 +118,13 @@ class VkFeed(
             return False
         except (TimeoutException, WebDriverException) as error:
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+
+    def _empty_wall_card(self, driver: WebDriver) -> bool:
+        # A generic placeholder can also contain an access or loading error.
+        return any(
+            card.text.strip() in self._empty_card_messages
+            for card in driver.find_elements(By.CSS_SELECTOR, self._empty_card_selector)
+        )
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
