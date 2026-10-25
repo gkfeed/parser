@@ -22,7 +22,7 @@ logger = structlog.get_logger(__name__)
 
 
 class FeedParserRepositoryProtocol(Protocol):
-    async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser: ...
+    async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser | None: ...
 
 
 class FeedRepositoryProtocol(Protocol):
@@ -30,7 +30,9 @@ class FeedRepositoryProtocol(Protocol):
 
 
 class ItemsRepositoryProtocol(Protocol):
-    async def add_items_to_feed(self, feed: Feed, items: list[Item]) -> list[Item]: ...
+    async def save_parser_result(
+        self, feed: Feed, items: list[Item], valid_for: datetime
+    ) -> list[Item]: ...
 
 
 class Dispatcher:
@@ -106,7 +108,6 @@ class Dispatcher:
             await self._schedule_failure(feed.id)
             return
 
-        self._failure_counts.pop(feed.id, None)
         items = result.items
         received = len(items)
 
@@ -114,7 +115,6 @@ class Dispatcher:
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
-            items = await self.items_repository.add_items_to_feed(feed, items)
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
@@ -123,12 +123,17 @@ class Dispatcher:
             new_valid_for = now + delta
         else:
             new_valid_for = max(result.retry_at, now + timedelta(seconds=1))
+
+        items = await self.items_repository.save_parser_result(
+            feed, items, new_valid_for
+        )
+        self._failure_counts.pop(feed.id, None)
+        if result.retry_at is not None:
             logger.info(
                 "feed_retry_scheduled",
                 reason="parser_requested_retry",
                 next_retry=new_valid_for.isoformat(),
             )
-        await self.feed_parser_repository.upsert(feed.id, new_valid_for)
         logger.info("feed_items_received", received=received, returned=len(items))
 
     async def _schedule_failure(self, feed_id: int) -> None:
