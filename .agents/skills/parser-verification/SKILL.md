@@ -5,7 +5,7 @@ description: Use after any code change in this repository, before marking the ta
 
 # Parser verification
 
-After each code change, review the task's staged and unstaged diff, relevant callers, and parser hooks. Follow `AGENTS.md` and `GEMINI.md`. Fix issues within scope and leave unrelated changes intact.
+After each code change, review the task's staged and unstaged diff, relevant callers, and parser hooks. Follow `AGENTS.md`. Fix issues within scope and leave unrelated changes intact.
 
 ## Review
 
