@@ -55,7 +55,9 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
 
     async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self._service_url)
-        media = soup.select(".search-result .profile-media-list__item")
+        media = soup.select(".search-result .profile-media-list__item")[
+            : self._max_media_items
+        ]
         semaphore = asyncio.Semaphore(self._image_download_concurrency)
 
         async def create_item(item: Tag) -> Item | None:
