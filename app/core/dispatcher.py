@@ -1,6 +1,6 @@
 import asyncio
 import random
-from collections.abc import Collection, Mapping
+from collections.abc import Awaitable, Callable, Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -12,7 +12,6 @@ from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import (
-    BrokerError,
     BrokerFeedUnavailable,
     BrokerNoWorker,
     BrokerService,
@@ -51,6 +50,7 @@ class Dispatcher:
         items_repository: ItemsRepositoryProtocol,
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
         broker_wait_timeout: int = 300,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
@@ -58,6 +58,7 @@ class Dispatcher:
         self.items_repository = items_repository
         self.parsers = parsers
         self.broker_wait_timeout = broker_wait_timeout
+        self.sleep = sleep
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
@@ -65,7 +66,7 @@ class Dispatcher:
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
                 tg.create_task(self._fetch_feed_items(feed))
-                await asyncio.sleep(1)
+                await self.sleep(1)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
         with bound_contextvars(feed_id=feed.id, parser=feed.type):
@@ -103,7 +104,9 @@ class Dispatcher:
                 next_retry=next_retry.isoformat(),
             )
             return
-        except BrokerError:
+        except Exception:
+            # This boundary only covers broker I/O and result validation.
+            # Database writes, including failure scheduling, must still raise.
             logger.exception("feed_dispatch_failed")
             await self._schedule_failure(feed.id)
             return
@@ -138,13 +141,13 @@ class Dispatcher:
 
     async def _schedule_failure(self, feed_id: int) -> None:
         failure_count = self._failure_counts.get(feed_id, 0) + 1
-        self._failure_counts[feed_id] = failure_count
         backoff = self._failure_backoffs[
             min(failure_count, len(self._failure_backoffs)) - 1
         ]
         jittered_backoff = backoff * random.uniform(0.9, 1.1)
         next_retry = datetime.now(UTC) + jittered_backoff
         await self.feed_parser_repository.upsert(feed_id, next_retry)
+        self._failure_counts[feed_id] = failure_count
         logger.warning(
             "feed_retry_scheduled",
             failure_count=failure_count,
