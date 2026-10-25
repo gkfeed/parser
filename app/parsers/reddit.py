@@ -36,8 +36,19 @@ class RedditFeed(
         self._extract_posts(BeautifulSoup(html, "html.parser"))
 
     def _extract_posts(self, soup: BeautifulSoup) -> list[Tag]:
-        if soup.select_one("#challenge-form, #cf-challenge-running, .cf-turnstile"):
+        title = soup.title.get_text(strip=True).lower() if soup.title else ""
+        if soup.select_one(
+            "#challenge-form, #cf-challenge-running, .cf-turnstile, #anubis_challenge"
+        ) or title in {
+            "just a moment...",
+            "checking you are not a bot",
+            "making sure you're not a bot!",
+        }:
             raise FeedUnavailable(self.feed.url, "reddit_mirror_challenge")
+        if soup.select_one("form input[type='password']"):
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_login")
+        if title in {"access denied", "forbidden", "blocked", "403 forbidden"}:
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_blocked")
         if soup.select_one("#error"):
             raise FeedUnavailable(self.feed.url, "reddit_mirror_error_page")
         posts = [post for post in soup.find_all(class_="post") if isinstance(post, Tag)]

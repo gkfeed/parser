@@ -3,15 +3,25 @@ gkfeed parser
 
 ## Setup
 
-### Database Migration
+### Database schema
 
-To apply database migrations using Alembic, run:
+[`gkfeed/infra`](https://github.com/gkfeed/infra) owns and prepares the PostgreSQL
+schema. An operator must apply its migrations before deploying the parser,
+following the [infra migration policy](https://github.com/gkfeed/infra/blob/master/docs/migrations.md).
+The parser has no schema migration commands and does not execute DDL.
+
+With the application environment configured, check schema compatibility before
+starting the parser:
 
 ```bash
-make migrate
+.venv/bin/python -m app.run.check_schema_compatibility
 ```
 
-This command executes `.venv/bin/alembic upgrade head`.
+This read-only check queries `public.schema_migrations` for the parser's minimum
+migration ID, currently `20260904184133`, or a later ID. It accepts later
+compatible migrations and exits with status 1 if the registry is missing,
+unreadable, or too old. It never applies migrations or repairs the schema.
+Use a database identity with the `gkfeed_parser` role provisioned by infra.
 
 ## Environment Variables
 

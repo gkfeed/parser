@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 import structlog
 from bs4 import Tag
 from requests.exceptions import RequestException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -187,7 +188,27 @@ class InstagramStoriesFeed(
         if isinstance(stories_result, WebElement):
             self._check_error(stories_result)
 
+        self._dismiss_subscription_landing(driver)
         self._load_all_media(driver)
+
+    def _dismiss_subscription_landing(self, driver: WebDriver) -> None:
+        buttons = driver.find_elements(
+            By.CSS_SELECTOR, ".tz-landing-exp .tz-landing__button-close"
+        )
+        if not buttons:
+            return
+
+        # Anonyig hides loaded results behind its subscription landing. Use its
+        # browser-download button so pagination can inspect the visible list.
+        self._click(driver, buttons[0])
+        try:
+            WebDriverWait(driver, self._results_wait_time).until(
+                EC.none_of(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, ".tz-landing-exp"))
+                )
+            )
+        except TimeoutException as exc:
+            raise self._unavailable("media_loading_unverified") from exc
 
     def _load_all_media(self, driver: WebDriver) -> None:
         try:
