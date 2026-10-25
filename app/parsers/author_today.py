@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import override
 from urllib.parse import urljoin
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
@@ -16,6 +16,15 @@ class AuthorTodayFeed(
 ):
     _cache_storage_time = timedelta(hours=1)
     _base_url = "https://author.today"
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        # An empty chapter list is valid; a missing list is not.
+        require_tag(
+            soup.select_one("#tab-chapters ul.table-of-content"),
+            "Author.Today table of contents",
+        )
 
     @property
     @override

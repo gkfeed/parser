@@ -35,17 +35,22 @@ class URLRanker:
         # Filter out URLs that are in cooldown
         active_urls = []
         for url in all_urls:
-            if url in self.last_failed:
-                last_fail_time = datetime.fromtimestamp(self.last_failed[url], UTC)
-                if datetime.now(UTC) - last_fail_time < timedelta(
-                    minutes=self.cooldown_minutes
-                ):
-                    continue  # Still in cooldown
+            if self.get_cooldown_until(url) is not None:
+                continue
             active_urls.append(url)
 
         # Sort active URLs by rank (lower rank is better)
         active_urls.sort(key=lambda url: self.ranks.get(url, 0))
         return active_urls
+
+    def get_cooldown_until(self, url: str) -> datetime | None:
+        failed_at = self.last_failed.get(url)
+        if failed_at is None:
+            return None
+        retry_at = datetime.fromtimestamp(failed_at, UTC) + timedelta(
+            minutes=self.cooldown_minutes
+        )
+        return retry_at if retry_at > datetime.now(UTC) else None
 
     def demote_url(self, url: str):
         self.ranks[url] = self.ranks.get(url, 0) + 1

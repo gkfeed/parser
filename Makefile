@@ -1,5 +1,4 @@
 PYTHON = .venv/bin/python
-ALEMBIC = .venv/bin/alembic
 PRODUCTION_COMPOSE = docker compose -f docker-compose.yml -f docker-compose.production.yml
 
 merge-to-master:
@@ -41,13 +40,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test test-integration debug format migrate makemigrations docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
-
-migrate:
-	$(ALEMBIC) upgrade head
-
-makemigrations:
-	$(ALEMBIC) revision --autogenerate -m "$(MSG)"
+.PHONY: merge-to-master test test-integration debug format docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
 
 init-dev:
 	uv sync --all-extras

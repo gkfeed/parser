@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any, ClassVar, override
+from typing import Any, override
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -13,64 +13,21 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
-from app.services.ytdlp import BaseExtractionMode, YtdlpInfoExtractor
+from app.services.ytdlp.vkvideo import extract_channel_videos, video_link
 from app.utils.datetime import constant_datetime
 
 
-class _InvalidVkVideoMetadata(ValueError):
-    """The source returned metadata that cannot describe a video feed."""
-
-
-def _video_link(video: dict[str, Any]) -> str:
-    video_id = video.get("id")
-    if video_id:
-        if not isinstance(video_id, (str, int)) or isinstance(video_id, bool):
-            raise _InvalidVkVideoMetadata(
-                "VK Video extraction returned an invalid video ID"
-            )
-        if not str(video_id).strip():
-            raise _InvalidVkVideoMetadata(
-                "VK Video extraction returned a blank video ID"
-            )
-        return f"https://vkvideo.ru/video{video_id}"
-
-    link = video.get("webpage_url") or video.get("url")
-    if not isinstance(link, str) or not link.strip():
-        raise _InvalidVkVideoMetadata(
-            "VK Video extraction returned a video without a usable link"
-        )
-    return link
-
-
-def _validate_extraction(
-    url: str, info: dict[str, Any] | None, error: str | None
-) -> dict[str, Any]:
-    if not isinstance(info, dict):
-        raise _InvalidVkVideoMetadata("VK Video extraction did not return metadata")
-    entries = info.get("entries")
-    if not isinstance(entries, list):
-        raise _InvalidVkVideoMetadata(
-            "VK Video extraction did not return an entries list"
-        )
-    if not entries:
-        # An empty extraction does not confirm that the channel has no videos.
-        raise _InvalidVkVideoMetadata("VK Video extraction returned no videos")
-    for video in entries:
-        if not isinstance(video, dict) or not video:
-            raise _InvalidVkVideoMetadata(
-                "VK Video extraction returned an invalid video entry"
-            )
-        _video_link(video)
-    return info
-
-
-class VkVideoExtractionMode(BaseExtractionMode):
-    result_handler = staticmethod(_validate_extraction)
-    opts: ClassVar[dict[str, Any]] = {
-        **BaseExtractionMode.opts,
-        "extract_flat": False,
-        "skip_download": True,
-    }
+def _video_publication_date(video: dict[str, Any], link: str) -> datetime:
+    timestamp = video.get("timestamp") or video.get("release_timestamp")
+    upload_date = video.get("upload_date")
+    try:
+        if timestamp:
+            return datetime.fromtimestamp(timestamp, UTC)
+        if upload_date:
+            return datetime.strptime(upload_date, "%Y%m%d").replace(tzinfo=UTC)
+        return constant_datetime
+    except (TypeError, ValueError, OverflowError, OSError) as error:
+        raise ValueError(f"Invalid VK Video publication date for {link}") from error
 
 
 class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
@@ -84,34 +41,16 @@ class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
 
     async def _parse_items(self) -> list[Item]:
         try:
-            info = await YtdlpInfoExtractor.extract_channel_videos_info(
-                self.feed.url, VkVideoExtractionMode(), self._max_videos
-            )
-            # Cached results bypass the extraction mode's result handler.
-            info = _validate_extraction(self.feed.url, info, None)
+            info = await extract_channel_videos(self.feed.url, self._max_videos)
         except (ValueError, DownloadError):
             return await self._parse_page_items()
 
         channel = info.get("title") or self.feed.title
         items = []
         for video in info["entries"]:
-            link = _video_link(video)
+            link = video_link(video)
 
-            timestamp = video.get("timestamp") or video.get("release_timestamp")
-            upload_date = video.get("upload_date")
-            try:
-                if timestamp:
-                    published_at = datetime.fromtimestamp(timestamp, UTC)
-                elif upload_date:
-                    published_at = datetime.strptime(upload_date, "%Y%m%d").replace(
-                        tzinfo=UTC
-                    )
-                else:
-                    published_at = constant_datetime
-            except (TypeError, ValueError, OverflowError, OSError) as error:
-                raise ValueError(
-                    f"Invalid VK Video publication date for {link}"
-                ) from error
+            published_at = _video_publication_date(video, link)
 
             items.append(
                 Item(
@@ -187,20 +126,25 @@ class VkVideoFeed(ItemLinkHashExtension, SeleniumParserExtension):
         links: set[str] = set()
         for card in soup.select(self._video_selector):
             title_tag = card.select_one('[data-testid="video_card_title"] a')
-            href = title_tag.get("href") if title_tag else None
-            if not isinstance(href, str) or title_tag is None:
-                continue
+            if title_tag is None:
+                raise FeedUnavailable(self.feed.url, "video_card_missing_title_link")
+            href = title_tag.get("href")
+            if not isinstance(href, str) or not href.strip():
+                raise FeedUnavailable(self.feed.url, "video_card_missing_href")
             path = urlsplit(urljoin(self.feed.url, href)).path
             if not path.startswith("/video"):
                 continue
             link = urljoin("https://vkvideo.ru/", path)
             if link in links:
                 continue
+            title = title_tag.get_text(" ", strip=True)
+            if not title:
+                raise FeedUnavailable(self.feed.url, "video_card_missing_title")
             links.add(link)
             items.append(
                 Item(
                     title=f"VK Video: {channel}",
-                    text=title_tag.get_text(" ", strip=True),
+                    text=title,
                     date=constant_datetime,
                     link=link,
                 )
