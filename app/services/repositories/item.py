@@ -1,7 +1,8 @@
 from datetime import datetime
+from itertools import batched
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import column, select, tuple_, values
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.item import Item as _Item
@@ -15,7 +16,13 @@ from .feed_parser import FeedParserRepository
 logger = structlog.get_logger(__name__)
 
 
+ItemIdentity = tuple[str, str, str]
+
+
 class ItemsRepository(BaseRepository):
+    # Three parameters per fallback identity, below SQLite's 999-variable limit.
+    _lookup_batch_size = 250
+
     async def get_all(self, feed: Feed) -> list[Item]:
         async with self._session_factory() as session:
             result = await session.execute(
@@ -43,19 +50,32 @@ class ItemsRepository(BaseRepository):
         self, session: AsyncSession, feed: Feed, items: list[Item]
     ) -> list[Item]:
         """Write items and hashes without committing the caller's transaction."""
+        known_hashes = await self._known_hashes(session, feed.id, items)
+        identities = list(
+            dict.fromkeys(
+                (item.title, item.link, item.text)
+                for item in items
+                if not item.hash or item.hash not in known_hashes
+            )
+        )
+        existing_identities = await self._existing_identities(
+            session, feed.id, identities
+        )
         unseen_items = []
         received = len(items)
         inserted = 0
         known_hash_skipped = 0
         existing_item_skipped = 0
         for item in items:
-            if item.hash and await self._contains_hash(session, item.hash, feed.id):
+            if item.hash and item.hash in known_hashes:
                 known_hash_skipped += 1
                 logger.debug("item_skipped", reason="known_hash")
                 continue
 
-            if not await self._check_if_exists(session, feed, item):
+            identity = (item.title, item.link, item.text)
+            if identity not in existing_identities:
                 self._create_item(session, feed, item)
+                existing_identities.add(identity)
                 inserted += 1
             else:
                 existing_item_skipped += 1
@@ -63,6 +83,8 @@ class ItemsRepository(BaseRepository):
 
             if item.hash:
                 session.add(ItemHash(hash=item.hash, feed_id=feed.id))
+                known_hashes.add(item.hash)
+            # A new hash is returned even when its fallback identity already exists.
             unseen_items.append(item)
 
         logger.info(
@@ -75,25 +97,37 @@ class ItemsRepository(BaseRepository):
         )
         return unseen_items
 
-    @staticmethod
-    async def _contains_hash(session: AsyncSession, hash: str, feed_id: int) -> bool:
-        stmt = select(ItemHash).where(
-            ItemHash.hash == hash, ItemHash.feed_id == feed_id
-        )
-        result = await session.execute(stmt)
-        return result.scalars().first() is not None
+    async def _known_hashes(
+        self, session: AsyncSession, feed_id: int, items: list[Item]
+    ) -> set[str]:
+        hashes = list(dict.fromkeys(item.hash for item in items if item.hash))
+        known_hashes: set[str] = set()
+        for batch in batched(hashes, self._lookup_batch_size):
+            result = await session.scalars(
+                select(ItemHash.hash).where(
+                    ItemHash.feed_id == feed_id, ItemHash.hash.in_(batch)
+                )
+            )
+            known_hashes.update(result)
+        return known_hashes
 
-    @staticmethod
-    async def _check_if_exists(session: AsyncSession, feed: Feed, item: Item) -> bool:
+    async def _existing_identities(
+        self, session: AsyncSession, feed_id: int, identities: list[ItemIdentity]
+    ) -> set[ItemIdentity]:
         # Omitting date from the fallback identity is intentional.
-        stmt = select(_Item).where(
-            _Item.feed_id == feed.id,
-            _Item.title == item.title,
-            _Item.link == item.link,
-            _Item.text == item.text,
-        )
-        existing = (await session.execute(stmt)).scalars().first()
-        return existing is not None
+        existing: set[ItemIdentity] = set()
+        for batch in batched(identities, self._lookup_batch_size):
+            candidates = values(column("title"), column("link"), column("text")).data(
+                list(batch)
+            )
+            result = await session.execute(
+                select(_Item.title, _Item.link, _Item.text).where(
+                    _Item.feed_id == feed_id,
+                    tuple_(_Item.title, _Item.link, _Item.text).in_(candidates),
+                )
+            )
+            existing.update((title, link, text) for title, link, text in result)
+        return existing
 
     @staticmethod
     def _create_item(session: AsyncSession, feed: Feed, item: Item) -> None:
