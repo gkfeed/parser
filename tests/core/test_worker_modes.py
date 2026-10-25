@@ -216,7 +216,7 @@ async def test_http_worker_processes_only_one_feed_at_a_time(
 async def start_light_worker(worker_broker):
     processes = []
 
-    async def start(concurrency):
+    async def start():
         environment = {
             **os.environ,
             "DB_URL": "postgresql://dummy:dummy@127.0.0.1/worker_test",
@@ -225,7 +225,6 @@ async def start_light_worker(worker_broker):
             "REDIS_HOST": worker_broker.redis_host,
             "BROKER_URL": worker_broker.url,
             "SELENIUM_DOCKER_URL": "http://127.0.0.1:1",
-            "LIGHT_WORKER_CONCURRENCY": str(concurrency),
         }
         process = await asyncio.create_subprocess_exec(
             sys.executable,
@@ -246,7 +245,7 @@ async def start_light_worker(worker_broker):
             await stop_worker(process)
 
 
-async def test_light_worker_parses_concurrently_with_a_global_limit(
+async def test_light_workers_process_concurrently_only_across_processes(
     worker_broker, start_light_worker
 ):
     await worker_broker.enqueue("first", "web", "/slow")
@@ -254,9 +253,17 @@ async def test_light_worker_parses_concurrently_with_a_global_limit(
     await worker_broker.enqueue("third", "web", "/rss")
     await worker_broker.enqueue("http-task", "yummyanime", "/http")
     await worker_broker.enqueue("browser-task", "spoti", "/rss")
-    await start_light_worker(2)
+    await start_light_worker()
 
     await wait_for_status(worker_broker.broker, "first", "processing")
+    await asyncio.wait_for(worker_broker.slow_started.wait(), timeout=10)
+    with pytest.raises(TimeoutError):
+        await asyncio.wait_for(
+            poll_status(worker_broker.broker, "second", "processing"), timeout=5
+        )
+    assert (await worker_broker.broker.get_task_data("second"))["status"] == "pending"
+
+    await start_light_worker()
     await wait_for_status(worker_broker.broker, "second", "processing")
     assert (await worker_broker.broker.get_task_data("third"))["status"] == "pending"
 

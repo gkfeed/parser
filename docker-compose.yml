@@ -33,7 +33,6 @@ services:
     environment:
       - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
       - REDIS_HOST=redis
-      - LIGHT_WORKER_CONCURRENCY=${LIGHT_WORKER_CONCURRENCY:-4}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

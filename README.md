@@ -41,15 +41,27 @@ back to a different logging configuration.
 
 Worker parser types are configured in `app/configs/workers.py`.
 
-- `worker_light` handles light parsers concurrently. `LIGHT_WORKER_CONCURRENCY`
-  limits in-flight tasks and defaults to `4`.
+- `worker_light` handles one light-parser task at a time in each container.
+  Run more light containers to process tasks concurrently.
 - `worker_http` handles the HTTP parsers formerly assigned to heavy, one task
   at a time.
 - `worker_browser` handles Selenium parsers, one task at a time, and owns one
   Grid slot.
 
 Each worker runs in its own container. Feed types and broker function names are
-unchanged. Light concurrency can include multiple feeds of the same parser type.
+unchanged. Multiple light containers can process feeds of the same parser type.
+
+For example, run three light containers locally:
+
+```bash
+docker compose up -d --scale worker_light=3 worker_light
+```
+
+Use the production overlay when scaling on the server:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --scale worker_light=3 worker_light
+```
 
 To skip parser types in all workers, add them to `ignored_parser_types`:
 
