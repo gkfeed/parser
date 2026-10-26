@@ -3,6 +3,7 @@ from typing import Any
 
 import structlog
 import yt_dlp
+from yt_dlp.extractor.common import InfoExtractor
 
 from app.utils.logging import url_log_fields
 
@@ -51,9 +52,13 @@ async def extract_info(
     opts: Any,
     keys: list[str] | None = None,
     result_handler: InfoResultHandler | None = None,
+    *,
+    extractor_class: type[InfoExtractor] | None = None,
 ) -> dict[str, Any]:
     extraction_logger = _YtdlpLogger(url)
     with yt_dlp.YoutubeDL({**opts, "logger": extraction_logger}) as ydl:
+        if extractor_class is not None and extractor_class.suitable(url):
+            ydl.add_info_extractor(extractor_class())
         try:
             info: Any = ydl.extract_info(url, download=False)
         finally:
