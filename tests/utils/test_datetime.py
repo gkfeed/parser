@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import parse_datetime
 
 
 @pytest.mark.parametrize(
@@ -26,11 +26,12 @@ from app.utils.datetime import constant_datetime, convert_datetime
         ),
     ],
 )
-def test_convert_datetime_preserves_the_instant(
+def test_parse_datetime_preserves_the_instant(
     raw_date: str, expected: datetime
 ) -> None:
-    assert convert_datetime(raw_date) == expected
+    assert parse_datetime(raw_date) == expected
 
 
-def test_convert_datetime_uses_fallback_for_invalid_input() -> None:
-    assert convert_datetime("not a date") == constant_datetime
+def test_parse_datetime_rejects_invalid_input() -> None:
+    with pytest.raises(ValueError, match="not a date"):
+        parse_datetime("not a date")
