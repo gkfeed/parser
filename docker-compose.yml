@@ -36,11 +36,32 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - redis
-  worker_heavy:
+  worker_http:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    command: ["worker_heavy"]
+    command: ["worker_http"]
+    tty: True
+    restart: on-failure
+    volumes:
+      - ~/.local/share/gkfeed/data:/data
+      - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
+    env_file:
+      - .env
+    environment:
+      - BROKER_URL=${BROKER_URL:-http://host.docker.internal:8000}
+      - REDIS_HOST=redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+  worker_browser:
+    profiles:
+      - browser
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    command: ["worker_browser"]
     tty: True
     restart: on-failure
     stop_grace_period: 120s
@@ -68,6 +89,8 @@ services:
     restart: always
   # should be in services/chrome.compose
   chrome:
+    profiles:
+      - browser
     image: selenium/standalone-chrome:4.48.0-20260905@sha256:11faf9d193dbdce26b4d7370f2d28e299515a00dd94453f154219469eb53b1a7
     restart: always
     entrypoint: ["python3", "/opt/gkfeed/watchdog.py"]
