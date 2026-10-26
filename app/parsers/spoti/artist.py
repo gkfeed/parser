@@ -28,9 +28,9 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         ):
             # Only the discography route may be missing; try the artist root.
             return
-        self._validate_release_page(soup)
+        self._extract_release_links(soup)
 
-    def _validate_release_page(self, soup: BeautifulSoup) -> None:
+    def _extract_release_links(self, soup: BeautifulSoup) -> list[Tag]:
         if soup.title and "Page not found" in soup.title.text:
             raise ValueError("Spotify artist page not found")
         page_url = soup.find("meta", property="og:url")
@@ -45,10 +45,11 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         )
         if not meta_matches and not canonical_matches:
             raise ValueError("Spotify page does not identify the requested artist")
-        if soup.select_one('a[href^="/album"]') is not None:
-            return
+        links = list(soup.select('a[href^="/album"]'))
+        if links:
+            return links
         if self._has_confirmed_empty_discography(soup):
-            return
+            return []
         raise ValueError(
             "Spotify releases missing without a confirmed empty discography"
         )
@@ -102,8 +103,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         return soup
 
     async def _parse_releases_links(self, soup) -> list[Tag]:
-        self._validate_release_page(soup)
-        return list(soup.select('a[href^="/album"]'))
+        return self._extract_release_links(soup)
 
     @property
     async def _releases_links(self) -> list[Tag]:
