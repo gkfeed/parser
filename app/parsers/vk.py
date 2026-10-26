@@ -5,6 +5,7 @@ from typing import override
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
+from dateutil.parser import parse
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -16,7 +17,7 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class VkFeed(
@@ -32,6 +33,13 @@ class VkFeed(
         '#page-wall [data-testid="feed-empty-result"], '
         '#page-wall [data-testid="empty_wall"]'
     )
+    _empty_card_selector = (
+        "#page_wall_posts > .no_rows, "
+        # The SPA group page uses an empty newsfeed card without a wall test ID.
+        '#spa_layout_content:has([data-testid="group-header"]) '
+        "section:has(.vkuiIcon--newsfeed_outline_56)"
+    )
+    _empty_card_messages = frozenset({"No results found", "The wall is empty."})
     _challenge_attempts = 3
 
     @override
@@ -42,6 +50,11 @@ class VkFeed(
         if soup.select_one("button.start") is not None:
             raise FeedUnavailable(url, "browser_challenge")
         if soup.select_one(self._empty_selector) is not None:
+            return
+        if any(
+            card.get_text(" ", strip=True) in self._empty_card_messages
+            for card in soup.select(self._empty_card_selector)
+        ):
             return
         raise FeedUnavailable(url, "missing_wall")
 
@@ -71,7 +84,10 @@ class VkFeed(
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
-        empty = ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector))
+        empty = ec.any_of(
+            ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector)),
+            self._empty_wall_card,
+        )
         page_ready = ec.any_of(posts, empty)
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
@@ -102,6 +118,13 @@ class VkFeed(
             return False
         except (TimeoutException, WebDriverException) as error:
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+
+    def _empty_wall_card(self, driver: WebDriver) -> bool:
+        # A generic placeholder can also contain an access or loading error.
+        return any(
+            card.text.strip() in self._empty_card_messages
+            for card in driver.find_elements(By.CSS_SELECTOR, self._empty_card_selector)
+        )
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -166,31 +189,44 @@ class VkFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        time_tag = post.find("time")
-        if not isinstance(time_tag, Tag):
+        for time_tag in post.select('[data-testid="post_date_block_preview"], time'):
+            owner = time_tag.find_parent(attrs={"data-testid": "post"})
+            if owner is None or owner is post:
+                break
+        else:
             return constant_datetime
 
-        datetime_str = time_tag.text.strip()
+        datetime_str = time_tag.get_text(" ", strip=True)
+        if time_tag.get("data-testid") == "post_date_block_preview":
+            return self._parse_post_day(datetime_str)
         if not datetime_str:
             return constant_datetime
-
         return self._parse_datetime(datetime_str)
 
-    def _parse_datetime(self, datetime_str: str) -> datetime:
-        if datetime_str.startswith("today"):
-            today_str = datetime.now(UTC).date().strftime("%m/%d/%Y")
-            datetime_str = today_str + datetime_str.split("at")[1]
-
-        if datetime_str.startswith("yesterday"):
-            yesterday = datetime.now(UTC).date() - timedelta(days=1)
-            yesterday_str = yesterday.strftime("%m/%d/%Y")
-            datetime_str = yesterday_str + datetime_str.split("at")[1]
-
-        try:
-            return convert_datetime(datetime_str)
-        except (IndexError, ValueError) as e:
-            print(e)
+    @staticmethod
+    def _parse_post_day(value: str) -> datetime:
+        # Relative previews cannot reliably identify a calendar day. Keep the
+        # constant rather than guessing from the current time or browser state.
+        if re.fullmatch(r"just now|\d+\s+(min|h|d)\s+ago", value, re.IGNORECASE):
             return constant_datetime
+        try:
+            parsed = parse(value)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid VK post date: {value!r}") from error
+        return parsed.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+
+    def _parse_datetime(self, datetime_str: str) -> datetime:
+        if datetime_str.startswith(("today", "yesterday")):
+            match = re.fullmatch(r"(today|yesterday)\s+at\s+(.+)", datetime_str)
+            if match is None:
+                raise ValueError(f"Invalid VK relative date: {datetime_str!r}")
+
+            relative_date = datetime.now(UTC).date()
+            if match.group(1) == "yesterday":
+                relative_date -= timedelta(days=1)
+            datetime_str = f"{relative_date.isoformat()} {match.group(2)}"
+
+        return parse_datetime(datetime_str)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:

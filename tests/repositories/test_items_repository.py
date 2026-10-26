@@ -7,13 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from app.models.item import Item as ItemModel
 from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
-from app.services.container import Container
-from app.services.repositories.feed import FeedRepository
-from app.services.repositories.item import ItemsRepository
 
 
 @pytest.mark.asyncio
-async def test_items_repository():
+async def test_items_repository(feed_repository, items_repository):
     # Setup feed
     feed_data = Feed(
         id=0,
@@ -21,7 +18,7 @@ async def test_items_repository():
         url=f"https://item-test.com/{datetime.now(UTC).timestamp()}",
         type="test",
     )
-    feed = await FeedRepository.create(feed_data)
+    feed = await feed_repository.create(feed_data)
 
     now = datetime.now(UTC)
     items = [
@@ -30,24 +27,26 @@ async def test_items_repository():
     ]
 
     # Test Add Items
-    await ItemsRepository.add_items_to_feed(feed, items)
+    await items_repository.add_items_to_feed(feed, items)
 
-    saved_items = await ItemsRepository.get_all(feed)
+    saved_items = await items_repository.get_all(feed)
     assert len(saved_items) >= 2
     assert any(i.title == "Item 1" for i in saved_items)
 
     # Test Duplicate handling (should not add again)
-    await ItemsRepository.add_items_to_feed(feed, items)
-    saved_items_after = await ItemsRepository.get_all(feed)
+    await items_repository.add_items_to_feed(feed, items)
+    saved_items_after = await items_repository.get_all(feed)
     # Check that for this feed, count remains 2 (or whatever was added)
     assert len([i for i in saved_items_after if i.title in ["Item 1", "Item 2"]]) == 2
 
     # Clean up
-    await FeedRepository.delete_by_id(feed.id)
+    await feed_repository.delete_by_id(feed.id)
 
 
 @pytest.mark.asyncio
-async def test_items_repository_handles_existing_duplicates(create_feed):
+async def test_items_repository_handles_existing_duplicates(
+    create_feed, session_factory, items_repository
+):
     feed = await create_feed("Duplicate Test Feed")
     
     now = datetime.now(UTC)
@@ -55,7 +54,7 @@ async def test_items_repository_handles_existing_duplicates(create_feed):
     item_title = "Duplicate Item"
     
     # Manually insert two identical items
-    async with Container.get_data().db_session() as session, session.begin():
+    async with session_factory() as session, session.begin():
         # Create two items manually to bypass repository checks
         item1 = ItemModel(
             feed_id=feed.id,
@@ -84,11 +83,13 @@ async def test_items_repository_handles_existing_duplicates(create_feed):
     
     # Try to add it again using Repository
     # This calls _check_if_exists which should not fail
-    await ItemsRepository.add_items_to_feed(feed, [item_to_check])
+    await items_repository.add_items_to_feed(feed, [item_to_check])
 
 
 @pytest.mark.asyncio
-async def test_saving_item_and_hash_is_atomic(create_feed):
+async def test_saving_item_and_hash_is_atomic(
+    create_feed, session_factory, items_repository
+):
     feed = await create_feed("Atomic item test")
     item = Item(
         title="Item rejected by database",
@@ -98,7 +99,7 @@ async def test_saving_item_and_hash_is_atomic(create_feed):
         hash="atomic-hash",
     )
 
-    async with Container.get_data().db_session() as session, session.begin():
+    async with session_factory() as session, session.begin():
         await session.execute(
             text(
                 "CREATE TRIGGER reject_atomic_item BEFORE INSERT ON item "
@@ -108,9 +109,9 @@ async def test_saving_item_and_hash_is_atomic(create_feed):
         )
 
     with pytest.raises(IntegrityError, match="simulated item failure"):
-        await ItemsRepository.add_items_to_feed(feed, [item])
+        await items_repository.add_items_to_feed(feed, [item])
 
-    async with Container.get_data().db_session() as session:
+    async with session_factory() as session:
         item_count = await session.scalar(
             select(func.count())
             .select_from(ItemModel)
@@ -125,12 +126,12 @@ async def test_saving_item_and_hash_is_atomic(create_feed):
     assert item_count == 0
     assert hash_count == 0
 
-    async with Container.get_data().db_session() as session, session.begin():
+    async with session_factory() as session, session.begin():
         await session.execute(text("DROP TRIGGER reject_atomic_item"))
 
-    saved_items = await ItemsRepository.add_items_to_feed(feed, [item])
+    saved_items = await items_repository.add_items_to_feed(feed, [item])
 
-    async with Container.get_data().db_session() as session:
+    async with session_factory() as session:
         item_count = await session.scalar(
             select(func.count())
             .select_from(ItemModel)

@@ -17,9 +17,6 @@ from app.services.broker import (
     BrokerNoWorker,
     BrokerService,
 )
-from app.services.repositories.feed import FeedRepository
-from app.services.repositories.feed_parser import FeedParserRepository
-from app.services.repositories.item import ItemsRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -47,10 +44,10 @@ class Dispatcher:
     def __init__(
         self,
         broker: BrokerService,
-        feed_parser_repository: FeedParserRepositoryProtocol = FeedParserRepository,
+        feed_parser_repository: FeedParserRepositoryProtocol,
+        feed_repository: FeedRepositoryProtocol,
+        items_repository: ItemsRepositoryProtocol,
         parsers: Mapping[str, type[BaseFeed]] = PARSERS,
-        feed_repository: FeedRepositoryProtocol = FeedRepository,
-        items_repository: ItemsRepositoryProtocol = ItemsRepository,
         broker_wait_timeout: int = 300,
     ):
         self.broker = broker
@@ -117,7 +114,7 @@ class Dispatcher:
             delta = getattr(
                 parser_cls, "_cache_storage_time_if_success", timedelta(days=1)
             )
-            items = await self._save_items(feed, items)
+            items = await self.items_repository.add_items_to_feed(feed, items)
         else:
             delta = getattr(parser_cls, "_cache_storage_time", timedelta(hours=1))
 
@@ -158,6 +155,3 @@ class Dispatcher:
         )
 
         return FeedResult.model_validate_json(items_json)
-
-    async def _save_items(self, feed: Feed, items: list[Item]) -> list[Item]:
-        return await self.items_repository.add_items_to_feed(feed, items)
