@@ -121,26 +121,25 @@ class InstagramStoriesFeed(
         return href
 
     @override
-    def make_actions(self, driver: WebDriver) -> None:
+    def _make_actions(self) -> None:
         # The results page keeps some requests open in Docker, so a synchronous
         # click can otherwise wait for Selenium's five-minute default timeout.
-        driver.set_page_load_timeout(30)
+        self.driver.set_page_load_timeout(30)
 
-        dismiss_buttons = driver.find_elements(
+        dismiss_buttons = self.driver.find_elements(
             By.XPATH,
             "/html/body/div/div[2]/div[2]/div[3]/div[2]/button[1]",
         )
         if dismiss_buttons:
-            self._click(driver, dismiss_buttons[0])
+            self._click_element(dismiss_buttons[0])
 
         links = self._wait_for(
-            driver,
             "search_form",
             EC.visibility_of_any_elements_located(
                 (By.CSS_SELECTOR, "form.search-form input.search-form__input")
             ),
         )
-        driver.execute_script(
+        self.driver.execute_script(
             """
             arguments[0].value = arguments[1];
             arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
@@ -150,13 +149,12 @@ class InstagramStoriesFeed(
         )
 
         button = self._wait_for(
-            driver,
             "search_submit",
             EC.element_to_be_clickable(
                 (By.CSS_SELECTOR, "form.search-form .search-form__button")
             ),
         )
-        self._click(driver, button)
+        self._click_element(button)
 
         stories_button = (
             "//button[contains(@class, 'tabs-component__button') "
@@ -164,7 +162,6 @@ class InstagramStoriesFeed(
             "'abcdefghijklmnopqrstuvwxyz')) = 'stories']"
         )
         result = self._wait_for(
-            driver,
             "search_result",
             EC.any_of(
                 EC.presence_of_element_located((By.XPATH, stories_button)),
@@ -173,16 +170,16 @@ class InstagramStoriesFeed(
         )
         result_classes = (result.get_attribute("class") or "").split()
         if "error-message__text" in result_classes:
-            self._check_error(driver, result, "search_result")
+            self._check_error(result, "search_result")
         if (
             "tabs-component__button--disabled" in result_classes
             or not result.is_enabled()
             or result.get_attribute("aria-disabled") == "true"
         ):
             raise self._browser_unavailable(
-                driver, "stories_tab", reason="stories_tab_disabled"
+                "stories_tab", reason="stories_tab_disabled"
             )
-        self._click(driver, result)
+        self._click_element(result)
         media_ready = EC.all_of(
             EC.presence_of_element_located(
                 (
@@ -206,16 +203,16 @@ class InstagramStoriesFeed(
             ),
         )
         stories_result = self._wait_for(
-            driver, "stories_media", EC.any_of(self._loaded_error, media_ready)
+            "stories_media", EC.any_of(self._loaded_error, media_ready)
         )
         if isinstance(stories_result, WebElement):
-            self._check_error(driver, stories_result, "stories_media")
+            self._check_error(stories_result, "stories_media")
 
-        self._dismiss_subscription_landing(driver)
-        self._load_all_media(driver)
+        self._dismiss_subscription_landing()
+        self._load_all_media()
 
-    def _dismiss_subscription_landing(self, driver: WebDriver) -> None:
-        buttons = driver.find_elements(
+    def _dismiss_subscription_landing(self) -> None:
+        buttons = self.driver.find_elements(
             By.CSS_SELECTOR, ".tz-landing-exp .tz-landing__button-close"
         )
         if not buttons:
@@ -223,29 +220,28 @@ class InstagramStoriesFeed(
 
         # Anonyig hides loaded results behind its subscription landing. Use its
         # browser-download button so pagination can inspect the visible list.
-        self._click(driver, buttons[0])
+        self._click_element(buttons[0])
         self._wait_for(
-            driver,
             "subscription_landing",
             EC.none_of(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".tz-landing-exp"))
             ),
         )
 
-    def _load_all_media(self, driver: WebDriver) -> None:
+    def _load_all_media(self) -> None:
         try:
             LazyListLoader(
-                driver,
+                self.driver,
                 items_selector=".search-result .profile-media-list__item",
                 trigger_selector=".search-result .profile-media-list .trigger",
             ).load(self._results_wait_time)
         except LazyListUnavailableError as exc:
             raise self._browser_unavailable(
-                driver, "pagination", reason="media_loading_unverified"
+                "pagination", reason="media_loading_unverified"
             ) from exc
         except LazyListTimeoutError as exc:
             raise self._browser_unavailable(
-                driver, "pagination", reason="media_loading_timeout"
+                "pagination", reason="media_loading_timeout"
             ) from exc
 
     @staticmethod

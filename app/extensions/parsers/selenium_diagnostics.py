@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable
-from typing import ClassVar, Literal, Never
+from typing import ClassVar, Literal, Never, final, override
 
 import structlog
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -25,23 +25,45 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension):
     _diagnostic_visible_selectors: ClassVar[dict[str, str]] = {}
     _diagnostic_error_selector = ""
     _diagnostic_content_selector = ""
+    _driver: WebDriver | None = None
+
+    @property
+    def driver(self) -> WebDriver:
+        """The driver is available only while browser actions are running."""
+        if self._driver is None:
+            raise RuntimeError("Browser actions are not active")
+        return self._driver
+
+    @final
+    @override
+    def make_actions(self, driver: WebDriver) -> None:
+        if self._driver is not None:
+            raise RuntimeError("Browser actions are already active")
+        self._driver = driver
+        try:
+            self._make_actions()
+        finally:
+            self._driver = None
+
+    def _make_actions(self) -> None:
+        raise NotImplementedError("Implement browser actions using self.driver")
+
+    def _click_element(self, element: WebElement) -> None:
+        self._click(self.driver, element)
 
     def _wait_for[T](
         self,
-        driver: WebDriver,
         stage: str,
         condition: Callable[[WebDriver], T | Literal[False]],
     ) -> T:
         try:
-            return WebDriverWait(driver, self._results_wait_time).until(condition)
+            return WebDriverWait(self.driver, self._results_wait_time).until(condition)
         except TimeoutException as exc:
-            raise self._browser_unavailable(
-                driver, stage, reason=f"{stage}_timeout"
-            ) from exc
+            raise self._browser_unavailable(stage, reason=f"{stage}_timeout") from exc
 
-    def _check_error(self, driver: WebDriver, error: WebElement, stage: str) -> Never:
+    def _check_error(self, error: WebElement, stage: str) -> Never:
         raise self._browser_unavailable(
-            driver, stage, message=error.get_attribute("textContent") or ""
+            stage, message=error.get_attribute("textContent") or ""
         )
 
     @staticmethod
@@ -80,7 +102,6 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension):
 
     def _browser_unavailable(
         self,
-        driver: WebDriver,
         stage: str,
         *,
         reason: str | None = None,
@@ -89,7 +110,7 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension):
         """Diagnose a browser failure without logging page text or credentials."""
         context: dict = {}
         try:
-            context = driver.execute_script(
+            context = self.driver.execute_script(
                 """
                 const [counts, visibleCounts, errorSelector, contentSelector] = arguments;
                 const count = s => document.querySelectorAll(s).length;

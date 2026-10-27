@@ -1,6 +1,7 @@
 import json
 import shutil
 from dataclasses import replace
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import ClassVar, override
@@ -32,15 +33,15 @@ class DiagnosticFeed(SeleniumDiagnosticsExtension):
         return []
 
     @override
-    def make_actions(self, driver):
+    def _make_actions(self):
         if self._diagnostic_error_selector:
-            errors = driver.find_elements(
+            errors = self.driver.find_elements(
                 By.CSS_SELECTOR, self._diagnostic_error_selector
             )
             if errors:
-                self._check_error(driver, errors[0], "catalog_response")
+                self._check_error(errors[0], "catalog_response")
         self._wait_for(
-            driver, "catalog_ready", EC.presence_of_element_located((By.ID, "ready"))
+            "catalog_ready", EC.presence_of_element_located((By.ID, "ready"))
         )
 
 
@@ -182,3 +183,29 @@ async def check_source_outcome(parser, reason):
     assert raised.value.retry_at is None
     if reason.endswith("_timeout"):
         assert raised.value.__cause__ is not None
+
+
+@pytest.mark.parametrize("reason", [None, "catalog_closed", "catalog_ready_timeout"])
+async def test_browser_actions_release_driver_for_reuse(local_browser_source, reason):
+    response, url = local_browser_source
+    parser = CatalogFeed(Feed(id=1, title="Local", type="test", url=url), {})
+    parser._service_url = url
+    parser._http_response_storage_time = timedelta(0)
+    body = {
+        None: '<div id="ready"></div>',
+        "catalog_closed": '<div id="error">Catalog closed</div>',
+        "catalog_ready_timeout": "",
+    }[reason]
+    response.update(status=200, body=f'<div id="catalog">{body}</div>')
+
+    with capture_logs():
+        await check_source_outcome(parser, reason)
+    with pytest.raises(RuntimeError, match="Browser actions are not active"):
+        _ = parser.driver
+
+    response.update(body='<div id="catalog"><div id="ready"></div></div>')
+    with capture_logs() as logs:
+        assert await parser.items == []
+    assert logs == []
+    with pytest.raises(RuntimeError, match="Browser actions are not active"):
+        _ = parser.driver
