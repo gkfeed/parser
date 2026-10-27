@@ -101,5 +101,9 @@ class YtdlpInfoExtractor(UseTemporaryCacheServiceExtension):
         if mode is None:
             mode = BaseExtractionMode()
         return await extract_info(
-            url, mode.options(max_videos), keys, mode.result_handler
+            url,
+            mode.options(max_videos),
+            keys,
+            mode.result_handler,
+            extractor_class=mode.extractor_class,
         )

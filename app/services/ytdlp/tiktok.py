@@ -2,10 +2,43 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from yt_dlp.extractor.tiktok import TikTokUserIE as UpstreamTikTokUserIE
+from yt_dlp.utils import ExtractorError
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 
 logger = structlog.get_logger(__name__)
+
+
+class TikTokUserIE(UpstreamTikTokUserIE):
+    """Keep the upstream extractor key and handle explicit profile denials."""
+
+    def _get_universal_data(self, webpage: str, display_id: str) -> dict[str, Any]:
+        data = super()._get_universal_data(webpage, display_id)
+        if not isinstance(data, dict):
+            raise TypeError("TikTok profile data is not an object")
+        detail = data.get("webapp.user-detail")
+        if not isinstance(detail, dict):
+            return data
+
+        status = detail.get("statusCode")
+        logger.info(
+            "tiktok_profile_response",
+            username=display_id,
+            tiktok_status_code=status,
+            stage="profile_metadata",
+        )
+        if status == 209002:
+            self.raise_login_required(
+                "TikTok is requiring login for audience controls, status code 209002"
+            )
+        if status == 10221:
+            # TikTok does not distinguish removal, renaming or access limits here.
+            raise ExtractorError(
+                "TikTok did not return a profile for this username, status code 10221",
+                expected=True,
+            )
+        return data
 
 
 class TikTokVideoRestricted(ValueError):
@@ -47,12 +80,23 @@ def classify_profile(
         )
     ):
         retry_at = datetime.now(UTC) + timedelta(days=1)
-        logger.warning("tiktok_profile_classified", outcome="restricted")
+        logger.warning(
+            "tiktok_profile_classified",
+            outcome="restricted",
+            tiktok_status_code=209002 if "status code 209002" in message else None,
+        )
         raise FeedUnavailable(url, "tiktok_profile_restricted", retry_at)
 
-    if "Unable to extract secondary user ID" in message:
+    if (
+        "Unable to extract secondary user ID" in message
+        or "status code 10221" in message
+    ):
         retry_at = datetime.now(UTC) + timedelta(hours=1)
-        logger.warning("tiktok_profile_classified", outcome="unavailable")
+        logger.warning(
+            "tiktok_profile_classified",
+            outcome="unavailable",
+            tiktok_status_code=10221 if "status code 10221" in message else None,
+        )
         raise FeedUnavailable(url, "tiktok_profile_unavailable", retry_at)
 
     # yt-dlp can return [None] after a playlist request fails. Only real
