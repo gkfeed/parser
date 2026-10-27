@@ -1,5 +1,4 @@
 PYTHON = .venv/bin/python
-ALEMBIC = .venv/bin/alembic
 PRODUCTION_COMPOSE = docker compose -f docker-compose.yml -f docker-compose.production.yml
 
 merge-to-master:
@@ -22,17 +21,17 @@ else
 	$(PYTHON) -m pytest -m integration
 endif
 
-dev:
-	$(PYTHON) -m app.main
-
 dispatcher:
 	$(PYTHON) -m app.run.dispatcher
 
 worker_light: redis
 	$(PYTHON) -m app.run.worker_light
 
-worker_heavy: redis
-	$(PYTHON) -m app.run.worker_heavy
+worker_http: redis
+	$(PYTHON) -m app.run.worker_http
+
+worker_browser: redis
+	$(PYTHON) -m app.run.worker_browser
 
 redis:
 	docker compose up -d redis
@@ -44,13 +43,7 @@ else
 	$(PYTHON) -m pytest --pdb
 endif
 
-.PHONY: merge-to-master test test-integration dev debug format migrate makemigrations docker-update docker-heavy-start docker-heavy-stop docker-restart-workers
-
-migrate:
-	$(ALEMBIC) upgrade head
-
-makemigrations:
-	$(ALEMBIC) revision --autogenerate -m "$(MSG)"
+.PHONY: merge-to-master test test-integration debug format docker-update docker-browser-start docker-browser-stop docker-restart-workers
 
 init-dev:
 	uv sync --all-extras
@@ -78,16 +71,17 @@ endif
 
 docker-update:
 	git fetch && git pull
-	$(PRODUCTION_COMPOSE) --profile heavy pull chrome
-	$(PRODUCTION_COMPOSE) --profile heavy stop && $(PRODUCTION_COMPOSE) --profile heavy rm -f
+	$(PRODUCTION_COMPOSE) stop
+	$(PRODUCTION_COMPOSE) rm -f
 	$(PRODUCTION_COMPOSE) build
-	$(PRODUCTION_COMPOSE) up -d
+	$(PRODUCTION_COMPOSE) up -d --remove-orphans
 
-docker-heavy-start:
-	$(PRODUCTION_COMPOSE) --profile heavy up -d worker_heavy
+docker-browser-start:
+	docker compose --profile browser pull chrome
+	docker compose --profile browser up -d worker_browser
 
-docker-heavy-stop:
-	$(PRODUCTION_COMPOSE) --profile heavy stop worker_heavy chrome
+docker-browser-stop:
+	docker compose --profile browser stop worker_browser chrome
 
 docker-restart-workers:
-	docker compose up -d --build --force-recreate --no-deps worker_light worker_heavy
+	docker compose up -d --build --force-recreate --no-deps worker_light worker_http
