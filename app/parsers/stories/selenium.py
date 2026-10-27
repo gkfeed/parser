@@ -1,25 +1,21 @@
 import asyncio
-from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Literal, Never, override
+from typing import ClassVar, Literal, override
 from urllib.parse import urlsplit
 
 import structlog
 from bs4 import Tag
 from requests.exceptions import RequestException
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
-from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.extensions.parsers.selenium_diagnostics import SeleniumDiagnosticsExtension
 from app.serializers.feed import Item
-from app.services import stories_diagnostics
 from app.services.hash import HashService
 from app.services.media_upload import FallbackUploader
 from app.services.selenium.lazy_list import (
@@ -34,7 +30,7 @@ logger = structlog.get_logger(__name__)
 
 
 class InstagramStoriesFeed(
-    ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
+    ItemsHashExtension, SeleniumDiagnosticsExtension, CacheFeedExtension
 ):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
     _cache_storage_time_if_success = timedelta(days=1)
@@ -45,6 +41,22 @@ class InstagramStoriesFeed(
     _service_url = "https://anonyig.com/en/iganony/"
     # This ad player creates/detaches nested frames that can hang ChromeDriver.
     _blocked_url_patterns = ("*://player.avplayer.com/*",)
+
+    _diagnostic_event = "stories_source_unavailable"
+    _diagnostic_selectors: ClassVar[dict[str, str]] = {
+        "search_forms": "form.search-form",
+        "search_results": ".search-result",
+        "loaders": ".search-result .loader-component",
+        "media_cards": ".search-result .profile-media-list__item",
+        "download_links": ".search-result a.download-btn[href]",
+        "subscription_landings": ".tz-landing-exp",
+        "pagination_triggers": ".search-result .profile-media-list .trigger",
+    }
+    _diagnostic_visible_selectors: ClassVar[dict[str, str]] = {
+        "visible_pagination_triggers": ".search-result .profile-media-list .trigger",
+    }
+    _diagnostic_error_selector = ".search-result .error-message__text"
+    _diagnostic_content_selector = "form.search-form, .search-result"
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -249,31 +261,26 @@ class InstagramStoriesFeed(
                 return error
         return False
 
-    def _wait_for[T](
-        self,
-        driver: WebDriver,
-        stage: str,
-        condition: Callable[[WebDriver], T | Literal[False]],
-    ) -> T:
-        try:
-            return WebDriverWait(driver, self._results_wait_time).until(condition)
-        except TimeoutException as exc:
-            raise self._browser_unavailable(driver, f"{stage}_timeout", stage) from exc
+    @classmethod
+    @override
+    def _classify_browser_error(cls, message: str) -> str:
+        reason = super()._classify_browser_error(message)
+        if reason != "upstream_error":
+            return reason
+        message = message.lower()
+        if "no stories" in message:
+            # The source also uses this message for upstream failures.
+            return "empty_unverified"
+        if "private" in message:
+            return "private"
+        if any(
+            text in message
+            for text in ("user not found", "profile not found", "account not found")
+        ):
+            return "not_found"
+        return reason
 
-    def _check_error(self, driver: WebDriver, error: WebElement, stage: str) -> Never:
-        message = error.get_attribute("textContent") or ""
-        raise self._browser_unavailable(
-            driver, stories_diagnostics.classify_error(message), stage, message=message
-        )
-
-    def _browser_unavailable(
-        self, driver: WebDriver, reason: str, stage: str, *, message: str = ""
-    ) -> FeedUnavailable:
-        reason = stories_diagnostics.log_browser_failure(
-            driver, reason, stage, message=message
-        )
-        return self._unavailable(reason)
-
+    @override
     def _unavailable(self, reason: str) -> FeedUnavailable:
         delay = (
             timedelta(days=1)
