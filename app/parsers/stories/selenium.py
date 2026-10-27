@@ -180,7 +180,7 @@ class InstagramStoriesFeed(
             or result.get_attribute("aria-disabled") == "true"
         ):
             raise self._browser_unavailable(
-                driver, "stories_tab_disabled", "stories_tab"
+                driver, "stories_tab", reason="stories_tab_disabled"
             )
         self._click(driver, result)
         media_ready = EC.all_of(
@@ -241,11 +241,11 @@ class InstagramStoriesFeed(
             ).load(self._results_wait_time)
         except LazyListUnavailableError as exc:
             raise self._browser_unavailable(
-                driver, "media_loading_unverified", "pagination"
+                driver, "pagination", reason="media_loading_unverified"
             ) from exc
         except LazyListTimeoutError as exc:
             raise self._browser_unavailable(
-                driver, "media_loading_timeout", "pagination"
+                driver, "pagination", reason="media_loading_timeout"
             ) from exc
 
     @staticmethod

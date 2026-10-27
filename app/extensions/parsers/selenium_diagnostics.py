@@ -1,5 +1,4 @@
 import re
-from abc import ABC
 from collections.abc import Callable
 from typing import ClassVar, Literal, Never
 
@@ -17,7 +16,7 @@ from .selenium import SeleniumParserExtension
 logger = structlog.get_logger(__name__)
 
 
-class SeleniumDiagnosticsExtension(SeleniumParserExtension, ABC):
+class SeleniumDiagnosticsExtension(SeleniumParserExtension):
     """Opt-in browser diagnostics configured with source selectors and hooks."""
 
     _results_wait_time = 30
@@ -36,12 +35,13 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension, ABC):
         try:
             return WebDriverWait(driver, self._results_wait_time).until(condition)
         except TimeoutException as exc:
-            raise self._browser_unavailable(driver, f"{stage}_timeout", stage) from exc
+            raise self._browser_unavailable(
+                driver, stage, reason=f"{stage}_timeout"
+            ) from exc
 
     def _check_error(self, driver: WebDriver, error: WebElement, stage: str) -> Never:
-        message = error.get_attribute("textContent") or ""
         raise self._browser_unavailable(
-            driver, self._classify_browser_error(message), stage, message=message
+            driver, stage, message=error.get_attribute("textContent") or ""
         )
 
     @staticmethod
@@ -58,25 +58,11 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension, ABC):
     @classmethod
     def _classify_browser_error(cls, message: str) -> str:
         message = message.lower()
-        if any(
-            text in message
-            for text in (
-                "captcha",
-                "verify you are human",
-                "challenge-platform",
-                "just a moment",
-            )
+        if re.search(
+            r"captcha|verify you are human|challenge-platform|just a moment", message
         ):
             return "challenge_required"
-        if any(
-            text in message
-            for text in (
-                "log in",
-                "login required",
-                "sign in",
-                "authentication required",
-            )
-        ):
+        if re.search(r"log in|login required|sign in|authentication required", message):
             return "authentication_required"
         status = cls._error_http_status(message)
         if status == 401:
@@ -85,21 +71,20 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension, ABC):
             return "rate_limited"
         if status is not None:
             return "upstream_http_error"
-        if any(
-            text in message
-            for text in (
-                "bad gateway",
-                "service unavailable",
-                "internal server error",
-                "<!doctype html",
-                "<html",
-            )
+        if re.search(
+            r"bad gateway|service unavailable|internal server error|<!doctype html|<html",
+            message,
         ):
             return "upstream_error_page"
         return "upstream_error"
 
     def _browser_unavailable(
-        self, driver: WebDriver, reason: str, stage: str, *, message: str = ""
+        self,
+        driver: WebDriver,
+        stage: str,
+        *,
+        reason: str | None = None,
+        message: str = "",
     ) -> FeedUnavailable:
         """Diagnose a browser failure without logging page text or credentials."""
         context: dict = {}
@@ -135,6 +120,7 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension, ABC):
         source_message = context.pop("source_message", "")
         message = message or source_message or page_message
         error_kind = self._classify_browser_error(message) if message else None
+        reason = reason or error_kind or "upstream_error"
         document_status = context.get("document_status")
         if error_kind in ("challenge_required", "authentication_required"):
             reason = error_kind
