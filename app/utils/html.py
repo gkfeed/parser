@@ -9,7 +9,7 @@ def require_tag(value: object, field: str) -> Tag:
 
 
 def required_attr(tag: Tag, attribute: str, field: str) -> str:
-    """Read a string attribute without coercing or normalizing its value."""
+    """Read a non-empty string attribute without normalizing its value."""
     value = tag.get(attribute)
     if value is None:
         raise ValueError(f"Missing {attribute!r} attribute for {field}")
@@ -17,6 +17,8 @@ def required_attr(tag: Tag, attribute: str, field: str) -> str:
         raise ValueError(  # noqa: TRY004 - malformed page data, not caller misuse
             f"Invalid {attribute!r} attribute for {field}: expected a string"
         )
+    if not value.strip():
+        raise ValueError(f"Empty {attribute!r} attribute for {field}")
     return value
 
 

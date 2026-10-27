@@ -25,7 +25,7 @@ _IMAGE_SOURCE = re.compile(r'src="data:(?P<mime_type>[^;]+);base64,(?P<encoded>[
 class InstagramFeed(
     ItemsHashExtension, HttpParserExtension, CacheFeedExtension, ResultSizeExtension
 ):
-    worker_kind = WorkerKind.HEAVY
+    worker_kind = WorkerKind.HTTP
     _cache_storage_time_if_success = timedelta(weeks=1)
     # At most 30 images are embedded, so base64 stays near 40 MiB before JSON.
     _max_image_bytes = 1024 * 1024

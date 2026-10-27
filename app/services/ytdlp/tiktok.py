@@ -2,11 +2,44 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
+from yt_dlp.extractor.tiktok import TikTokUserIE as UpstreamTikTokUserIE
+from yt_dlp.utils import ExtractorError
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
+
+
+class TikTokUserIE(UpstreamTikTokUserIE):
+    """Keep the upstream extractor key and handle explicit profile denials."""
+
+    def _get_universal_data(self, webpage: str, display_id: str) -> dict[str, Any]:
+        data = super()._get_universal_data(webpage, display_id)
+        if not isinstance(data, dict):
+            raise TypeError("TikTok profile data is not an object")
+        detail = data.get("webapp.user-detail")
+        if not isinstance(detail, dict):
+            return data
+
+        status = detail.get("statusCode")
+        logger.info(
+            "tiktok_profile_response",
+            username=display_id,
+            tiktok_status_code=status,
+            stage="profile_metadata",
+        )
+        if status == 209002:
+            self.raise_login_required(
+                "TikTok is requiring login for audience controls, status code 209002"
+            )
+        if status == 10221:
+            # TikTok does not distinguish removal, renaming or access limits here.
+            raise ExtractorError(
+                "TikTok did not return a profile for this username, status code 10221",
+                expected=True,
+            )
+        return data
 
 
 class TikTokVideoRestricted(ValueError):
@@ -53,13 +86,26 @@ def classify_profile(
     restriction = _profile_restriction(message)
     if restriction:
         retry_at = datetime.now(UTC) + timedelta(days=1)
+        status = 209002 if "status code 209002" in message else None
         log.warning(
             "tiktok_profile_classified",
             outcome="restricted",
             diagnostic_subtype=restriction,
-            stage="profile_access",
+            stage="profile_metadata" if status else "profile_access",
+            tiktok_status_code=status,
         )
         raise FeedUnavailable(url, "tiktok_profile_restricted", retry_at)
+
+    if "status code 10221" in message:
+        retry_at = datetime.now(UTC) + timedelta(hours=1)
+        log.warning(
+            "tiktok_profile_classified",
+            outcome="unavailable",
+            diagnostic_subtype="profile_not_returned",
+            stage="profile_metadata",
+            tiktok_status_code=10221,
+        )
+        raise FeedUnavailable(url, "tiktok_profile_unavailable", retry_at)
 
     if "Unable to extract secondary user ID" in message:
         retry_at = datetime.now(UTC) + timedelta(hours=1)
@@ -75,6 +121,7 @@ def classify_profile(
             diagnostic_subtype="secondary_user_id_missing",
             stage="profile_embed" if embed_unavailable else "profile_identity",
             access_hint="private_or_embedding_disabled" if embed_unavailable else None,
+            tiktok_status_code=None,
         )
         raise FeedUnavailable(url, "tiktok_profile_unavailable", retry_at)
 
