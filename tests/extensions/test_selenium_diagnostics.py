@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
-from typing import ClassVar, override
+from typing import override
 
 import pytest
 from selenium import webdriver
@@ -34,12 +34,6 @@ class DiagnosticFeed(SeleniumDiagnosticsExtension):
 
     @override
     def _make_actions(self):
-        if self._diagnostic_error_selector:
-            errors = self.driver.find_elements(
-                By.CSS_SELECTOR, self._diagnostic_error_selector
-            )
-            if errors:
-                self._check_error(errors[0], "catalog_response")
         self._wait_for(
             "catalog_ready", EC.presence_of_element_located((By.ID, "ready"))
         )
@@ -47,12 +41,29 @@ class DiagnosticFeed(SeleniumDiagnosticsExtension):
 
 class CatalogFeed(DiagnosticFeed):
     _diagnostic_event = "catalog_unavailable"
-    _diagnostic_selectors: ClassVar[dict[str, str]] = {"entries": ".entry"}
-    _diagnostic_visible_selectors: ClassVar[dict[str, str]] = {
-        "visible_entries": ".entry"
-    }
-    _diagnostic_error_selector = "#error"
-    _diagnostic_content_selector = "#catalog"
+
+    @override
+    def _make_actions(self):
+        errors = self.driver.find_elements(By.ID, "error")
+        if errors:
+            self._check_error(errors[0], "catalog_response")
+        super()._make_actions()
+
+    @override
+    def _browser_context(self):
+        return self.driver.execute_script(
+            """
+            const entries = [...document.querySelectorAll('.entry')];
+            return {
+                document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                entries: entries.length,
+                visible_entries: entries.filter(e =>
+                    e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})).length,
+                page_message: document.querySelector('#catalog') ? '' :
+                    document.title + ' ' + (document.body?.innerText || '')
+            };
+            """
+        )
 
     @classmethod
     @override

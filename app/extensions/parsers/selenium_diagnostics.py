@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable
-from typing import ClassVar, Literal, Never, final, override
+from typing import Literal, Never, final, override
 
 import structlog
 from selenium.common.exceptions import TimeoutException, WebDriverException
@@ -17,14 +17,10 @@ logger = structlog.get_logger(__name__)
 
 
 class SeleniumDiagnosticsExtension(SeleniumParserExtension):
-    """Opt-in browser diagnostics configured with source selectors and hooks."""
+    """Opt-in browser diagnostics with an optional source context hook."""
 
     _results_wait_time = 30
     _diagnostic_event = "browser_source_unavailable"
-    _diagnostic_selectors: ClassVar[dict[str, str]] = {}
-    _diagnostic_visible_selectors: ClassVar[dict[str, str]] = {}
-    _diagnostic_error_selector = ""
-    _diagnostic_content_selector = ""
     _driver: WebDriver | None = None
 
     @property
@@ -100,6 +96,17 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension):
             return "upstream_error_page"
         return "upstream_error"
 
+    def _browser_context(self) -> dict:
+        """Return safe log fields; source_message/page_message are hashed, not logged."""
+        return self.driver.execute_script(
+            """
+            return {
+                document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                page_message: document.title + ' ' + (document.body?.innerText || '')
+            };
+            """
+        )
+
     def _browser_unavailable(
         self,
         stage: str,
@@ -110,30 +117,7 @@ class SeleniumDiagnosticsExtension(SeleniumParserExtension):
         """Diagnose a browser failure without logging page text or credentials."""
         context: dict = {}
         try:
-            context = self.driver.execute_script(
-                """
-                const [counts, visibleCounts, errorSelector, contentSelector] = arguments;
-                const count = s => document.querySelectorAll(s).length;
-                const countVisible = s => [...document.querySelectorAll(s)].filter(e =>
-                    e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})).length;
-                const contentPresent = contentSelector && document.querySelector(contentSelector);
-                return {
-                    ...Object.fromEntries(Object.entries(counts).map(([k, s]) => [k, count(s)])),
-                    ...Object.fromEntries(Object.entries(visibleCounts).map(([k, s]) => [k, countVisible(s)])),
-                    document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
-                    source_message: errorSelector ?
-                        document.querySelector(errorSelector)?.textContent || '' : '',
-                    // Read full-page failures only when the expected UI is absent.
-                    // These texts are classified and hashed, never logged.
-                    page_message: !contentPresent ?
-                        document.title + ' ' + (document.body?.innerText || '') : ''
-                };
-                """,
-                self._diagnostic_selectors,
-                self._diagnostic_visible_selectors,
-                self._diagnostic_error_selector,
-                self._diagnostic_content_selector,
-            )
+            context = self._browser_context()
         except WebDriverException as exc:
             # Diagnostics must preserve the actual source failure.
             context["diagnostic_error"] = type(exc).__name__

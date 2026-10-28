@@ -1,6 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import ClassVar, Literal, override
+from typing import Literal, override
 from urllib.parse import urlsplit
 
 import structlog
@@ -43,20 +43,6 @@ class InstagramStoriesFeed(
     _blocked_url_patterns = ("*://player.avplayer.com/*",)
 
     _diagnostic_event = "stories_source_unavailable"
-    _diagnostic_selectors: ClassVar[dict[str, str]] = {
-        "search_forms": "form.search-form",
-        "search_results": ".search-result",
-        "loaders": ".search-result .loader-component",
-        "media_cards": ".search-result .profile-media-list__item",
-        "download_links": ".search-result a.download-btn[href]",
-        "subscription_landings": ".tz-landing-exp",
-        "pagination_triggers": ".search-result .profile-media-list .trigger",
-    }
-    _diagnostic_visible_selectors: ClassVar[dict[str, str]] = {
-        "visible_pagination_triggers": ".search-result .profile-media-list .trigger",
-    }
-    _diagnostic_error_selector = ".search-result .error-message__text"
-    _diagnostic_content_selector = "form.search-form, .search-result"
 
     @override
     async def _generate_hash(self, item: Item) -> str:
@@ -256,6 +242,34 @@ class InstagramStoriesFeed(
             if (error.get_attribute("textContent") or "").strip():
                 return error
         return False
+
+    @override
+    def _browser_context(self) -> dict:
+        return self.driver.execute_script(
+            """
+            const count = s => document.querySelectorAll(s).length;
+            const triggers = [...document.querySelectorAll(
+                '.search-result .profile-media-list .trigger')];
+            const forms = count('form.search-form');
+            const results = count('.search-result');
+            return {
+                document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                search_forms: forms,
+                search_results: results,
+                loaders: count('.search-result .loader-component'),
+                media_cards: count('.search-result .profile-media-list__item'),
+                download_links: count('.search-result a.download-btn[href]'),
+                subscription_landings: count('.tz-landing-exp'),
+                pagination_triggers: triggers.length,
+                visible_pagination_triggers: triggers.filter(e =>
+                    e.checkVisibility({checkOpacity: true, checkVisibilityCSS: true})).length,
+                source_message: document.querySelector(
+                    '.search-result .error-message__text')?.textContent || '',
+                page_message: !forms && !results ?
+                    document.title + ' ' + (document.body?.innerText || '') : ''
+            };
+            """
+        )
 
     @classmethod
     @override
