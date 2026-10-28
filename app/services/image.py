@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import re
 from dataclasses import dataclass
 from functools import cached_property
 from io import BytesIO
@@ -60,11 +61,36 @@ class ImageService:
         content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
         if response.status >= 400 or not content_type.startswith("image/"):
             raise ImageResponseError(response.status, content_type)
+        return await cls.from_content(response.content)
+
+    @classmethod
+    async def from_data_url(cls, url: str) -> EmbeddedImage:
+        """Validate a base64 image data URL, including its declared MIME type."""
+        header, separator, encoded = url.partition(",")
+        if not separator or not re.fullmatch(
+            r"data:image/[a-zA-Z0-9.+-]+;base64", header
+        ):
+            raise ValueError("Invalid base64 image data URI header")
+        if len(encoded) > 4 * ((cls._max_download_bytes + 2) // 3):
+            raise ValueError("Image exceeds byte limit")
+        original = await asyncio.to_thread(
+            EmbeddedImage.from_base64, header[5:-7].lower(), encoded
+        )
+        image = await cls.from_content(original.content)
+        if original.mime_type != image.mime_type:
+            raise ValueError("Image MIME type does not match its data")
+        return image
+
+    @classmethod
+    async def from_content(cls, content: bytes) -> EmbeddedImage:
+        """Validate image bytes without resizing or re-encoding them."""
+        if len(content) > cls._max_download_bytes:
+            raise ValueError("Image exceeds byte limit")
         try:
-            mime_type = await asyncio.to_thread(cls._validate_image, response.content)
+            mime_type = await asyncio.to_thread(cls._validate_image, content)
         except (OSError, ValueError, Image.DecompressionBombError) as exc:
             raise ValueError(f"Invalid image: {exc}") from exc
-        return EmbeddedImage(response.content, mime_type)
+        return EmbeddedImage(content, mime_type)
 
     @classmethod
     async def resize(cls, image: EmbeddedImage, budget: int) -> EmbeddedImage:
@@ -84,10 +110,12 @@ class ImageService:
             if image.width * image.height > cls._max_image_pixels:
                 raise ValueError("Image exceeds pixel limit")
             mime_type = Image.MIME.get(image.format or "")
-            if mime_type is None:
+            if mime_type is None or not mime_type.startswith("image/"):
                 raise ValueError("Unknown image format")
             image.verify()
-            return mime_type
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+        return mime_type
 
     @classmethod
     def _resize_image(cls, data: bytes, budget: int) -> bytes:
