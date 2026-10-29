@@ -47,6 +47,19 @@ To skip parser types in both light and heavy workers, add them to `ignored_parse
 ignored_parser_types = ["yt", "rezka:collection"]
 ```
 
+The light worker runs one persistent event loop and accepts up to
+`LIGHT_WORKER_CONCURRENCY` feed jobs at once. The default is `4`; values below
+`1` fail startup. Slots remain occupied until parsing and broker submission
+finish. Queues are polled in round-robin order. A complete empty sweep triggers
+an idle delay that grows from 0.1 seconds to at most 1 second, and finding a job
+resets the delay. Heavy browser work remains sequential.
+
+On SIGTERM or SIGINT, the light worker stops taking new jobs. It waits for an
+in-progress claim and every accepted job, including broker submissions, before
+exiting. yt-dlp extraction runs in a thread and finishes before its resources
+are released. Graceful shutdown has no application deadline, so allow enough
+time for slow sources and extraction retries before forcing the process to stop.
+
 ## Docker worker logs
 
 Docker workers append their stdout and stderr to persistent text files:
