@@ -3,21 +3,31 @@ import contextlib
 import os
 import pickle
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import fields
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from app.configs.selenium import SELENIUM_COOKIES_PATH
+from app.services.container import Container
 from app.services.selenium.schemas import SeleniumGetHtmlArgs
-from app.utils.inject import inject
 
 
-async def get_html(args: SeleniumGetHtmlArgs) -> str:
-    return await _get_html(**asdict(args))
+async def get_html(
+    args: SeleniumGetHtmlArgs,
+    *,
+    driver_factory: Callable[[], WebDriver] | None = None,
+) -> str:
+    # asdict deep-copies bound callbacks and their owning parser/dependencies.
+    # Local actions must run on the original instance, without serialization.
+    options = {field.name: getattr(args, field.name) for field in fields(args)}
+    if driver_factory is None:
+        factory: Callable[[], WebDriver] = Container.get_data().selenium_web_driver
+    else:
+        factory = driver_factory
+    return await _get_html(driver=factory(), **options)
 
 
-@inject({"driver": "selenium_web_driver"}, call=True)
 async def _get_html(
     url: str,
     driver: WebDriver,
