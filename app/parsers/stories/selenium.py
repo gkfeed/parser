@@ -1,20 +1,26 @@
 import asyncio
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Literal, override
+from typing import Literal, Never, override
 from urllib.parse import urlsplit
 
 import structlog
 from bs4 import Tag
 from requests.exceptions import RequestException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
-from app.extensions.parsers.selenium_diagnostics import SeleniumDiagnosticsExtension
+from app.extensions.parsers.selenium_diagnostics import (
+    BrowserSnapshot,
+    SeleniumDiagnosticsExtension,
+)
 from app.serializers.feed import Item
 from app.services.hash import HashService
 from app.services.media_upload import FallbackUploader
@@ -25,6 +31,8 @@ from app.services.selenium.lazy_list import (
 )
 from app.utils.datetime import constant_datetime
 from app.utils.logging import url_log_fields
+
+from .errors import classify_error, failure_reason, http_error_status
 
 logger = structlog.get_logger(__name__)
 
@@ -243,9 +251,24 @@ class InstagramStoriesFeed(
                 return error
         return False
 
+    def _wait_for[T](
+        self,
+        stage: str,
+        condition: Callable[[WebDriver], T | Literal[False]],
+    ) -> T:
+        try:
+            return WebDriverWait(self.driver, self._results_wait_time).until(condition)
+        except TimeoutException as exc:
+            raise self._browser_unavailable(stage, reason=f"{stage}_timeout") from exc
+
+    def _check_error(self, error: WebElement, stage: str) -> Never:
+        raise self._browser_unavailable(
+            stage, message=error.get_attribute("textContent") or ""
+        )
+
     @override
-    def _browser_context(self) -> dict:
-        return self.driver.execute_script(
+    def _browser_context(self) -> BrowserSnapshot:
+        context = self.driver.execute_script(
             """
             const count = s => document.querySelectorAll(s).length;
             const triggers = [...document.querySelectorAll(
@@ -271,26 +294,33 @@ class InstagramStoriesFeed(
             """
         )
 
-    @classmethod
-    @override
-    def _classify_browser_error(cls, message: str) -> str:
-        reason = super()._classify_browser_error(message)
-        if reason != "upstream_error":
-            return reason
-        message = message.lower()
-        if "no stories" in message:
-            # The source also uses this message for upstream failures.
-            return "empty_unverified"
-        if "private" in message:
-            return "private"
-        if any(
-            text in message
-            for text in ("user not found", "profile not found", "account not found")
-        ):
-            return "not_found"
-        return reason
+        page_message = context.pop("page_message", "")
+        source_message = context.pop("source_message", "")
+        context["full_page_error"] = bool(page_message)
+        return BrowserSnapshot(context, text=source_message or page_message)
 
-    @override
+    def _browser_unavailable(
+        self, stage: str, *, reason: str | None = None, message: str = ""
+    ) -> FeedUnavailable:
+        snapshot = self._capture_browser_context()
+        message = message or snapshot.text
+        error_kind = classify_error(message) if message else None
+        reason = failure_reason(
+            reason,
+            error_kind=error_kind,
+            document_status=snapshot.fields.get("document_status"),
+            full_page_error=bool(snapshot.fields.get("full_page_error")),
+        )
+        self._log_browser_diagnostics(
+            stage,
+            snapshot,
+            message=message,
+            reason=reason,
+            error_kind=error_kind,
+            error_http_status=http_error_status(message),
+        )
+        return self._unavailable(reason)
+
     def _unavailable(self, reason: str) -> FeedUnavailable:
         delay = (
             timedelta(days=1)
