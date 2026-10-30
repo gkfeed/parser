@@ -1,4 +1,7 @@
 import re
+from datetime import UTC, datetime, timedelta
+
+from app.extensions.parsers.exceptions import FeedUnavailable
 
 
 def http_error_status(message: str) -> int | None:
@@ -65,3 +68,12 @@ def failure_reason(
     ):
         return error_kind
     return fallback or error_kind or "upstream_error"
+
+
+def unavailable(feed_url: str, reason: str) -> FeedUnavailable:
+    delay = (
+        timedelta(days=1)
+        if reason in ("private", "not_found")
+        else timedelta(minutes=1)
+    )
+    return FeedUnavailable(feed_url, reason, datetime.now(UTC) + delay)
