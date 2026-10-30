@@ -35,7 +35,7 @@ class InstagramStoriesFeed(
     ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
 ):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
-    _cache_storage_time_if_success = timedelta(days=1)
+    success_result_delay = timedelta(days=1)
     _selenium_wait_time = 10
     _page_load_timeout_seconds = 30
     _results_wait_time = 30

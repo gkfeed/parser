@@ -18,7 +18,7 @@ logger = structlog.get_logger(__name__)
 
 
 class BaseTikTokFeed(ItemLinkHashExtension, CacheFeedExtension, _BaseFeed, ABC):
-    _cache_storage_time_if_success = timedelta(days=1)
+    success_result_delay = timedelta(days=1)
 
     async def _parse_items(self) -> list[Item]:
         links = await self._video_links

@@ -26,7 +26,7 @@ class OneFootballFeed(
         '.xpaLayoutContainerComponentResolver--entityTitle p[class*="_title"]'
     )
     __match_lists_selector = 'ul:is([class*="MatchCardsList"], [class*="_matches"])'
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

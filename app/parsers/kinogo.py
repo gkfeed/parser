@@ -12,7 +12,7 @@ from app.utils.html import require_tag, required_text
 
 class KinogoFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     worker_kind = WorkerKind.LIGHT
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
 
     @override
     async def _parse_items(self) -> list[Item]:

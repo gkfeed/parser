@@ -13,7 +13,7 @@ from app.utils.datetime import constant_datetime
 
 
 class MatreshkaFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension):
-    _cache_storage_time = timedelta(days=1)
+    empty_result_delay = timedelta(days=1)
     _page_size = 12
 
     @override

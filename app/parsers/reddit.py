@@ -18,7 +18,7 @@ from app.utils.html import require_tag, required_attr, required_text
 class RedditFeed(
     PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension
 ):
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
     _headers: ClassVar[dict[str, str]] = {"User-Agent": "gkfeed-parser/0.1"}
 
     @cached_property

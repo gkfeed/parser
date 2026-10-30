@@ -273,3 +273,29 @@ async def test_next_run_at_reads_and_updates_legacy_column(
             {"id": feed.id},
         )
         assert datetime.fromisoformat(stored.scalar_one()).replace(tzinfo=UTC) == future
+
+
+@pytest.mark.parametrize("has_items", [False, True], ids=["empty", "success"])
+async def test_public_scheduling_overrides_are_inherited(
+    create_feed, broker_boundary, dispatcher_factory, feed_parser_repository, has_items
+):
+    class ParentFeed(CacheFeedExtension):
+        empty_result_delay = timedelta(seconds=11)
+
+    class ScheduledFeed(ParentFeed):
+        success_result_delay = timedelta(hours=2)
+
+    feed = await create_feed()
+    _, payload, _ = broker_boundary
+    payload["result"] = FeedResult(
+        items=[make_item()] if has_items else []
+    ).model_dump_json()
+    dispatcher = dispatcher_factory(parsers={feed.type: ScheduledFeed})
+    before = datetime.now(UTC)
+    await dispatcher.dispatch()
+    after = datetime.now(UTC)
+
+    schedule = await feed_parser_repository.get_by_feed_id(feed.id)
+    assert schedule is not None
+    delay = timedelta(hours=2) if has_items else timedelta(seconds=11)
+    assert before + delay <= schedule.next_run_at.replace(tzinfo=UTC) <= after + delay

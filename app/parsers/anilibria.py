@@ -11,8 +11,8 @@ from app.utils.datetime import constant_datetime
 
 
 class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
-    _cache_storage_time_if_success = timedelta(days=1)
-    _cache_storage_time = timedelta(seconds=5)
+    success_result_delay = timedelta(days=1)
+    empty_result_delay = timedelta(seconds=5)
 
     @override
     async def _parse_items(self) -> list[Item]:

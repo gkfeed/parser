@@ -56,14 +56,9 @@ class ParserConfig:
 
     @property
     def scheduling_policy(self) -> ParserSchedulingPolicy:
-        """Expose existing cache-backed delays, including inherited overrides."""
         return ParserSchedulingPolicy(
-            empty_delay=getattr(
-                self.handler, "_cache_storage_time", timedelta(hours=1)
-            ),
-            success_delay=getattr(
-                self.handler, "_cache_storage_time_if_success", timedelta(days=1)
-            ),
+            empty_delay=self.handler.empty_result_delay,
+            success_delay=self.handler.success_result_delay,
         )
 
 
