@@ -1,3 +1,5 @@
+"""Owned loopback HTTP/Chromium resources. Run: make test-integration FILE=tests/browser."""
+
 from collections.abc import Generator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field

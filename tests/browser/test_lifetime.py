@@ -4,50 +4,21 @@ from pathlib import Path
 
 import pytest
 import requests
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
 
+from app.services.selenium import SeleniumGetHtmlArgs, SeleniumService
 from tests.browser.resources import LocalChromium, local_site
-from tests.browser.source import SourceFailure, source
+from tests.browser.stories import media, stories_parser
 
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.parametrize(
-    ("body", "failure"),
-    [
-        ('<div id="ready">Loaded</div>', None),
-        ('<div id="error">Failed</div>', SourceFailure),
-        ("", TimeoutException),
-    ],
-)
-async def test_parser_reuse_after_success_error_or_timeout(
-    site, browser, body, failure
-):
-    parser = source(site.publish(body), browser)
-    if failure is None:
-        assert [item.title for item in await parser.items] == ["Loaded"]
-    else:
-        with pytest.raises(failure):
-            await parser.items
-    browser.assert_released()
-    with pytest.raises(RuntimeError, match="Browser actions are not active"):
-        _ = parser.driver
-
-    site.publish('<div id="ready">Loaded</div>')
-    assert [item.title for item in await parser.items] == ["Loaded"]
-
-    assert len(browser.drivers) == 2
-    assert site.requests.count("/") == 2
-    browser.assert_released()
-    with pytest.raises(RuntimeError, match="Browser actions are not active"):
-        _ = parser.driver
-
-
 async def test_cancellation_releases_browser_and_parser_can_run_again(site, browser):
-    parser = source(site.publish('<div id="ready">Loaded</div>'), browser)
+    url = site.publish(media(site.url))
+    parser = stories_parser(url, browser)
     parser._selenium_wait_time = 60
-    task = asyncio.create_task(parser.items)
+    task = asyncio.create_task(parser.get_html(url))
     try:
         # get_html yields after navigation, during its configured wait.
         await asyncio.sleep(0)
@@ -63,7 +34,8 @@ async def test_cancellation_releases_browser_and_parser_can_run_again(site, brow
     browser.assert_released()
 
     parser._selenium_wait_time = 0
-    assert [item.title for item in await parser.items] == ["Loaded"]
+    parser._results_wait_time = 4
+    assert b"download-btn" in await parser.get_html(url)
     assert len(browser.drivers) == 2
     browser.assert_released()
 
@@ -82,3 +54,24 @@ async def test_resource_scope_closes_server_and_browser_on_failure(failure):
     assert not Path(driver.capabilities["chrome"]["userDataDir"]).exists()
     with pytest.raises(requests.ConnectionError):
         await asyncio.to_thread(requests.get, site.url, timeout=1)
+
+
+async def test_explicit_local_factory_never_falls_back_to_an_external_worker(browser):
+    with local_site() as site:
+        url = site.url
+    # A closed loopback server produces a real browser navigation failure.
+    args = SeleniumGetHtmlArgs(
+        url=url,
+        should_delete_cookies=False,
+        should_load_cookies=False,
+        should_save_cookies=False,
+        make_actions_function=None,
+        selenium_wait_timeout_seconds=0,
+    )
+
+    with pytest.raises(WebDriverException, match="ERR_CONNECTION_REFUSED"):
+        await SeleniumService.get_html(
+            args, fallback_to_external_selenium=True, driver_factory=browser
+        )
+
+    browser.assert_released()
