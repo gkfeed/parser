@@ -1,5 +1,4 @@
 from abc import ABC
-from collections.abc import Callable
 from datetime import timedelta
 
 from selenium.common.exceptions import TimeoutException
@@ -13,8 +12,6 @@ from .http import HttpParserExtension
 
 
 class SeleniumParserExtension(HttpParserExtension, ABC):
-    # Optional instance dependency. The service owns each returned driver's lifetime.
-    selenium_driver_factory: Callable[[], WebDriver] | None = None
     worker_kind = WorkerKind.HEAVY
     _http_response_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
@@ -35,8 +32,7 @@ class SeleniumParserExtension(HttpParserExtension, ABC):
                 selenium_wait_timeout_seconds=self._selenium_wait_time,
                 page_load_timeout_seconds=self._page_load_timeout_seconds,
                 blocked_url_patterns=self._blocked_url_patterns,
-            ),
-            driver_factory=self.selenium_driver_factory,
+            )
         )
         return html.encode()
 
