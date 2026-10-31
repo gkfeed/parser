@@ -31,8 +31,8 @@ logger = structlog.get_logger(__name__)
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     """Embed still images and deduplicate by their content.
 
-    Video URL lifetimes are unverified and no durable video store is configured.
-    Explicitly marked videos are unsupported, even when a thumbnail is available.
+    Videos are represented by embedded thumbnails, without temporary video URLs.
+    Videos without thumbnails are skipped.
     """
 
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
@@ -63,7 +63,7 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
                 return await self._create_item_from_media(item)
 
         items = await asyncio.gather(*(create_item(item) for item in media))
-        # Only explicitly unsupported videos may be omitted.
+        # Videos without thumbnails have no durable media to publish.
         return [item for item in items if item is not None]
 
     @override
@@ -88,26 +88,30 @@ class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtens
             raise FeedUnavailable(self.feed.url, "empty_unverified")
 
     async def _create_item_from_media(self, media: Tag) -> Item | None:
-        if media.find(class_="tags__item--video") is not None:
-            logger.info("anonyig_media_skipped", reason="unsupported_video")
-            return None
-
+        is_video = media.find(class_="tags__item--video") is not None
         img = media.select_one("img")
         if img is None:
+            if is_video:
+                logger.info("anonyig_media_skipped", reason="missing_video_thumbnail")
+                return None
             raise ValueError("Anonyig media is missing an image")
 
         src = img.get("src")
         if not isinstance(src, str) or not src.strip():
+            if is_video:
+                logger.info("anonyig_media_skipped", reason="missing_video_thumbnail")
+                return None
             raise ValueError("Anonyig image is missing a valid src")
         src = src.strip()
 
         image_url = escape(await self._embedded_image_url(src), quote=True)
         username = escape(self._user_name, quote=True)
         img_tag = f'<img src="{image_url}" alt="{username}" />'
+        label = "<br>Video thumbnail" if is_video else ""
 
         return Item(
             title="inst: " + self._user_name,
-            text=f"{username}<br>{img_tag}",
+            text=f"{username}{label}<br>{img_tag}",
             date=constant_datetime,
             link=self.feed.url,
         )
