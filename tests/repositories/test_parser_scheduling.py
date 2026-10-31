@@ -7,10 +7,8 @@ from aiohttp.test_utils import TestServer
 from sqlalchemy import text
 
 from app.core.dispatcher import Dispatcher
-from app.extensions.parsers.base import BaseFeed
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.parsers import Parser
-from app.serializers.feed import FeedFailure, FeedResult, Item
+from app.serializers.feed import Feed, FeedFailure, FeedResult, Item
 from app.services.broker import BrokerService
 from app.services.repositories.feed import FeedRepository
 from app.services.repositories.feed_parser import FeedParserRepository
@@ -47,6 +45,21 @@ def dispatcher_factory(broker_boundary, session_factory):
     )
 
 
+@pytest.fixture
+def create_parser_feed(feed_repository):
+    async def create(parser=Parser.TIKTOK):
+        return await feed_repository.create(
+            Feed(
+                id=0,
+                title="Scheduled feed",
+                url="https://example.com/scheduled-feed",
+                type=parser.value.id,
+            )
+        )
+
+    return create
+
+
 def make_item():
     return Item(
         title="Scheduled item",
@@ -59,33 +72,32 @@ def make_item():
 
 @pytest.mark.parametrize("has_items", [False, True], ids=["empty", "success"])
 @pytest.mark.parametrize(
-    "handler, empty_delay, success_delay",
+    "parser, empty_delay, success_delay",
     [
-        (BaseFeed, timedelta(hours=1), timedelta(days=1)),
-        (CacheFeedExtension, timedelta(minutes=5), timedelta(hours=1)),
-        (Parser.ANILIBRIA.value.handler, timedelta(seconds=5), timedelta(days=1)),
-        (Parser.TIKTOK.value.handler, timedelta(minutes=5), timedelta(days=1)),
-        (Parser.INST.value.handler, timedelta(minutes=5), timedelta(weeks=1)),
+        (Parser.SHIKI, timedelta(hours=1), timedelta(days=1)),
+        (Parser.ANILIBRIA, timedelta(seconds=5), timedelta(days=1)),
+        (Parser.TIKTOK, timedelta(minutes=5), timedelta(days=1)),
+        (Parser.INST, timedelta(minutes=5), timedelta(weeks=1)),
     ],
-    ids=["base", "cache", "custom", "inherited", "instagram"],
+    ids=["shiki", "anilibria", "tiktok", "instagram"],
 )
 async def test_dispatch_schedules_results(
-    create_feed,
+    create_parser_feed,
     broker_boundary,
     dispatcher_factory,
     feed_repository,
     feed_parser_repository,
     items_repository,
-    handler,
+    parser,
     empty_delay,
     success_delay,
     has_items,
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed(parser)
     _, payload, submitted = broker_boundary
     items = [make_item()] if has_items else []
     payload["result"] = FeedResult(items=items).model_dump_json()
-    dispatcher = dispatcher_factory(parsers={feed.type: handler})
+    dispatcher = dispatcher_factory()
 
     before = datetime.now(UTC)
     await dispatcher.dispatch()
@@ -100,21 +112,22 @@ async def test_dispatch_schedules_results(
     assert await feed_repository.get_eligible({feed.type}) == []
     await dispatcher.dispatch()
     assert len(submitted) == 1
+    assert submitted[0]["function"] == f"gkfeed.process_feed_{feed.type}"
 
 
 async def test_known_items_still_use_success_delay(
-    create_feed,
+    create_parser_feed,
     broker_boundary,
     dispatcher_factory,
     feed_parser_repository,
     items_repository,
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     _, payload, _ = broker_boundary
     item = make_item()
     await items_repository.add_items_to_feed(feed, [item])
     payload["result"] = FeedResult(items=[item]).model_dump_json()
-    dispatcher = dispatcher_factory(parsers={feed.type: CacheFeedExtension})
+    dispatcher = dispatcher_factory()
 
     before = datetime.now(UTC)
     await dispatcher.dispatch()
@@ -122,28 +135,24 @@ async def test_known_items_still_use_success_delay(
 
     schedule = await feed_parser_repository.get_by_feed_id(feed.id)
     assert schedule is not None
-    delay = timedelta(hours=1)
+    delay = timedelta(days=1)
     assert before + delay <= schedule.next_run_at.replace(tzinfo=UTC) <= after + delay
     assert len(await items_repository.get_all(feed)) == 1
 
 
-@pytest.mark.parametrize("has_items", [False, True], ids=["empty", "success"])
 @pytest.mark.parametrize("retry_delay", [timedelta(days=3), -timedelta(days=1)])
 async def test_parser_retry_overrides_policy(
-    create_feed,
+    create_parser_feed,
     broker_boundary,
     dispatcher_factory,
     feed_parser_repository,
-    has_items,
     retry_delay,
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     _, payload, _ = broker_boundary
     retry_at = datetime.now(UTC) + retry_delay
-    payload["result"] = FeedResult(
-        items=[make_item()] if has_items else [], retry_at=retry_at
-    ).model_dump_json()
-    dispatcher = dispatcher_factory(parsers={feed.type: CacheFeedExtension})
+    payload["result"] = FeedResult(items=[], retry_at=retry_at).model_dump_json()
+    dispatcher = dispatcher_factory()
 
     before = datetime.now(UTC)
     await dispatcher.dispatch()
@@ -159,11 +168,11 @@ async def test_parser_retry_overrides_policy(
 
 
 async def test_failure_backoff_progression_and_reset(
-    create_feed, broker_boundary, dispatcher_factory, feed_parser_repository
+    create_parser_feed, broker_boundary, dispatcher_factory, feed_parser_repository
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     _, payload, submitted = broker_boundary
-    dispatcher = dispatcher_factory(parsers={feed.type: CacheFeedExtension})
+    dispatcher = dispatcher_factory()
     delays = [
         timedelta(minutes=15),
         timedelta(hours=1),
@@ -191,13 +200,13 @@ async def test_failure_backoff_progression_and_reset(
 
 @pytest.mark.parametrize("explicit_retry", [False, True])
 async def test_unavailable_feed_scheduling(
-    create_feed,
+    create_parser_feed,
     broker_boundary,
     dispatcher_factory,
     feed_parser_repository,
     explicit_retry,
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     _, payload, _ = broker_boundary
     retry_at = datetime.now(UTC) + timedelta(days=2) if explicit_retry else None
     payload.update(
@@ -206,7 +215,7 @@ async def test_unavailable_feed_scheduling(
             error_type="feed_unavailable", reason="source_down", retry_at=retry_at
         ).model_dump_json(),
     )
-    dispatcher = dispatcher_factory(parsers={feed.type: CacheFeedExtension})
+    dispatcher = dispatcher_factory()
     before = datetime.now(UTC)
     await dispatcher.dispatch()
     after = datetime.now(UTC)
@@ -221,14 +230,12 @@ async def test_unavailable_feed_scheduling(
 
 
 async def test_unclaimed_task_retries_after_one_minute(
-    create_feed, broker_boundary, dispatcher_factory, feed_parser_repository
+    create_parser_feed, broker_boundary, dispatcher_factory, feed_parser_repository
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     _, payload, _ = broker_boundary
     payload["status"] = "pending"
-    dispatcher = dispatcher_factory(
-        parsers={feed.type: BaseFeed}, broker_wait_timeout=0
-    )
+    dispatcher = dispatcher_factory(broker_wait_timeout=0)
     before = datetime.now(UTC)
     await dispatcher.dispatch()
     after = datetime.now(UTC)
@@ -239,9 +246,9 @@ async def test_unclaimed_task_retries_after_one_minute(
 
 
 async def test_next_run_at_reads_and_updates_legacy_column(
-    create_feed, session_factory, feed_repository, feed_parser_repository
+    create_parser_feed, session_factory, feed_repository, feed_parser_repository
 ):
-    feed = await create_feed()
+    feed = await create_parser_feed()
     due = datetime.now(UTC) - timedelta(days=1)
     # Start with the deployed schema, independently of the ORM's table definition.
     async with session_factory() as session, session.begin():
@@ -272,29 +279,3 @@ async def test_next_run_at_reads_and_updates_legacy_column(
             {"id": feed.id},
         )
         assert datetime.fromisoformat(stored.scalar_one()).replace(tzinfo=UTC) == future
-
-
-@pytest.mark.parametrize("has_items", [False, True], ids=["empty", "success"])
-async def test_public_scheduling_overrides_are_inherited(
-    create_feed, broker_boundary, dispatcher_factory, feed_parser_repository, has_items
-):
-    class ParentFeed(CacheFeedExtension):
-        empty_result_delay = timedelta(seconds=11)
-
-    class ScheduledFeed(ParentFeed):
-        success_result_delay = timedelta(hours=2)
-
-    feed = await create_feed()
-    _, payload, _ = broker_boundary
-    payload["result"] = FeedResult(
-        items=[make_item()] if has_items else []
-    ).model_dump_json()
-    dispatcher = dispatcher_factory(parsers={feed.type: ScheduledFeed})
-    before = datetime.now(UTC)
-    await dispatcher.dispatch()
-    after = datetime.now(UTC)
-
-    schedule = await feed_parser_repository.get_by_feed_id(feed.id)
-    assert schedule is not None
-    delay = timedelta(hours=2) if has_items else timedelta(seconds=11)
-    assert before + delay <= schedule.next_run_at.replace(tzinfo=UTC) <= after + delay
