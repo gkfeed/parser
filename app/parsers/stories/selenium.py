@@ -18,8 +18,8 @@ from app.services.media_upload import FallbackUploader
 from app.utils.datetime import constant_datetime
 from app.utils.logging import url_log_fields
 
-from .browser import StoriesBrowser
 from .errors import unavailable
+from .page import StoriesPage
 
 logger = structlog.get_logger(__name__)
 
@@ -100,7 +100,7 @@ class InstagramStoriesFeed(
 
     @override
     def make_actions(self, driver: WebDriver) -> None:
-        StoriesBrowser(driver, self.feed.url).run()
+        StoriesPage(driver, self.feed.url).run()
 
     def _unavailable(self, reason: str) -> FeedUnavailable:
         return unavailable(self.feed.url, reason)

@@ -19,8 +19,8 @@ from app.services.selenium.lazy_list import (
 from .errors import classify_error, failure_reason, http_error_status, unavailable
 
 
-class StoriesBrowser:
-    """One Stories browser interaction; the Selenium service owns the driver."""
+class StoriesPage:
+    """Interact with the Stories page using a driver owned by SeleniumService."""
 
     _results_wait_time = 30
 
