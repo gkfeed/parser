@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import delete, or_, select
 
+from app.core.parser_id import ParserId
 from app.models.feed import Feed as _Feed
 from app.models.feed_parser import FeedParser
 from app.serializers.feed import Feed
@@ -13,7 +14,7 @@ from ._base import BaseRepository
 class FeedRepository(BaseRepository):
     async def create(self, item: Feed) -> Feed:
         async with self._session_factory() as session, session.begin():
-            _item = _Feed(title=item.title, url=item.url, type=item.type)
+            _item = _Feed(title=item.title, url=item.url, type=item.type.value)
             session.add(_item)
             await session.flush()
             return self._unserialize(_item)
@@ -23,13 +24,16 @@ class FeedRepository(BaseRepository):
             result = await session.execute(select(_Feed))
             return [self._unserialize(f) for f in result.scalars().all()]
 
-    async def get_eligible(self, parser_types: Collection[str]) -> list[Feed]:
+    async def get_eligible(
+        self, parser_types: Collection[ParserId | str]
+    ) -> list[Feed]:
+        parser_ids = tuple(ParserId(parser_id).value for parser_id in parser_types)
         async with self._session_factory() as session:
             result = await session.execute(
                 select(_Feed)
                 .outerjoin(FeedParser, FeedParser.feed_id == _Feed.id)
                 .where(
-                    _Feed.type.in_(parser_types),
+                    _Feed.type.in_(parser_ids),
                     or_(
                         FeedParser.feed_id.is_(None),
                         FeedParser.valid_for < datetime.now(UTC),
@@ -52,4 +56,6 @@ class FeedRepository(BaseRepository):
 
     @staticmethod
     def _unserialize(feed: _Feed) -> Feed:
-        return Feed(id=feed.id, title=feed.title, url=feed.url, type=feed.type)
+        return Feed(
+            id=feed.id, title=feed.title, url=feed.url, type=ParserId(feed.type)
+        )
