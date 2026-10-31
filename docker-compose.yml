@@ -5,8 +5,6 @@ services:
       dockerfile: docker/dispatcher/Dockerfile
     tty: True
     restart: on-failure
-    volumes:
-      - ~/.local/share/gkfeed/data:/data
     env_file:
       - .env
     # only for dev
@@ -25,7 +23,6 @@ services:
     tty: True
     restart: on-failure
     volumes:
-      - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
     env_file:
       - .env
@@ -44,7 +41,6 @@ services:
     tty: True
     restart: on-failure
     volumes:
-      - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
     env_file:
       - .env
@@ -66,7 +62,6 @@ services:
     restart: on-failure
     stop_grace_period: 120s
     volumes:
-      - ~/.local/share/gkfeed/data:/data
       - ${WORKER_LOG_DIR:-~/.local/share/gkfeed/logs}:/logs
       - selenium_recovery:/selenium-recovery
     env_file:
