@@ -11,7 +11,7 @@ from app.services.mangalib import MangaLibChapter, MangaLibClient
 
 class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
     _headers: ClassVar[dict[str, str]] = MangaLibClient.headers
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
     _max_posts = 5
 
     @override

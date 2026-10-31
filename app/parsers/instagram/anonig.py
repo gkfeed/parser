@@ -29,7 +29,7 @@ logger = structlog.get_logger(__name__)
 
 class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
-    _cache_storage_time_if_success = timedelta(weeks=1)
+    success_result_delay = timedelta(weeks=1)
     _selenium_wait_time = 0
     _results_wait_time = 30
     _load_more_wait_time = 5

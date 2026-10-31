@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.dispatcher import Dispatcher
+from app.extensions.parsers.base import BaseFeed
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import BrokerError
 
@@ -79,8 +80,8 @@ async def test_fetch_feed_items_success(dispatcher):
         )
     ]
 
-    class MockParser:
-        _cache_storage_time_if_success = timedelta(hours=2)
+    class MockParser(BaseFeed):
+        success_result_delay = timedelta(hours=2)
 
     dispatcher.parsers = {"test": MockParser}
 
@@ -116,8 +117,8 @@ async def test_fetch_feed_items_success(dispatcher):
 async def test_fetch_feed_items_no_items(dispatcher):
     feed = Feed(id=1, title="Test", url="http://test.com", type="test")
 
-    class MockParser:
-        _cache_storage_time = timedelta(minutes=30)
+    class MockParser(BaseFeed):
+        empty_result_delay = timedelta(minutes=30)
 
     dispatcher.parsers = {"test": MockParser}
 
@@ -175,7 +176,7 @@ async def test_fetch_feed_items_backs_off_after_failures(dispatcher):
 @pytest.mark.asyncio
 async def test_success_resets_failure_backoff(dispatcher):
     feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    dispatcher.parsers = {"test": object}
+    dispatcher.parsers = {"test": BaseFeed}
 
     with (
         patch.object(
