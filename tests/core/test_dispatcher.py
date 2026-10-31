@@ -17,6 +17,8 @@ def dispatcher():
     return Dispatcher(
         broker=AsyncMock(),
         feed_parser_repository=FakeFeedParserRepository,
+        feed_repository=AsyncMock(),
+        items_repository=AsyncMock(),
         parsers={},
     )
 
@@ -86,7 +88,9 @@ async def test_fetch_feed_items_success(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = FeedResult(items=items)
         mock_save.return_value = items
@@ -121,7 +125,9 @@ async def test_fetch_feed_items_no_items(dispatcher):
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = FeedResult(items=[])
 

@@ -12,7 +12,7 @@ from .http import HttpParserExtension
 
 
 class SeleniumParserExtension(HttpParserExtension, ABC):
-    worker_kind = WorkerKind.HEAVY
+    worker_kind = WorkerKind.BROWSER
     _http_response_storage_time = timedelta(hours=1)
     _selenium_wait_time = 0
     _should_delete_cookies = False

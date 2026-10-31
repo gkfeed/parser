@@ -6,6 +6,7 @@ from bs4 import Tag
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.html import require_tag, required_text
 
 
 class YummyAnimeFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
@@ -40,20 +41,18 @@ class YummyAnimeFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExte
     async def _show_status(self, soup: Tag) -> str:
         status = soup.select_one(".status-category div")
         if isinstance(status, Tag):
-            return status.get_text(" ", strip=True)
+            return required_text(status, "YummyAnime show status", separator=" ")
 
         legacy_statuses = soup.find_all(class_="anime-r")
         if len(legacy_statuses) > 1:
-            return legacy_statuses[1].get_text(" ", strip=True)
+            status = require_tag(legacy_statuses[1], "YummyAnime show status")
+            return required_text(status, "YummyAnime show status", separator=" ")
 
         raise ValueError("Couldn't find status of show: " + self._show_url)
 
     async def _show_title(self, soup: Tag) -> str:
-        title = soup.find("h1")
-        if isinstance(title, Tag):
-            return title.get_text(" ", strip=True)
-
-        raise ValueError("Couldn't find title of show: " + self._show_url)
+        title = require_tag(soup.find("h1"), "YummyAnime show title")
+        return required_text(title, "YummyAnime show title", separator=" ")
 
     @property
     def _show_url(self) -> str:

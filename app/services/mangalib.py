@@ -29,6 +29,10 @@ class MangaLibClient:
 
     async def get_chapters(self, slug: str, limit: int) -> list[MangaLibChapter]:
         response = await self._fetch(f"{self._api_base_url}{slug}/chapters")
+        return self.parse_chapters(response, limit)
+
+    @classmethod
+    def parse_chapters(cls, response: bytes, limit: int) -> list[MangaLibChapter]:
         try:
             payload = json.loads(response)
         except (json.JSONDecodeError, UnicodeDecodeError) as error:
@@ -38,7 +42,7 @@ class MangaLibClient:
             raise ValueError(  # noqa: TRY004 - malformed API data is a value error
                 "MangaLib API returned invalid chapter data"
             )
-        return [self._parse_chapter(chapter) for chapter in reversed(chapters[-limit:])]
+        return [cls._parse_chapter(chapter) for chapter in reversed(chapters[-limit:])]
 
     @classmethod
     def _parse_chapter(cls, chapter: object) -> MangaLibChapter:

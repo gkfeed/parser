@@ -1,7 +1,11 @@
+from datetime import datetime
 from urllib.parse import urlsplit, urlunsplit
+
+import structlog
 
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.base import BaseFeed
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.serializers.feed import Item
 from app.services.youtube import YoutubePublishDateService
@@ -12,6 +16,8 @@ from app.services.ytdlp import (
 )
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.utils.datetime import constant_datetime
+
+logger = structlog.get_logger(__name__)
 
 
 class _BaseYoutubeFeed(BaseFeed):
@@ -52,11 +58,8 @@ class YoutubeFeed(ItemLinkHashExtension, _BaseYoutubeFeed):
             return []
 
         channel_name = channel_info["channel"]
-        channel_id = channel_info.get("channel_id")
-        channel_publish_dates = (
-            await YoutubePublishDateService.get_channel_publish_dates(channel_id)
-            if channel_id
-            else {}
+        channel_publish_dates = await self._get_channel_publish_dates(
+            channel_info.get("channel_id")
         )
 
         items = []
@@ -67,17 +70,38 @@ class YoutubeFeed(ItemLinkHashExtension, _BaseYoutubeFeed):
             published_at = YoutubePublishDateService.resolve(
                 video_info, channel_publish_dates
             )
+            if published_at is None:
+                logger.warning(
+                    "youtube_publish_date_fallback",
+                    video_url=video_url,
+                    fallback_date=constant_datetime.isoformat(),
+                )
+                published_at = constant_datetime
 
             items.append(
                 Item(
                     title="YT: " + channel_name,
                     text=title,
-                    date=published_at or constant_datetime,
+                    date=published_at,
                     link=video_url,
                 )
             )
 
         return items
+
+    @staticmethod
+    async def _get_channel_publish_dates(channel_id: str | None) -> dict[str, datetime]:
+        if not channel_id:
+            return {}
+        try:
+            return await YoutubePublishDateService.get_channel_publish_dates(channel_id)
+        except (FeedUnavailable, ValueError):
+            logger.warning(
+                "youtube_channel_publish_dates_failed",
+                channel_id=channel_id,
+                exc_info=True,
+            )
+        return {}
 
     @staticmethod
     def _validate_channel_info(info: dict) -> None:

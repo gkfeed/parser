@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from math import isfinite
 from typing import Any
 
@@ -19,6 +20,7 @@ logger = structlog.get_logger(__name__)
 class TikTokFeed(BaseTikTokFeed):
     worker_kind = WorkerKind.LIGHT
     _max_videos = 10
+    _empty_confirmed_cache_time = timedelta(days=3)
     _entries_by_url: dict[str, dict[str, Any]]
 
     @property
@@ -38,6 +40,8 @@ class TikTokFeed(BaseTikTokFeed):
             raise FeedUnavailable(self.feed.url, "tiktok_profile_empty_unverified")
         if entries and info.get("tiktok_outcome") == "empty_confirmed":
             raise ValueError("Confirmed empty TikTok profile contains video entries")
+        if info.get("tiktok_outcome") == "empty_confirmed":
+            self.data["retry_at"] = datetime.now(UTC) + self._empty_confirmed_cache_time
 
         videos: list[str] = []
         for index, entry in enumerate(entries, start=1):
