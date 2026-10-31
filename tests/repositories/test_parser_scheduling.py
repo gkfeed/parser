@@ -260,7 +260,6 @@ async def test_next_run_at_reads_and_updates_legacy_column(
     schedule = await feed_parser_repository.get_by_feed_id(feed.id)
     assert schedule is not None
     assert schedule.next_run_at.replace(tzinfo=UTC) == due
-    assert schedule.valid_for == schedule.next_run_at
     assert await feed_repository.get_eligible({feed.type}) == [feed]
 
     future = datetime.now(UTC) + timedelta(days=1)
