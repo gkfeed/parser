@@ -37,7 +37,7 @@ class AnilibriaClient:
         last_error: ValueError | FeedUnavailable | None = None
         for base_url in self._api_base_urls:
             try:
-                return self._parse_release(await self._fetch(urljoin(base_url, path)))
+                return self.parse_release(await self._fetch(urljoin(base_url, path)))
             except (ValueError, FeedUnavailable) as error:
                 last_error = error
 
@@ -46,7 +46,7 @@ class AnilibriaClient:
         raise ValueError("AniLibria API mirrors returned invalid data") from last_error
 
     @classmethod
-    def _parse_release(cls, response: bytes) -> AnilibriaRelease:
+    def parse_release(cls, response: bytes) -> AnilibriaRelease:
         try:
             release = json.loads(response)
         except (json.JSONDecodeError, UnicodeDecodeError) as error:

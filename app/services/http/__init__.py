@@ -25,6 +25,8 @@ class HttpResponse:
     status: int
     content: bytes
     headers: dict[str, str]
+    url: str = ""
+    redirect_statuses: tuple[int, ...] = ()
 
 
 class HttpService:
@@ -68,6 +70,8 @@ class HttpService:
                         response.status,
                         content,
                         {key.lower(): value for key, value in response.headers.items()},
+                        url=str(response.url),
+                        redirect_statuses=tuple(hop.status for hop in response.history),
                     )
             except (ClientError, TimeoutError) as exc:
                 raise HttpRequestError(status=getattr(exc, "status", None)) from exc

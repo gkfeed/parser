@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup, Tag
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.utils.datetime import convert_datetime
-from app.utils.html import require_tag
+from app.utils.datetime import parse_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
@@ -34,25 +34,21 @@ class XFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        media_body = post.find(class_="media-body")
-        if isinstance(media_body, Tag):
-            return media_body.text.strip()
-        raise ValueError
+        media_body = require_tag(post.find(class_="media-body"), "X post title")
+        return required_text(media_body, "X post title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        link_tag = post.find("a")
-        if link_tag and isinstance(link_tag, Tag) and "href" in link_tag.attrs:
-            return self._x_url + str(link_tag["href"])
-        raise ValueError
+        link_tag = require_tag(post.find("a"), "X post link")
+        return self._x_url + required_attr(link_tag, "href", "X post link")
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
         date_tag = post.find(class_="tweet-date")
         if isinstance(date_tag, Tag):
             date_str = date_tag.a.text if date_tag.a else ""
-            if date_str:
-                return convert_datetime(date_str)
+            if date_str.strip():
+                return parse_datetime(date_str)
         return await super()._get_post_datetime(post)
 
     @property

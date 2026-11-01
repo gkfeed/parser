@@ -126,15 +126,15 @@ class InstagramService:
             )
             return None
         content_type = response.headers.get("content-type", "").split(";", 1)[0]
-        self._source_details[source] = {
-            "status": response.status,
-            "response_bytes": len(response.content),
-            "content_type": content_type
+        self._source_details.setdefault(source, {}).update(
+            status=response.status,
+            response_bytes=len(response.content),
+            content_type=content_type
             if content_type in ("application/json", "text/html", "text/plain")
             else "other",
-            "request_seconds": round(monotonic() - started, 3),
-            "retry_after_present": "retry-after" in response.headers,
-        }
+            request_seconds=round(monotonic() - started, 3),
+            retry_after_present="retry-after" in response.headers,
+        )
         return response
 
     async def _extract_media(
@@ -211,20 +211,31 @@ class InstagramService:
     async def _get_api_json(
         self, url: str, headers: dict[str, str], source: str
     ) -> dict[str, object] | None:
-        for reason in ("rate-limited", "authentication-required"):
+        details = self._source_details.setdefault(source, {})
+        for reason, field in (
+            ("rate-limited", "rate_limit_cooldown_state"),
+            ("authentication-required", "authentication_cooldown_state"),
+        ):
             key = f"instagram:{source}:{reason}"
-            if not self._cache.has_valid_cache(key):
-                continue
             retry_at = self._cache.get_expiry(key)
-            if retry_at is not None:
-                self._retry_times.append(retry_at)
+            if retry_at is None:
+                details[field] = "missing"
+                continue
+            remaining = (retry_at - datetime.now(UTC)).total_seconds()
+            if remaining <= 0:
+                details[field] = "expired"
+                continue
+            details[field] = "active"
+            self._retry_times.append(retry_at)
             self._source_outcomes[source] = f"skipped:{reason}"
             self._logger.info(
                 "instagram_api_skipped",
                 source=source,
                 reason=reason,
-                retry_at=retry_at.isoformat() if retry_at else None,
+                retry_at=retry_at.isoformat(),
+                cooldown_remaining_seconds=round(remaining, 3),
                 cooldown_scope="source",
+                **details,
             )
             return None
 

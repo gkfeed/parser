@@ -8,12 +8,10 @@ from app.core.dispatcher import Dispatcher
 from app.extensions.parsers.base import BaseFeed
 from app.serializers.feed import Feed, FeedResult
 from app.services.broker import BrokerService
-from app.services.repositories.feed import FeedRepository
-from app.services.repositories.feed_parser import FeedParserRepository
 
 
 @pytest.mark.asyncio
-async def test_feed_repository():
+async def test_feed_repository(feed_repository):
     feed_data = Feed(
         id=0,
         title="Test Feed",
@@ -22,24 +20,24 @@ async def test_feed_repository():
     )
 
     # Test Create
-    created_feed = await FeedRepository.create(feed_data)
+    created_feed = await feed_repository.create(feed_data)
     assert created_feed.id != 0
     assert created_feed.title == "Test Feed"
 
     # Test Get All
-    all_feeds = await FeedRepository.get_all()
+    all_feeds = await feed_repository.get_all()
     assert any(f.id == created_feed.id for f in all_feeds)
 
     # Test Get By ID
-    found_feed = await FeedRepository.get_by_id(created_feed.id)
+    found_feed = await feed_repository.get_by_id(created_feed.id)
     assert found_feed.title == "Test Feed"
 
     # Clean up
-    await FeedRepository.delete_by_id(created_feed.id)
+    await feed_repository.delete_by_id(created_feed.id)
 
 
 @pytest.fixture
-async def scheduled_feeds():
+async def scheduled_feeds(feed_repository, feed_parser_repository):
     now = datetime.now(UTC)
     cases = [
         ("future", "test", now + timedelta(days=1)),
@@ -51,18 +49,20 @@ async def scheduled_feeds():
     ]
     feeds = {}
     for title, parser_type, valid_for in cases:
-        feed = await FeedRepository.create(
-            Feed(id=0, title=title, url=f"https://example.com/{title}", type=parser_type)
+        feed = await feed_repository.create(
+            Feed(
+                id=0, title=title, url=f"https://example.com/{title}", type=parser_type
+            )
         )
         feeds[title] = feed
         if valid_for is not None:
-            await FeedParserRepository.upsert(feed.id, valid_for)
+            await feed_parser_repository.upsert(feed.id, valid_for)
     return feeds
 
 
 @pytest.mark.asyncio
-async def test_eligible_feeds(scheduled_feeds):
-    eligible = await FeedRepository.get_eligible({"test", "second"})
+async def test_eligible_feeds(scheduled_feeds, feed_repository):
+    eligible = await feed_repository.get_eligible({"test", "second"})
 
     assert eligible == [
         scheduled_feeds["missing"],
@@ -72,12 +72,16 @@ async def test_eligible_feeds(scheduled_feeds):
 
 
 @pytest.mark.asyncio
-async def test_eligible_feeds_without_supported_parsers(scheduled_feeds):
-    assert await FeedRepository.get_eligible(set()) == []
+async def test_eligible_feeds_without_supported_parsers(
+    scheduled_feeds, feed_repository
+):
+    assert await feed_repository.get_eligible(set()) == []
 
 
 @pytest.mark.asyncio
-async def test_dispatch_only_eligible_feeds(scheduled_feeds):
+async def test_dispatch_only_eligible_feeds(
+    scheduled_feeds, feed_repository, feed_parser_repository, items_repository
+):
     submitted = []
 
     async def enqueue(request):
@@ -98,6 +102,9 @@ async def test_dispatch_only_eligible_feeds(scheduled_feeds):
     async with TestServer(app) as server:
         dispatcher = Dispatcher(
             broker=BrokerService(str(server.make_url("/"))),
+            feed_repository=feed_repository,
+            feed_parser_repository=feed_parser_repository,
+            items_repository=items_repository,
             parsers={"test": BaseFeed, "second": BaseFeed},
         )
         await dispatcher.dispatch()
@@ -108,7 +115,7 @@ async def test_dispatch_only_eligible_feeds(scheduled_feeds):
         ]
 
         for feed in submitted:
-            schedule = await FeedParserRepository.get_by_feed_id(feed.id)
+            schedule = await feed_parser_repository.get_by_feed_id(feed.id)
             assert schedule is not None
             assert schedule.valid_for.replace(tzinfo=UTC) > datetime.now(UTC)
 

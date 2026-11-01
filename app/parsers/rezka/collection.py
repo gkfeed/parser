@@ -4,6 +4,7 @@ from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
 from app.utils.datetime import constant_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
@@ -15,21 +16,16 @@ class RezkaCollectionFeed(ItemsHashExtension, SeleniumParserExtension):
         soup = await self.get_soup(self.feed.url)
         titles = self._extract_collection_titles(soup)
 
-        return [
-            self._item_from_title(title)
-            for title in titles
-        ]
+        return [self._item_from_title(title) for title in titles]
 
     def _item_from_title(self, title_tag: Tag) -> Item:
-        anchor = title_tag.find("a")
-        if not isinstance(anchor, Tag) or "href" not in anchor.attrs:
-            raise ValueError(
-                "Could not extract collection item: <a> tag or href attribute not found."
-            )
+        anchor = require_tag(title_tag.find("a"), "Rezka collection item")
+        title = required_text(anchor, "Rezka collection title")
+        href = required_attr(anchor, "href", "Rezka collection link")
         return Item(
-            title=anchor.text,
-            link=self._normalize_href(str(anchor["href"])),
-            text=anchor.text,
+            title=title,
+            link=self._normalize_href(href),
+            text=title,
             date=constant_datetime,
         )
 

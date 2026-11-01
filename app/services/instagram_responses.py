@@ -63,20 +63,38 @@ class InstagramResponseAdapter:
             is not None,
             **self._crawler_root_details(objects),
         )
+        page_state = self._crawler_page_state(soup, self.details)
+        self.details["page_state"] = page_state
         timeline_ids = {
             str(value["id"])
             for value in objects
             if value.get("id") is not None
             and isinstance(value.get("polaris_timeline_connection"), dict)
         }
+        matching = [value for value in objects if self._matches_username(value)]
         users = [
             value
-            for value in objects
-            if self._matches_username(value)
-            and isinstance(value.get("is_private"), bool)
+            for value in matching
+            if isinstance(value.get("is_private"), bool)
             and any(value.get(key) is not None for key in ("id", "pk"))
         ]
-        self.details["matching_profiles"] = len(users)
+        self.details.update(
+            matching_profiles=len(users),
+            matching_username_objects=len(matching),
+            matching_id_profiles=sum(
+                any(value.get(key) is not None for key in ("id", "pk"))
+                for value in matching
+            ),
+            matching_privacy_profiles=sum(
+                isinstance(value.get("is_private"), bool) for value in matching
+            ),
+            timeline_objects=sum(
+                isinstance(value.get("polaris_timeline_connection"), dict)
+                for value in objects
+            ),
+        )
+        if page_state not in ("profile_page", "unknown"):
+            raise InstagramResponseError(page_state)
         user = max(
             users,
             key=lambda value: (
@@ -144,12 +162,57 @@ class InstagramResponseAdapter:
                     "PolarisErrorRoot.react",
                     "PolarisProfilePostsLoggedOutTabGridRoot.react",
                     "PolarisLoggedOutMobileProfileRoot.react",
+                    "PolarisLoggedOutMobileGatedBlockRoot.react",
                 )
                 else "other",
                 "root_failure_reason_present": props.get("failure_reason") is not None,
                 "restricted_age_present": props.get("restricted_age") is not None,
+                "age_restricted": type(props.get("restricted_age")) is int
+                and props["restricted_age"] > 0,
             }
         return {"root_component": "missing"}
+
+    @staticmethod
+    def _crawler_page_state(soup: BeautifulSoup, details: dict[str, object]) -> str:
+        # Inspect form destinations, never login links or translated page text.
+        # Navigation links and bundled login code also occur on valid profiles.
+        form_paths = {
+            InstagramResponseAdapter._form_path(form.get("action"))
+            for form in soup.find_all("form")
+            if isinstance(form, Tag)
+        }
+        if any(
+            path in ("/challenge", "/checkpoint")
+            or path.startswith(("/challenge/", "/checkpoint/"))
+            for path in form_paths
+        ):
+            return "challenge_page"
+        if details.get("age_restricted") is True:
+            return "age_restricted"
+        if "/accounts/login" in form_paths:
+            return "login_page"
+        component = details.get("root_component")
+        if component == "PolarisLoggedOutMobileGatedBlockRoot.react":
+            return "logged_out_gate"
+        if component == "PolarisErrorRoot.react":
+            # Instagram's generic error root does not prove account deletion.
+            return "error_page"
+        if component in (
+            "PolarisProfilePostsLoggedOutTabGridRoot.react",
+            "PolarisLoggedOutMobileProfileRoot.react",
+        ):
+            return "profile_page"
+        return "unknown"
+
+    @staticmethod
+    def _form_path(action: object) -> str:
+        if not isinstance(action, str):
+            return ""
+        try:
+            return urlsplit(action).path.rstrip("/")
+        except ValueError:
+            # A malformed optional form action is not evidence of a login wall.
+            return ""
 
     def _matches_username(self, user: dict) -> bool:
         username = user.get("username")

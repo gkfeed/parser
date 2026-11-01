@@ -13,4 +13,4 @@
 - [x] Integration-style tests cover valid, malformed, empty, and rate-limited responses.
 - [x] `make lint` and `make test` pass.
 
-The adapters and their HTTP contract checks pass on the current `HttpService` interface. Task 05 has no PR yet; reuse its completed branch/PR and rerun these checks before closing this task. The task file is retained until that prerequisite is resolved.
+The adapters and their HTTP contract checks pass on the current `HttpService` interface. Task 05 is being developed in PR #97; reuse its completed branch/PR and rerun these checks before closing this task. The task file is retained until that prerequisite is resolved.

@@ -7,7 +7,7 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
-from app.utils.html import require_tag, required_attr
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class InsolaranceFeed(
@@ -42,7 +42,7 @@ class InsolaranceFeed(
         title = require_tag(
             a_tags[-2] if len(a_tags) >= 2 else None, "Insolarance post title"
         )
-        return title.text.strip()
+        return required_text(title, "Insolarance post title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:

@@ -1,11 +1,14 @@
 from typing import Any, ClassVar
 
-from app.services.ytdlp.tiktok import classify_profile, classify_video
+from yt_dlp.extractor.common import InfoExtractor
+
+from app.services.ytdlp.tiktok import TikTokUserIE, classify_profile, classify_video
 from app.workers.youtube import InfoResultHandler
 
 
 class BaseExtractionMode:
     result_handler: InfoResultHandler | None = None
+    extractor_class: ClassVar[type[InfoExtractor] | None] = None
     opts: ClassVar[dict[str, Any]] = {
         "socket_timeout": 60,
         "ignoreerrors": True,
@@ -38,6 +41,7 @@ class ChannelExtractionMode(BaseExtractionMode):
 
 class TikTokProfileExtractionMode(BaseExtractionMode):
     result_handler = staticmethod(classify_profile)
+    extractor_class = TikTokUserIE
 
 
 class TikTokVideoExtractionMode(BaseExtractionMode):

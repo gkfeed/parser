@@ -11,8 +11,8 @@ from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.redlib import InvalidRedlibPage, RedlibClient
-from app.utils.datetime import convert_datetime
-from app.utils.html import require_tag, required_text
+from app.utils.datetime import parse_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class RedditFeed(
@@ -36,8 +36,19 @@ class RedditFeed(
         self._extract_posts(BeautifulSoup(html, "html.parser"))
 
     def _extract_posts(self, soup: BeautifulSoup) -> list[Tag]:
-        if soup.select_one("#challenge-form, #cf-challenge-running, .cf-turnstile"):
+        title = soup.title.get_text(strip=True).lower() if soup.title else ""
+        if soup.select_one(
+            "#challenge-form, #cf-challenge-running, .cf-turnstile, #anubis_challenge"
+        ) or title in {
+            "just a moment...",
+            "checking you are not a bot",
+            "making sure you're not a bot!",
+        }:
             raise FeedUnavailable(self.feed.url, "reddit_mirror_challenge")
+        if soup.select_one("form input[type='password']"):
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_login")
+        if title in {"access denied", "forbidden", "blocked", "403 forbidden"}:
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_blocked")
         if soup.select_one("#error"):
             raise FeedUnavailable(self.feed.url, "reddit_mirror_error_page")
         posts = [post for post in soup.find_all(class_="post") if isinstance(post, Tag)]
@@ -85,15 +96,14 @@ class RedditFeed(
         datetime_tag = post.find(class_="created")
         if isinstance(datetime_tag, Tag):
             datetime_str = datetime_tag.get("title")
-            if isinstance(datetime_str, str):
-                return convert_datetime(datetime_str)
+            if isinstance(datetime_str, str) and datetime_str.strip():
+                return parse_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        comments_tag = post.find(class_="post_comments")
-        if isinstance(comments_tag, Tag):
-            post_href = comments_tag.get("href")
-            if isinstance(post_href, str):
-                return urljoin("https://www.reddit.com", post_href)
-        raise ValueError
+        comments_tag = require_tag(
+            post.find(class_="post_comments"), "Reddit comments link"
+        )
+        post_href = required_attr(comments_tag, "href", "Reddit comments link")
+        return urljoin("https://www.reddit.com", post_href)

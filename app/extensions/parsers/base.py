@@ -8,7 +8,7 @@ from app.serializers.feed import Feed, Item
 
 
 class BaseFeed:
-    worker_kind = WorkerKind.HEAVY
+    worker_kind = WorkerKind.HTTP
 
     def __init__(self, feed: Feed, data: dict) -> None:
         self.feed = feed

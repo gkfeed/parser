@@ -1,8 +1,17 @@
 import json
+import ssl
+from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping
+from socket import gaierror
 from urllib.parse import urlsplit
 
 import structlog
+from aiohttp import (
+    ClientConnectionError,
+    ClientConnectorDNSError,
+    ClientPayloadError,
+    ClientSSLError,
+)
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.services.http import HttpRequestError, HttpService
@@ -36,7 +45,7 @@ class RedlibClient:
         self._base_urls_cache: list[str] | None = None
 
     async def _get_base_urls(self) -> list[str]:
-        if self._base_urls_cache:
+        if self._base_urls_cache is not None:
             return self._base_urls_cache
 
         response = await self._fetch_instances(self._instances_url)
@@ -66,7 +75,8 @@ class RedlibClient:
             if "url" not in instance:
                 continue
             all_urls.append(self._get_instance_url(instance["url"]))
-        self._base_urls_cache = self._url_ranker.get_ranked_urls(all_urls)
+        # Cache the directory, not the cooldown/ranking snapshot.
+        self._base_urls_cache = all_urls
         return self._base_urls_cache
 
     @staticmethod
@@ -79,7 +89,9 @@ class RedlibClient:
         return url
 
     async def get_page_html(self, page_url: str) -> bytes:
-        base_urls = await self._get_base_urls()
+        all_urls = await self._get_base_urls()
+        base_urls = self._url_ranker.get_ranked_urls(all_urls)
+        failures: Counter[str] = Counter()
         last_error: FeedUnavailable | InvalidRedlibPage | HttpRequestError | None = None
         path = "/".join(page_url.split("/")[3:])
 
@@ -89,32 +101,82 @@ class RedlibClient:
             except (FeedUnavailable, InvalidRedlibPage, HttpRequestError) as error:
                 last_error = error
                 self._url_ranker.demote_url(base_url)
+                reason = self._failure_reason(error)
+                failures[reason] += 1
+                http_error = self._http_error(error)
                 logger.warning(
                     "reddit_mirror_failed",
                     **url_log_fields(base_url, field="mirror"),
-                    reason=self._failure_reason(error),
+                    reason=reason,
+                    attempt=sum(failures.values()),
+                    error_type=type(error).__name__,
+                    cause_type=type(http_error.__cause__).__name__
+                    if http_error is not None and http_error.__cause__ is not None
+                    else None,
+                    http_status=http_error.status if http_error is not None else None,
                 )
                 continue
 
             self._url_ranker.promote_url(base_url)
             return html
 
-        reason = "no_mirrors_available"
+        reason = "mirrors_on_cooldown" if all_urls else "no_mirrors_configured"
         if last_error is not None:
             reason = self._failure_reason(last_error)
-        retry_at = (
-            last_error.retry_at if isinstance(last_error, FeedUnavailable) else None
+        cooldowns = [
+            retry_at
+            for url in all_urls
+            if (retry_at := self._url_ranker.get_cooldown_until(url)) is not None
+        ]
+        retry_at = min(cooldowns) if cooldowns else None
+        logger.warning(
+            "reddit_mirrors_exhausted",
+            reason=reason,
+            mirrors_configured=len(all_urls),
+            mirrors_available=len(base_urls),
+            mirrors_cooling_down=len(all_urls) - len(base_urls),
+            mirrors_attempted=sum(failures.values()),
+            failure_counts=dict(failures),
+            retry_at=retry_at.isoformat() if retry_at else None,
         )
         raise FeedUnavailable(
             page_url, f"reddit_mirrors_exhausted:{reason}", retry_at
         ) from last_error
 
-    @staticmethod
+    @classmethod
     def _failure_reason(
+        cls,
         error: FeedUnavailable | InvalidRedlibPage | HttpRequestError,
     ) -> str:
+        http_error = cls._http_error(error)
+        if http_error is not None:
+            return cls._http_failure_reason(http_error)
         if isinstance(error, FeedUnavailable):
             return error.reason
-        if isinstance(error, HttpRequestError):
-            return "http_request_failed"
         return "invalid_page"
+
+    @staticmethod
+    def _http_error(error: Exception) -> HttpRequestError | None:
+        # HttpParserExtension wraps the service error in FeedUnavailable.
+        if isinstance(error, HttpRequestError):
+            return error
+        if isinstance(error.__cause__, HttpRequestError):
+            return error.__cause__
+        return None
+
+    @staticmethod
+    def _http_failure_reason(error: HttpRequestError) -> str:
+        if error.status is not None:
+            return "http_status"
+        cause = error.__cause__
+        if isinstance(cause, (ClientSSLError, ssl.SSLError)):
+            return "tls_error"
+        if isinstance(cause, (ClientConnectorDNSError, gaierror)):
+            return "dns_error"
+        if isinstance(cause, TimeoutError):
+            return "timeout"
+        if isinstance(cause, ClientConnectionError):
+            return "connection_error"
+        if isinstance(cause, ClientPayloadError):
+            return "response_payload_error"
+        return "http_request_failed"
