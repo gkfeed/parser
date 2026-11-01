@@ -12,8 +12,8 @@ from app.utils.html import require_tag, required_attr, required_text
 
 
 class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
-    _cache_storage_time = timedelta(hours=1)
-    _cache_storage_time_if_success = timedelta(days=1)
+    empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(days=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

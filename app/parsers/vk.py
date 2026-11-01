@@ -26,7 +26,7 @@ class VkFeed(
     SeleniumParserExtension,
     CacheFeedExtension,
 ):
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
     _selenium_wait_time = 5
     _post_selector = '[data-testid="post"][data-post-id]'
     _empty_selector = (

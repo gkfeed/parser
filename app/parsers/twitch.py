@@ -10,7 +10,7 @@ from app.services.twitch.types import Stream
 
 class TwitchFeed(CacheFeedExtension, ItemIdentityHashExtension):
     worker_kind = WorkerKind.LIGHT
-    _cache_storage_time_if_success = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
 
     async def _parse_items(self) -> list[Item]:
         stream = await Twitch.get_stream(self._streamer_name)

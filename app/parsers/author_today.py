@@ -14,7 +14,7 @@ from app.utils.html import require_tag, required_attr, required_text
 class AuthorTodayFeed(
     PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
 ):
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
     _base_url = "https://author.today"
 
     @override

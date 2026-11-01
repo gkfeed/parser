@@ -36,7 +36,7 @@ class FeedRepository(BaseRepository):
                     _Feed.type.in_(parser_ids),
                     or_(
                         FeedParser.feed_id.is_(None),
-                        FeedParser.valid_for < datetime.now(UTC),
+                        FeedParser.next_run_at < datetime.now(UTC),
                     ),
                 )
                 .order_by(_Feed.id)

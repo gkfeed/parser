@@ -13,7 +13,7 @@ from app.utils.html import require_tag, required_attr, required_text
 class InsolaranceFeed(
     PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
 ):
-    _cache_storage_time_if_success = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

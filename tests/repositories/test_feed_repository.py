@@ -48,15 +48,15 @@ async def scheduled_feeds(feed_repository, feed_parser_repository):
         ("naive-due", "second", now.replace(tzinfo=None) - timedelta(days=1)),
     ]
     feeds = {}
-    for title, parser_type, valid_for in cases:
+    for title, parser_type, next_run_at in cases:
         feed = await feed_repository.create(
             Feed(
                 id=0, title=title, url=f"https://example.com/{title}", type=parser_type
             )
         )
         feeds[title] = feed
-        if valid_for is not None:
-            await feed_parser_repository.upsert(feed.id, valid_for)
+        if next_run_at is not None:
+            await feed_parser_repository.upsert(feed.id, next_run_at)
     return feeds
 
 
@@ -117,7 +117,7 @@ async def test_dispatch_only_eligible_feeds(
         for feed in submitted:
             schedule = await feed_parser_repository.get_by_feed_id(feed.id)
             assert schedule is not None
-            assert schedule.valid_for.replace(tzinfo=UTC) > datetime.now(UTC)
+            assert schedule.next_run_at.replace(tzinfo=UTC) > datetime.now(UTC)
 
         await dispatcher.dispatch()
         assert len(submitted) == 3

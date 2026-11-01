@@ -15,7 +15,7 @@ class FeedParserRepository(BaseRepository):
             )
             return result.scalar_one_or_none()
 
-    async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser:
+    async def upsert(self, feed_id: int, next_run_at: datetime) -> FeedParser:
         async with self._session_factory() as session, session.begin():
             result = await session.execute(
                 select(FeedParser).where(FeedParser.feed_id == feed_id)
@@ -23,9 +23,9 @@ class FeedParserRepository(BaseRepository):
             feed_parser = result.scalar_one_or_none()
 
             if feed_parser:
-                feed_parser.valid_for = valid_for
+                feed_parser.next_run_at = next_run_at
             else:
-                feed_parser = FeedParser(feed_id=feed_id, valid_for=valid_for)
+                feed_parser = FeedParser(feed_id=feed_id, next_run_at=next_run_at)
                 session.add(feed_parser)
 
             await session.flush()

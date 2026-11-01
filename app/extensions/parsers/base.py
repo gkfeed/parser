@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import final
+from datetime import timedelta
+from typing import ClassVar, final
 
 from structlog.contextvars import bound_contextvars
 
@@ -9,6 +10,8 @@ from app.serializers.feed import Feed, Item
 
 class BaseFeed:
     worker_kind = WorkerKind.HTTP
+    empty_result_delay: ClassVar[timedelta] = timedelta(hours=1)
+    success_result_delay: ClassVar[timedelta] = timedelta(days=1)
 
     def __init__(self, feed: Feed, data: dict) -> None:
         self.feed = feed

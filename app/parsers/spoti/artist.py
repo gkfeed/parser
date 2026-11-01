@@ -15,7 +15,7 @@ from app.utils.html import required_attr, required_text
 
 
 class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
-    _cache_storage_time = timedelta(days=1)
+    empty_result_delay = timedelta(days=1)
     _selenium_wait_time = 20
 
     @override

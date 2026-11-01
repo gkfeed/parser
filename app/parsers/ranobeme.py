@@ -14,7 +14,7 @@ class RanobeMeFeed(
     PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
 ):
     _base_url = "https://ranobe.me"
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
