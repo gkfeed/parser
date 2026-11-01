@@ -1,14 +1,18 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict
+
+from app.core.parser_id import ParserId
 
 
 class Feed(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
     id: int
     title: str
     url: str
-    type: str
+    type: ParserId
 
 
 class Item(BaseModel):

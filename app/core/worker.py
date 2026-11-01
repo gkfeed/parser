@@ -5,6 +5,7 @@ import structlog
 from structlog.contextvars import bound_contextvars, clear_contextvars
 
 from app.configs.env import BROKER_URL
+from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
@@ -17,18 +18,26 @@ logger = structlog.get_logger(__name__)
 _MAX_RESULT_RESIZE_ATTEMPTS = 8
 
 
-async def run_worker(type: str):
+async def run_worker(parser_id: ParserId):
+    parser_id = ParserId(parser_id)
     clear_contextvars()
     await asyncio.sleep(1)
 
     broker = BrokerService(BROKER_URL)
-    task = await broker.get_task(f"gkfeed.process_feed_{type}")
+    task = await broker.get_task(parser_id.task_name)
 
     if not task:
         return
 
-    feed = Feed.model_validate_json(task.args[0])
-    with bound_contextvars(task_id=task.id, parser=type, feed_id=feed.id):
+    try:
+        feed = Feed.model_validate_json(task.args[0])
+        if feed.type != parser_id:
+            raise ValueError(f"Feed parser {feed.type} does not match {parser_id}")
+    except (ValueError, TypeError, IndexError) as exc:
+        await _submit_error(broker, task.id, "invalid_feed")
+        raise ValueError(f"Invalid feed for parser {parser_id}") from exc
+
+    with bound_contextvars(task_id=task.id, parser=parser_id, feed_id=feed.id):
         await _process_feed(task, feed, broker)
 
 
