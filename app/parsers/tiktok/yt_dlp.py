@@ -25,7 +25,7 @@ class TikTokFeed(BaseTikTokFeed):
 
     @property
     async def _video_links(self) -> list[str]:
-        self.data.pop("retry_at", None)
+        self.retry_at = None
         self._entries_by_url = {}
         info = await YtdlpInfoExtractor.extract_channel_videos_info(
             self.feed.url, TikTokProfileExtractionMode(), self._max_videos
@@ -41,7 +41,7 @@ class TikTokFeed(BaseTikTokFeed):
         if entries and info.get("tiktok_outcome") == "empty_confirmed":
             raise ValueError("Confirmed empty TikTok profile contains video entries")
         if info.get("tiktok_outcome") == "empty_confirmed":
-            self.data["retry_at"] = datetime.now(UTC) + self._empty_confirmed_cache_time
+            self.retry_at = datetime.now(UTC) + self._empty_confirmed_cache_time
 
         videos: list[str] = []
         for index, entry in enumerate(entries, start=1):

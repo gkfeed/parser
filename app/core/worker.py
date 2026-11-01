@@ -5,11 +5,11 @@ import structlog
 from structlog.contextvars import bound_contextvars, clear_contextvars
 
 from app.configs.env import BROKER_URL
+from app.core.parsers import create_parser
 from app.extensions.parsers.base import BaseFeed
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.result_size import ResultSizeExtension
-from app.parsers import PARSERS
 from app.serializers.feed import Feed, FeedFailure, FeedResult, Item
 from app.services.broker import BrokerError, BrokerResultTooLarge, BrokerService, Task
 
@@ -34,14 +34,10 @@ async def run_worker(type: str):
 
 async def _process_feed(task: Task, feed: Feed, broker: BrokerService) -> None:
     started = monotonic()
-    parser = PARSERS.get(feed.type)
     logger.info("feed_processing_started")
 
-    if not parser:
-        raise ValueError(f"No parser found for feed type: {feed.type}")
-
     try:
-        parser_instance = parser(feed, {})
+        parser_instance = create_parser(feed)
         items = await parser_instance.items
 
         if isinstance(parser_instance, ItemsHashExtension):
@@ -80,7 +76,7 @@ async def _submit_result(
 ) -> None:
     original_items = items
     rejected_size: int | None = None
-    result = FeedResult(items=items, retry_at=parser.data.get("retry_at"))
+    result = FeedResult(items=items, retry_at=parser.retry_at)
     for attempt in range(_MAX_RESULT_RESIZE_ATTEMPTS + 1):
         items_json = result.model_dump_json()
         if rejected_size is not None and len(items_json) >= rejected_size:
