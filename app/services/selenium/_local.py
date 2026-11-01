@@ -3,7 +3,7 @@ import contextlib
 import os
 import pickle
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import fields
 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -14,7 +14,9 @@ from app.utils.inject import inject
 
 
 async def get_html(args: SeleniumGetHtmlArgs) -> str:
-    return await _get_html(**asdict(args))
+    # asdict would deep-copy the bound callback and its owning parser.
+    options = {field.name: getattr(args, field.name) for field in fields(args)}
+    return await _get_html(**options)
 
 
 @inject({"driver": "selenium_web_driver"}, call=True)

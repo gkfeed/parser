@@ -12,7 +12,7 @@ from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 from app.services.hash import HashService
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.utils.datetime import constant_datetime, parse_datetime
 from app.utils.html import require_tag, required_text
 
 
@@ -21,6 +21,11 @@ class OneFootballFeed(
 ):
     __base_url = "https://onefootball.com"
     __match_path = re.compile(r"^/[^/]+/match/\d+/?\Z")
+    __entity_title_selector = (
+        '[class*="EntityTitle"][class*="__title"], '
+        '.xpaLayoutContainerComponentResolver--entityTitle p[class*="_title"]'
+    )
+    __match_lists_selector = 'ul:is([class*="MatchCardsList"], [class*="_matches"])'
     _cache_storage_time = timedelta(hours=1)
 
     @override
@@ -35,12 +40,12 @@ class OneFootballFeed(
         main = require_tag(soup.find("main"), "OneFootball main content")
         required_text(
             require_tag(
-                main.select_one('[class*="EntityTitle"][class*="__title"]'),
+                main.select_one(self.__entity_title_selector),
                 "OneFootball entity title",
             ),
             "OneFootball entity title",
         )
-        match_lists = main.select('ul[class*="MatchCardsList"]')
+        match_lists = main.select(self.__match_lists_selector)
         if not match_lists:
             self._validate_empty_matches(main)
             return
@@ -92,7 +97,7 @@ class OneFootballFeed(
         soup = await self.get_soup(self.feed.url)
         return [
             link
-            for link in soup.select('main ul[class*="MatchCardsList"] a[href]')
+            for link in soup.select(f"main {self.__match_lists_selector} a[href]")
             if self.__match_path.fullmatch(str(link["href"]))
         ][:2]
 
@@ -114,8 +119,8 @@ class OneFootballFeed(
     async def _get_post_datetime(self, post: Tag) -> datetime:
         time_tag = post.find("time")
         datetime_attr = time_tag.get("datetime") if isinstance(time_tag, Tag) else None
-        if isinstance(datetime_attr, str):
-            return convert_datetime(datetime_attr)
+        if isinstance(datetime_attr, str) and datetime_attr.strip():
+            return parse_datetime(datetime_attr)
         return constant_datetime
 
     @override

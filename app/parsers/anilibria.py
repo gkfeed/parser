@@ -15,6 +15,10 @@ class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExt
     _cache_storage_time = timedelta(seconds=5)
 
     @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        AnilibriaClient.parse_release(html)
+
+    @override
     async def _parse_items(self) -> list[Item]:
         release = await AnilibriaClient(self.get_html).get_release(
             self._get_alias_from_url()

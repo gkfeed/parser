@@ -9,6 +9,7 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class LiveballFeed(
@@ -37,10 +38,7 @@ class LiveballFeed(
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        match_url = post.get("href")
-        if not isinstance(match_url, str) or not match_url:
-            raise ValueError("Match URL not found")
-
+        match_url = required_attr(post, "href", "Liveball match link")
         return urljoin(self._base_url, match_url)
 
     @override
@@ -53,10 +51,10 @@ class LiveballFeed(
         return datetime.fromtimestamp(timestamp, tz=UTC)
 
     def _extract_league_name(self, match: Tag) -> str:
-        league_elem = match.select_one(".lb-match-card__tournament")
-        if league_elem:
-            return league_elem.get_text(strip=True)
-        raise ValueError("League name not found")
+        league_elem = require_tag(
+            match.select_one(".lb-match-card__tournament"), "Liveball tournament"
+        )
+        return required_text(league_elem, "Liveball tournament")
 
     def _extract_teams(self, match: Tag) -> tuple[str, str]:
         teams = match.select(".lb-match-team__name")

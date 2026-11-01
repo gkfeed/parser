@@ -1,46 +1,33 @@
 from datetime import timedelta
 from typing import override
 
-from bs4 import Tag
-
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
-from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.serializers.feed import Item
+from app.utils.datetime import constant_datetime
 from app.utils.html import require_tag, required_text
 
 
-class KinogoFeed(
-    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
-):
+class KinogoFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
     worker_kind = WorkerKind.LIGHT
     _cache_storage_time = timedelta(hours=1)
 
-    @property
     @override
-    async def _posts(self) -> list[Tag]:
+    async def _parse_items(self) -> list[Item]:
         soup = await self.get_soup(self.feed.url)
-        return [soup]
+        title_tag = require_tag(soup.find("h1"), "Kinogo show title")
+        title = required_text(title_tag, "Kinogo show title", separator=" ")
 
-    @override
-    async def _get_post_title(self, post: Tag) -> str:
-        title = await self._show_title(post)
-        status = await self._show_status(post)
-        return f"{title} {status}"
+        status_tag = require_tag(soup.find(class_="status7"), "Kinogo show status")
+        status = required_text(status_tag, "Kinogo show status", separator=" ")
 
-    @override
-    async def _get_post_text(self, post: Tag) -> str:
-        return await self._show_status(post)
-
-    @override
-    async def _get_post_link(self, post: Tag) -> str:
-        return self.feed.url
-
-    async def _show_status(self, soup: Tag) -> str:
-        status = require_tag(soup.find(class_="status7"), "Kinogo show status")
-        return required_text(status, "Kinogo show status", separator=" ")
-
-    async def _show_title(self, soup: Tag) -> str:
-        title = require_tag(soup.find("h1"), "Kinogo show title")
-        return required_text(title, "Kinogo show title", separator=" ")
+        return [
+            Item(
+                title=f"{title} {status}",
+                text=status,
+                date=constant_datetime,
+                link=self.feed.url,
+            )
+        ]

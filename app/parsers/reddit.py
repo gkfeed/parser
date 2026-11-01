@@ -11,8 +11,8 @@ from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.redlib import InvalidRedlibPage, RedlibClient
-from app.utils.datetime import convert_datetime
-from app.utils.html import require_tag, required_text
+from app.utils.datetime import parse_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class RedditFeed(
@@ -96,15 +96,14 @@ class RedditFeed(
         datetime_tag = post.find(class_="created")
         if isinstance(datetime_tag, Tag):
             datetime_str = datetime_tag.get("title")
-            if isinstance(datetime_str, str):
-                return convert_datetime(datetime_str)
+            if isinstance(datetime_str, str) and datetime_str.strip():
+                return parse_datetime(datetime_str)
         return await super()._get_post_datetime(post)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        comments_tag = post.find(class_="post_comments")
-        if isinstance(comments_tag, Tag):
-            post_href = comments_tag.get("href")
-            if isinstance(post_href, str):
-                return urljoin("https://www.reddit.com", post_href)
-        raise ValueError
+        comments_tag = require_tag(
+            post.find(class_="post_comments"), "Reddit comments link"
+        )
+        post_href = required_attr(comments_tag, "href", "Reddit comments link")
+        return urljoin("https://www.reddit.com", post_href)

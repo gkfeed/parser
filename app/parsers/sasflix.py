@@ -15,6 +15,14 @@ class SasflixFeed(ItemLinkHashExtension, HttpParserExtension):
         rss_url = f"{self.feed.url.rstrip('/').removesuffix('/rss.xml')}/rss.xml"
 
         content = await self.get_html(rss_url)
+        return self._items_from_content(content)
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        self._items_from_content(html)
+
+    @staticmethod
+    def _items_from_content(content: bytes) -> list[Item]:
         feed = RSSParser.parse_bytes(
             content,
             content_priority=("encoded", "enclosure", "description"),

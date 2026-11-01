@@ -85,9 +85,13 @@ class RezkaClient:
     def show_urls(url: str, mode: RezkaPageMode) -> list[str]:
         parts = urlsplit(url)._replace(netloc="hdrezka.me")
         match = re.fullmatch(r"(.*/\d+-.+)-(\d{4})(?:-(?:u|latest))?\.html", parts.path)
-        if mode is RezkaPageMode.FILM or match is None:
+        if match is None:
             return [parts.geturl()]
         prefix, year = match.groups()
+        if mode is RezkaPageMode.FILM:
+            # Moved films can return HTTP 500 at the old URL in a fresh session.
+            paths = [parts.path, f"{prefix}-{year}-latest.html"]
+            return [parts._replace(path=path).geturl() for path in dict.fromkeys(paths)]
         paths = [parts.path, f"{prefix}-{year}-u.html", f"{prefix}-{year}-latest.html"]
         if not prefix.endswith("-serial"):
             paths.append(f"{prefix}-serial-{year}-latest.html")

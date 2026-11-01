@@ -4,12 +4,12 @@ from xml.etree import ElementTree
 from xml.parsers import expat
 
 import structlog
-from dateutil.parser import parse as parse_datetime
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.serializers.feed import Item
 from app.services.http import HttpRequestError, HttpService
-from app.utils.datetime import convert_datetime
+from app.services.rss_http import http_unavailable
+from app.utils.datetime import parse_datetime
 from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
@@ -80,6 +80,30 @@ def _description(
     return next((sources[source] for source in priority if sources[source]), "")
 
 
+def _parse_item(
+    element: ElementTree.Element,
+    index: int,
+    *,
+    content_priority: tuple[ContentSource, ...],
+    default_title: str,
+) -> dict[str, str]:
+    item = {
+        "title": _text(element, "title", default_title),
+        "link": _text(element, "link"),
+        "description": _description(element, content_priority),
+        "pub_date": _text(element, "pubDate"),
+        "guid": _text(element, "guid"),
+    }
+    for field in ("title", "link", "pub_date"):
+        if not item[field].strip():
+            raise ValueError(f"RSS item {index}: missing or empty {field}")
+    try:
+        parse_datetime(item["pub_date"])
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(f"RSS item {index}: invalid pubDate: {exc}") from exc
+    return item
+
+
 class RSSParser:
     @staticmethod
     async def fetch_bytes(url: str, headers: dict[str, str] | None = None) -> bytes:
@@ -90,7 +114,7 @@ class RSSParser:
         except HttpRequestError as exc:
             raise FeedUnavailable(url, "http_request_failed") from exc
         if not 200 <= response.status < 300:
-            raise FeedUnavailable(url, f"http_status_{response.status}")
+            raise http_unavailable(url, response)
         return response.content
 
     @staticmethod
@@ -106,7 +130,7 @@ class RSSParser:
                 title=item["title"],
                 link=item["link"],
                 text=item["description"],
-                date=convert_datetime(item["pub_date"]),
+                date=parse_datetime(item["pub_date"]),
                 guid=item.get("guid", "") if include_guid else None,
             )
             for item in feed
@@ -173,21 +197,12 @@ class RSSParser:
 
         items = []
         for index, element in enumerate(channels[0].findall("item"), start=1):
-            item = {
-                "title": _text(element, "title", default_title),
-                "link": _text(element, "link"),
-                "description": _description(element, content_priority),
-                "pub_date": _text(element, "pubDate"),
-                "guid": _text(element, "guid"),
-            }
-            for field in ("title", "link", "pub_date"):
-                if not item[field].strip():
-                    raise ValueError(f"RSS item {index}: missing or empty {field}")
-            try:
-                # Validate before convert_datetime can replace a bad date with
-                # its historical constant fallback. Do not change that utility.
-                parse_datetime(item["pub_date"])
-            except (ValueError, OverflowError) as exc:
-                raise ValueError(f"RSS item {index}: invalid pubDate: {exc}") from exc
-            items.append(item)
+            items.append(
+                _parse_item(
+                    element,
+                    index,
+                    content_priority=content_priority,
+                    default_title=default_title,
+                )
+            )
         return items

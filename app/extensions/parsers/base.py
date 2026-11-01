@@ -10,7 +10,7 @@ from app.serializers.feed import Feed, Item
 
 
 class BaseFeed:
-    worker_kind = WorkerKind.HEAVY
+    worker_kind = WorkerKind.HTTP
 
     def __init__(self, feed: Feed, data: Mapping[str, object] | None = None) -> None:
         # Empty dictionaries remain accepted while existing integration callers

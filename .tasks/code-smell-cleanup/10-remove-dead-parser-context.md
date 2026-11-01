@@ -16,8 +16,7 @@ Final removal is blocked by the prohibition on changing existing tests.
 empty dictionary. Several existing parser tests also pass `{}` directly.
 The compatibility adapter and optional empty constructor argument remain until
 those callers can migrate to `create_parser`. Nonempty constructor data raises
-instead of silently losing a retry request. Existing tests are unchanged; new
-local HTTP boundary scenarios exercise the worker's runtime construction path.
+instead of silently losing a retry request. Existing tests are unchanged.
 
 Scheduling policy remains owned by task 04. This transition preserves the TTL
 attributes consumed by the current dispatcher rather than duplicating that work.
