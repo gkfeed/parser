@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.core.parser_id import ParserId
 from app.models.item import Item as ItemModel
 from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
@@ -16,7 +17,7 @@ async def test_items_repository(feed_repository, items_repository):
         id=0,
         title="Item Test Feed",
         url=f"https://item-test.com/{datetime.now(UTC).timestamp()}",
-        type="test",
+        type=ParserId.WEB,
     )
     feed = await feed_repository.create(feed_data)
 
