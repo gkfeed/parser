@@ -47,10 +47,10 @@ To skip parser types in both light and heavy workers, add them to `ignored_parse
 ignored_parser_types = ["yt", "rezka:collection"]
 ```
 
-The light worker runs one persistent event loop and accepts up to
-`LIGHT_WORKER_CONCURRENCY` feed jobs at once. The default is `4`; values below
-`1` fail startup. Slots remain occupied until parsing and broker submission
-finish. Queues are polled in round-robin order. A complete empty sweep triggers
+Each light-worker container processes one feed at a time in a persistent event
+loop. It finishes parsing and the terminal broker submission before claiming
+another feed. Scale the number of worker containers for parallel processing.
+Queues are polled in round-robin order. A complete empty sweep triggers
 an idle delay that grows from 0.1 seconds to at most 1 second, and finding a job
 resets the delay. Heavy browser work remains sequential.
 

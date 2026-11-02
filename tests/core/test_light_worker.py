@@ -145,7 +145,7 @@ async def stop_worker(worker: asyncio.Task[None], boundary: WorkerBoundary) -> N
         await asyncio.wait_for(worker, 5)
 
 
-async def test_fast_feed_finishes_while_slow_feed_waits(
+async def test_worker_processes_one_feed_at_a_time(
     boundary: WorkerBoundary,
 ) -> None:
     boundary.feed_gates["1"] = asyncio.Event()
@@ -153,17 +153,17 @@ async def test_fast_feed_finishes_while_slow_feed_waits(
         await boundary.enqueue(task_id)
     await boundary.enqueue(4, ParserId.SHIKI)
     worker = asyncio.create_task(
-        run_light_workers(
-            [ParserId.WEB, ParserId.SHIKI], concurrency=2, broker=boundary.broker
-        )
+        run_light_workers([ParserId.WEB, ParserId.SHIKI], broker=boundary.broker)
     )
     try:
-        await asyncio.wait_for(boundary.completed["4"].wait(), 5)
+        await asyncio.wait_for(boundary.feed_started["1"].wait(), 5)
+        await asyncio.sleep(0.05)
+        assert boundary.claimed == ["1"]
+        assert not boundary.results
+        boundary.feed_gates["1"].set()
         await asyncio.wait_for(boundary.completed["3"].wait(), 5)
-        assert boundary.feed_started["1"].is_set()
-        assert not boundary.completed["1"].is_set()
-        assert boundary.claimed[:2] == ["1", "4"]
-        assert boundary.peak_active == 2
+        assert boundary.claimed == ["1", "4", "2", "3"]
+        assert boundary.peak_active == 1
         assert len(FeedResult.model_validate_json(boundary.results["4"]).items) == 1
         assert not boundary.errors
     finally:
@@ -172,30 +172,56 @@ async def test_fast_feed_finishes_while_slow_feed_waits(
     assert not boundary.active
 
 
-async def test_slots_include_pending_broker_submissions(
+async def test_multiple_worker_instances_process_independent_feeds(
+    boundary: WorkerBoundary,
+) -> None:
+    boundary.feed_gates["1"] = asyncio.Event()
+    await boundary.enqueue(1)
+    await boundary.enqueue(2)
+    first = asyncio.create_task(
+        run_light_workers([ParserId.WEB], broker=boundary.broker)
+    )
+    second: asyncio.Task[None] | None = None
+    try:
+        await asyncio.wait_for(boundary.feed_started["1"].wait(), 5)
+        second = asyncio.create_task(
+            run_light_workers([ParserId.WEB], broker=boundary.broker)
+        )
+        await asyncio.wait_for(boundary.completed["2"].wait(), 5)
+        assert not boundary.completed["1"].is_set()
+        assert boundary.claimed == ["1", "2"]
+        assert boundary.peak_active == 2
+    finally:
+        await stop_worker(first, boundary)
+        if second is not None:
+            await stop_worker(second, boundary)
+    assert set(boundary.results) == {"1", "2"}
+    assert not boundary.active
+
+
+async def test_worker_waits_for_broker_submission_before_next_claim(
     boundary: WorkerBoundary,
 ) -> None:
     for task_id in (1, 2, 3, 4):
         boundary.submission_gates[str(task_id)] = asyncio.Event()
         await boundary.enqueue(task_id)
     worker = asyncio.create_task(
-        run_light_workers([ParserId.WEB], concurrency=2, broker=boundary.broker)
+        run_light_workers([ParserId.WEB], broker=boundary.broker)
     )
     try:
         await asyncio.wait_for(boundary.submission_started["1"].wait(), 5)
-        await asyncio.wait_for(boundary.submission_started["2"].wait(), 5)
         await asyncio.sleep(0.05)
-        assert boundary.claimed == ["1", "2"]
+        assert boundary.claimed == ["1"]
         boundary.submission_gates["1"].set()
-        await asyncio.wait_for(boundary.submission_started["3"].wait(), 5)
+        await asyncio.wait_for(boundary.submission_started["2"].wait(), 5)
         worker.cancel()
         await asyncio.sleep(0)
         assert not worker.done()
-        assert boundary.claimed == ["1", "2", "3"]
+        assert boundary.claimed == ["1", "2"]
     finally:
         await stop_worker(worker, boundary)
-    assert set(boundary.results) == {"1", "2", "3"}
-    assert boundary.peak_active == 2
+    assert set(boundary.results) == {"1", "2"}
+    assert boundary.peak_active == 1
     assert not boundary.active
 
 
@@ -208,7 +234,7 @@ async def test_shutdown_finishes_claim_feed_and_submission(
     await boundary.enqueue(1)
     await boundary.enqueue(2)
     worker = asyncio.create_task(
-        run_light_workers([ParserId.WEB], concurrency=2, broker=boundary.broker)
+        run_light_workers([ParserId.WEB], broker=boundary.broker)
     )
     try:
         await asyncio.wait_for(boundary.claim_started["1"].wait(), 5)
@@ -239,7 +265,6 @@ async def test_empty_queues_use_bounded_fair_idle_polling(
     worker = asyncio.create_task(
         run_light_workers(
             [ParserId.WEB, ParserId.SHIKI],
-            concurrency=2,
             idle_poll_min=0.03,
             idle_poll_max=0.12,
             broker=boundary.broker,
@@ -247,6 +272,9 @@ async def test_empty_queues_use_bounded_fair_idle_polling(
     )
     try:
         await asyncio.sleep(0.4)
+        if slow_feed:
+            assert boundary.polls == ["gkfeed.process_feed_web"]
+            return
         assert 6 <= len(boundary.polls) <= 14
         assert boundary.polls[::2] == ["gkfeed.process_feed_web"] * len(
             boundary.polls[::2]
@@ -265,7 +293,7 @@ async def test_broker_submission_failures_escape_worker(
     await boundary.enqueue(1)
     with pytest.raises(BrokerError, match="Failed to submit error"):
         await asyncio.wait_for(
-            run_light_workers([ParserId.WEB], concurrency=1, broker=boundary.broker), 5
+            run_light_workers([ParserId.WEB], broker=boundary.broker), 5
         )
     assert not boundary.results
     assert not boundary.errors
@@ -284,7 +312,7 @@ async def test_light_worker_rejects_invalid_or_misrouted_payload(
     await boundary.broker.enqueue(ParserId.WEB.task_name, [json.dumps(payload)])
     with pytest.raises(ValueError, match="Invalid feed for parser web"):
         await asyncio.wait_for(
-            run_light_workers([ParserId.WEB], concurrency=1, broker=boundary.broker), 5
+            run_light_workers([ParserId.WEB], broker=boundary.broker), 5
         )
     assert boundary.errors == {"1": "invalid_feed"}
     assert not boundary.feed_started
@@ -303,7 +331,7 @@ async def test_failed_feed_submits_failure_and_next_feed_runs(
     await boundary.broker.enqueue("gkfeed.process_feed_web", [feed.model_dump_json()])
     await boundary.enqueue(2)
     worker = asyncio.create_task(
-        run_light_workers([ParserId.WEB], concurrency=1, broker=boundary.broker)
+        run_light_workers([ParserId.WEB], broker=boundary.broker)
     )
     try:
         await asyncio.wait_for(boundary.completed["2"].wait(), 5)
