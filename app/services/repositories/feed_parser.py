@@ -29,12 +29,15 @@ class FeedParserRepository(BaseRepository):
         session: AsyncSession, feed_id: int, valid_for: datetime
     ) -> FeedParser:
         """Write state within the caller's transaction and feed row lock."""
-        statement = insert(FeedParser).values(feed_id=feed_id, valid_for=valid_for)
-        upsert_statement = statement.on_conflict_do_update(
-            index_elements=[FeedParser.feed_id],
-            set_={"valid_for": statement.excluded.valid_for},
-        ).returning(FeedParser)
+        statement = (
+            insert(FeedParser)
+            .values(feed_id=feed_id, valid_for=valid_for)
+            .on_conflict_do_update(
+                index_elements=[FeedParser.feed_id], set_={"valid_for": valid_for}
+            )
+            .returning(FeedParser)
+        )
         result = await session.execute(
-            upsert_statement, execution_options={"populate_existing": True}
+            statement, execution_options={"populate_existing": True}
         )
         return result.scalar_one()
