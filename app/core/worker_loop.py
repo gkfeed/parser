@@ -44,10 +44,8 @@ async def _run_sequential_workers(
         await run_worker(parser_id)
 
 
-async def run_workers(parser_ids: Sequence[ParserId]) -> None:
+async def _run_workers(parser_ids: Sequence[ParserId], kind: WorkerKind) -> None:
     """Run assigned queues sequentially in one process event loop."""
-    parser_ids = tuple(parser_ids)
-    kind = _worker_kind(parser_ids)
     task = asyncio.current_task()
     assert task is not None
     stop_event = asyncio.Event()
@@ -74,9 +72,10 @@ async def run_workers(parser_ids: Sequence[ParserId]) -> None:
 
 def main(parser_ids: Sequence[ParserId]) -> None:
     configure_logging()
+    parser_ids = tuple(parser_ids)
     kind = _worker_kind(parser_ids)
     try:
-        asyncio.run(run_workers(parser_ids))
+        asyncio.run(_run_workers(parser_ids, kind))
     except asyncio.CancelledError:
         pass
     except Exception:
