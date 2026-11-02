@@ -1,5 +1,4 @@
 import asyncio
-from collections.abc import Awaitable, Callable
 
 import structlog
 from asyncpg import InterfaceError, PostgresError
@@ -40,41 +39,33 @@ async def _dispatch_cycle(dispatcher: Dispatcher) -> bool:
     return succeeded
 
 
-async def _dispatch_cycles(
-    dispatcher: Dispatcher, sleep: Callable[[float], Awaitable[None]]
-) -> None:
+async def _dispatch_cycles(dispatcher: Dispatcher) -> None:
     retry_index = 0
     while True:
         logger.info("dispatch_cycle_started")
         if await _dispatch_cycle(dispatcher):
             retry_index = 0
-            await sleep(CYCLE_PAUSE_SECONDS)
+            await asyncio.sleep(CYCLE_PAUSE_SECONDS)
             continue
         delay = DATABASE_RETRY_SECONDS[retry_index]
         retry_index = min(retry_index + 1, len(DATABASE_RETRY_SECONDS) - 1)
         logger.warning("dispatch_database_retry", retry_in_seconds=delay)
-        await sleep(delay)
+        await asyncio.sleep(delay)
 
 
-async def dispatch_broker(
-    dispatcher: Dispatcher | None = None,
-    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
-) -> None:
+async def dispatch_broker() -> None:
     configure_logging()
-    owns_engine = dispatcher is None
-    if dispatcher is None:
-        dispatcher = Dispatcher(
-            broker=BrokerService(BROKER_URL),
-            feed_parser_repository=FeedParserRepository(session_factory),
-            feed_repository=FeedRepository(session_factory),
-            items_repository=ItemsRepository(session_factory),
-        )
+    dispatcher = Dispatcher(
+        broker=BrokerService(BROKER_URL),
+        feed_parser_repository=FeedParserRepository(session_factory),
+        feed_repository=FeedRepository(session_factory),
+        items_repository=ItemsRepository(session_factory),
+    )
     try:
         async with HttpService.connection_pool():
-            await _dispatch_cycles(dispatcher, sleep)
+            await _dispatch_cycles(dispatcher)
     finally:
-        if owns_engine:
-            await engine.dispose()
+        await engine.dispose()
 
 
 if __name__ == "__main__":

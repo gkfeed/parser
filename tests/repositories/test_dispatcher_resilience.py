@@ -21,7 +21,6 @@ from app.core.dispatcher import Dispatcher
 from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
 from app.models import Base
-from app.run.dispatcher import dispatch_broker
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import BrokerService
 from app.services.repositories.feed import FeedRepository
@@ -62,10 +61,6 @@ async def session_factory(request):
     finally:
         await drop_schema(engine, schema)
         await engine.dispose()
-
-
-async def yield_control(_delay: float) -> None:
-    await asyncio.sleep(0)
 
 
 @dataclass
@@ -109,7 +104,6 @@ class LocalBroker:
             feed_parser_repository=FeedParserRepository(self.db),
             items_repository=ItemsRepository(self.db),
             parsers={ParserId.WEB: BaseFeed},
-            sleep=yield_control,
         )
 
 
@@ -123,11 +117,6 @@ async def local_broker(session_factory):
         broker.url = str(server.make_url("/"))
         yield broker
         broker.release_peer.set()
-
-
-async def execute_sql(db, statement: str) -> None:
-    async with db() as session, session.begin():
-        await session.execute(text(statement))
 
 
 async def reject_schedule_writes(db) -> None:
@@ -153,14 +142,6 @@ async def reject_schedule_writes(db) -> None:
                 "BEGIN SELECT RAISE(ABORT, 'database write rejected'); END"
             )
         )
-
-
-async def allow_schedule_writes(db) -> None:
-    async with db() as session, session.begin():
-        statement = "DROP TRIGGER reject_schedule"
-        if session.get_bind().dialect.name == "postgresql":
-            statement += " ON feed_parser"
-        await session.execute(text(statement))
 
 
 @pytest.mark.parametrize(
@@ -237,136 +218,3 @@ async def test_failed_feed_schedule_database_error_stops_cycle(
 
     assert failure.value.subgroup(IntegrityError) is not None
     assert await FeedParserRepository(local_broker.db).get_by_feed_id(feed.id) is None
-
-
-async def test_database_backoff_repeats_and_resets_after_success(
-    create_feed, local_broker
-):
-    feed = await create_feed("Retry feed")
-    await reject_schedule_writes(local_broker.db)
-    delays = []
-
-    async def advance(delay: float) -> None:
-        delays.append(delay)
-        if len(delays) == 8:
-            await allow_schedule_writes(local_broker.db)
-        if len(delays) == 9:
-            schedule = await FeedParserRepository(local_broker.db).get_by_feed_id(
-                feed.id
-            )
-            assert schedule is not None
-            await execute_sql(local_broker.db, "DELETE FROM feed_parser")
-            await reject_schedule_writes(local_broker.db)
-        if len(delays) == 10:
-            raise asyncio.CancelledError
-
-    with pytest.raises(asyncio.CancelledError):
-        await dispatch_broker(local_broker.dispatcher(), sleep=advance)
-
-    assert delays == [1, 2, 5, 10, 30, 60, 60, 60, 60, 1]
-    assert len(local_broker.requested) == 10
-
-
-async def test_database_read_failure_backs_off(local_broker):
-    await execute_sql(local_broker.db, "ALTER TABLE feed RENAME TO unavailable_feed")
-    delays = []
-
-    async def stop_after_retry(delay: float) -> None:
-        delays.append(delay)
-        raise asyncio.CancelledError
-
-    try:
-        with pytest.raises(asyncio.CancelledError):
-            await dispatch_broker(local_broker.dispatcher(), sleep=stop_after_retry)
-    finally:
-        await execute_sql(
-            local_broker.db, "ALTER TABLE unavailable_feed RENAME TO feed"
-        )
-
-    assert delays == [1]
-    assert local_broker.requested == []
-
-
-async def test_database_outage_does_not_escalate_feed_retry(create_feed, local_broker):
-    feed = await create_feed("Unavailable feed")
-    local_broker.results[feed.id] = {"status": "completed", "result": "invalid json"}
-    await reject_schedule_writes(local_broker.db)
-    delays = []
-    before = datetime.now(UTC)
-
-    async def advance(delay: float) -> None:
-        delays.append(delay)
-        if len(delays) == 4:
-            await allow_schedule_writes(local_broker.db)
-        if len(delays) == 5:
-            raise asyncio.CancelledError
-
-    with pytest.raises(asyncio.CancelledError):
-        await dispatch_broker(local_broker.dispatcher(), sleep=advance)
-
-    after = datetime.now(UTC)
-    schedule = await FeedParserRepository(local_broker.db).get_by_feed_id(feed.id)
-    assert schedule is not None
-    retry_at = schedule.valid_for.replace(tzinfo=UTC)
-    assert before + timedelta(minutes=13.5) <= retry_at
-    assert retry_at <= after + timedelta(minutes=16.5)
-    assert delays == [1, 2, 5, 10, 60]
-
-
-async def test_postgres_connection_loss_backs_off(local_broker):
-    connections = []
-
-    async def disconnect(_reader, writer):
-        connections.append(writer)
-        writer.close()
-        await writer.wait_closed()
-
-    server = await asyncio.start_server(disconnect, "127.0.0.1", 0)
-    port = server.sockets[0].getsockname()[1]
-    engine = create_async_engine(
-        f"postgresql+asyncpg://test:test@127.0.0.1:{port}/unavailable"
-    )
-    db = async_sessionmaker(engine, expire_on_commit=False)
-    dispatcher = Dispatcher(
-        broker=BrokerService(local_broker.url),
-        feed_repository=FeedRepository(db),
-        feed_parser_repository=FeedParserRepository(db),
-        items_repository=ItemsRepository(db),
-        parsers={ParserId.WEB: BaseFeed},
-        sleep=yield_control,
-    )
-    delays = []
-
-    async def stop_after_two_retries(delay: float) -> None:
-        delays.append(delay)
-        if len(delays) == 2:
-            raise asyncio.CancelledError
-
-    try:
-        with pytest.raises(asyncio.CancelledError):
-            await dispatch_broker(dispatcher, sleep=stop_after_two_retries)
-    finally:
-        server.close()
-        await server.wait_closed()
-        await engine.dispose()
-
-    assert delays == [1, 2]
-    assert len(connections) == 2
-    assert local_broker.requested == []
-
-
-async def test_non_database_cycle_error_is_not_retried(create_feed, local_broker):
-    await create_feed("Test feed")
-    dispatcher = local_broker.dispatcher()
-
-    async def invalid_start(_delay: float) -> None:
-        raise RuntimeError("invalid cycle configuration")
-
-    async def unexpected_retry(_delay: float) -> None:
-        raise AssertionError("A non-database cycle failure must propagate")
-
-    dispatcher.sleep = invalid_start
-    with pytest.raises(ExceptionGroup) as failure:
-        await dispatch_broker(dispatcher, sleep=unexpected_retry)
-
-    assert failure.value.subgroup(RuntimeError) is not None

@@ -1,6 +1,6 @@
 import asyncio
 import random
-from collections.abc import Awaitable, Callable, Collection, Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -50,7 +50,6 @@ class Dispatcher:
         parsers: Mapping[ParserId, type[BaseFeed]]
         | Mapping[str, type[BaseFeed]] = PARSERS,
         broker_wait_timeout: int = 300,
-        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
@@ -60,7 +59,6 @@ class Dispatcher:
             ParserId(parser_id): parser for parser_id, parser in parsers.items()
         }
         self.broker_wait_timeout = broker_wait_timeout
-        self.sleep = sleep
         self._failure_counts: dict[int, int] = {}
 
     async def dispatch(self):
@@ -68,7 +66,7 @@ class Dispatcher:
         async with asyncio.TaskGroup() as tg:
             for feed in feeds:
                 tg.create_task(self._fetch_feed_items(feed))
-                await self.sleep(1)
+                await asyncio.sleep(1)
 
     async def _fetch_feed_items(self, feed: Feed) -> None:
         with bound_contextvars(feed_id=feed.id, parser=feed.type):
