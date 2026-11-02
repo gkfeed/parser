@@ -12,7 +12,8 @@ import structlog
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.services.cache.temporary import TemporaryCacheService
 from app.services.http import HttpRequestError, HttpResponse, HttpService
-from app.services.instagram_responses import (
+
+from .responses import (
     InstagramPost,
     InstagramProfile,
     InstagramResponseAdapter,
