@@ -1,11 +1,16 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
+from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.core.dispatcher import Dispatcher
+from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
+from app.models.feed import Feed as FeedModel
 from app.serializers.feed import Feed, FeedResult
 from app.services.broker import BrokerService
 
@@ -16,7 +21,7 @@ async def test_feed_repository(feed_repository):
         id=0,
         title="Test Feed",
         url=f"https://test.com/{datetime.now(UTC).timestamp()}",
-        type="test",
+        type=ParserId.WEB,
     )
 
     # Test Create
@@ -39,13 +44,14 @@ async def test_feed_repository(feed_repository):
 @pytest.fixture
 async def scheduled_feeds(feed_repository, feed_parser_repository):
     now = datetime.now(UTC)
+    # TWITCH is valid but not configured in this dispatcher.
     cases = [
-        ("future", "test", now + timedelta(days=1)),
-        ("missing", "test", None),
-        ("unsupported-missing", "unsupported", None),
-        ("due", "test", now - timedelta(days=1)),
-        ("unsupported-due", "unsupported", now - timedelta(days=1)),
-        ("naive-due", "second", now.replace(tzinfo=None) - timedelta(days=1)),
+        ("future", ParserId.WEB, now + timedelta(days=1)),
+        ("missing", ParserId.WEB, None),
+        ("unconfigured-missing", ParserId.TWITCH, None),
+        ("due", ParserId.WEB, now - timedelta(days=1)),
+        ("unconfigured-due", ParserId.TWITCH, now - timedelta(days=1)),
+        ("naive-due", ParserId.RANOBE_ME, now.replace(tzinfo=None) - timedelta(days=1)),
     ]
     feeds = {}
     for title, parser_type, valid_for in cases:
@@ -62,7 +68,7 @@ async def scheduled_feeds(feed_repository, feed_parser_repository):
 
 @pytest.mark.asyncio
 async def test_eligible_feeds(scheduled_feeds, feed_repository):
-    eligible = await feed_repository.get_eligible({"test", "second"})
+    eligible = await feed_repository.get_eligible({ParserId.WEB, ParserId.RANOBE_ME})
 
     assert eligible == [
         scheduled_feeds["missing"],
@@ -105,7 +111,7 @@ async def test_dispatch_only_eligible_feeds(
             feed_repository=feed_repository,
             feed_parser_repository=feed_parser_repository,
             items_repository=items_repository,
-            parsers={"test": BaseFeed, "second": BaseFeed},
+            parsers={ParserId.WEB: BaseFeed, ParserId.RANOBE_ME: BaseFeed},
         )
         await dispatcher.dispatch()
         assert submitted == [
@@ -121,3 +127,61 @@ async def test_dispatch_only_eligible_feeds(
 
         await dispatcher.dispatch()
         assert len(submitted) == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parser_id", list(ParserId))
+async def test_parser_id_round_trip(feed_repository, session_factory, parser_id):
+    payload = {
+        "id": 0,
+        "title": "Parser ID round trip",
+        "url": "https://example.com/feed",
+        "type": parser_id.value,
+    }
+    feed = Feed.model_validate_json(json.dumps(payload))
+    created = await feed_repository.create(feed)
+    found = await feed_repository.get_by_id(created.id)
+
+    assert found.type is parser_id
+    assert found.model_dump(mode="json")["type"] == parser_id.value
+    assert Feed.model_validate_json(found.model_dump_json()) == found
+    assert await feed_repository.get_all() == [found]
+    assert await feed_repository.get_eligible({parser_id.value}) == [found]
+    async with session_factory() as session:
+        stored_type = await session.scalar(
+            select(FeedModel.type).where(FeedModel.id == found.id)
+        )
+    assert stored_type == parser_id.value
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parser_type", ["test", "unknown", "unsupported", "second"])
+async def test_invalid_parser_payload_is_not_persisted(feed_repository, parser_type):
+    payload = json.dumps({
+        "id": 0,
+        "title": "Invalid parser",
+        "url": "https://example.com/invalid",
+        "type": parser_type,
+    })
+    with pytest.raises(ValidationError, match="type"):
+        await feed_repository.create(Feed.model_validate_json(payload))
+    assert await feed_repository.get_all() == []
+
+
+@pytest.mark.asyncio
+async def test_unknown_stored_parser_is_rejected(feed_repository, session_factory):
+    # Simulate legacy data written before parser identifiers were validated.
+    async with session_factory() as session, session.begin():
+        stored = FeedModel(
+            title="Legacy feed", url="https://example.com/legacy", type="unknown"
+        )
+        session.add(stored)
+        await session.flush()
+        feed_id = stored.id
+
+    with pytest.raises(ValueError, match="unknown"):
+        await feed_repository.get_by_id(feed_id)
+    with pytest.raises(ValueError, match="unknown"):
+        await feed_repository.get_all()
+    with pytest.raises(ValueError, match="unknown"):
+        await feed_repository.get_eligible({"unknown"})

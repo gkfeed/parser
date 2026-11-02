@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.parser_id import ParserId
 from app.models import Base
 from app.serializers.feed import Feed
 from app.services.repositories.feed import FeedRepository
@@ -61,7 +62,7 @@ def create_feed(feed_repository):
             id=0,
             title=title,
             url=f"https://test.com/{datetime.now(UTC).timestamp()}-{title}",
-            type="test",
+            type=ParserId.WEB,
         )
         return await feed_repository.create(feed_data)
 
