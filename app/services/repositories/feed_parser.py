@@ -2,12 +2,13 @@ from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.feed_parser import FeedParser
 
 from ._base import BaseRepository
-from ._feed_lock import lock_feed_in_session
+from ._feed_integrity import deleted_feed_caused_error, feed_exists
 
 
 class FeedParserRepository(BaseRepository):
@@ -19,8 +20,16 @@ class FeedParserRepository(BaseRepository):
             return result.scalar_one_or_none()
 
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser | None:
+        try:
+            return await self._upsert(feed_id, valid_for)
+        except IntegrityError as exc:
+            if not await deleted_feed_caused_error(self._session_factory, feed_id, exc):
+                raise
+            return None
+
+    async def _upsert(self, feed_id: int, valid_for: datetime) -> FeedParser | None:
         async with self._session_factory() as session, session.begin():
-            if not await lock_feed_in_session(session, feed_id):
+            if not await feed_exists(session, feed_id):
                 return None
             return await self.upsert_in_session(session, feed_id, valid_for)
 
@@ -28,7 +37,7 @@ class FeedParserRepository(BaseRepository):
     async def upsert_in_session(
         session: AsyncSession, feed_id: int, valid_for: datetime
     ) -> FeedParser:
-        """Write state within the caller's transaction and feed row lock."""
+        """Write state within the caller's transaction."""
         statement = (
             insert(FeedParser)
             .values(feed_id=feed_id, valid_for=valid_for)

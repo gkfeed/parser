@@ -2,6 +2,7 @@ from datetime import datetime
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.item import Item as _Item
@@ -9,7 +10,7 @@ from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
 
 from ._base import BaseRepository
-from ._feed_lock import lock_feed_in_session
+from ._feed_integrity import deleted_feed_caused_error, feed_exists
 from .feed_parser import FeedParserRepository
 
 logger = structlog.get_logger(__name__)
@@ -31,8 +32,19 @@ class ItemsRepository(BaseRepository):
         self, feed: Feed, items: list[Item], valid_for: datetime
     ) -> list[Item]:
         """Commit items, hashes and parser state together, or discard a deleted feed."""
+        try:
+            return await self._save_parser_result(feed, items, valid_for)
+        except IntegrityError as exc:
+            if not await deleted_feed_caused_error(self._session_factory, feed.id, exc):
+                raise
+            logger.info("parser_result_discarded", reason="feed_deleted")
+            return []
+
+    async def _save_parser_result(
+        self, feed: Feed, items: list[Item], valid_for: datetime
+    ) -> list[Item]:
         async with self._session_factory() as session, session.begin():
-            if not await lock_feed_in_session(session, feed.id):
+            if not await feed_exists(session, feed.id):
                 logger.info("parser_result_discarded", reason="feed_deleted")
                 return []
             unseen_items = await self.add_items_in_session(session, feed, items)
