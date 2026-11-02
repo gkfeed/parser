@@ -9,7 +9,7 @@ from app.models.item_hash import ItemHash
 from app.serializers.feed import Feed, Item
 
 from ._base import BaseRepository
-from .feed import FeedRepository
+from .feed import _lock_feed_in_session
 from .feed_parser import FeedParserRepository
 
 logger = structlog.get_logger(__name__)
@@ -32,7 +32,7 @@ class ItemsRepository(BaseRepository):
     ) -> list[Item]:
         """Commit items, hashes and parser state together, or discard a deleted feed."""
         async with self._session_factory() as session, session.begin():
-            if not await FeedRepository.lock_in_session(session, feed.id):
+            if not await _lock_feed_in_session(session, feed.id):
                 logger.info("parser_result_discarded", reason="feed_deleted")
                 return []
             unseen_items = await self.add_items_in_session(session, feed, items)

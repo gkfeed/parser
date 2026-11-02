@@ -11,15 +11,15 @@ from app.serializers.feed import Feed
 from ._base import BaseRepository
 
 
-class FeedRepository(BaseRepository):
-    @staticmethod
-    async def lock_in_session(session: AsyncSession, feed_id: int) -> bool:
-        # Serialize parser results and prevent deletion until the commit completes.
-        feed_id_found = await session.scalar(
-            select(_Feed.id).where(_Feed.id == feed_id).with_for_update()
-        )
-        return feed_id_found is not None
+async def _lock_feed_in_session(session: AsyncSession, feed_id: int) -> bool:
+    # Serialize parser results and prevent deletion until the commit completes.
+    feed_id_found = await session.scalar(
+        select(_Feed.id).where(_Feed.id == feed_id).with_for_update()
+    )
+    return feed_id_found is not None
 
+
+class FeedRepository(BaseRepository):
     async def create(self, item: Feed) -> Feed:
         async with self._session_factory() as session, session.begin():
             _item = _Feed(title=item.title, url=item.url, type=item.type)
