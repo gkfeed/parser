@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.feed_parser import FeedParser
 
 from ._base import BaseRepository
-from .feed import _lock_feed_in_session
+from ._feed_lock import lock_feed_in_session
 
 
 class FeedParserRepository(BaseRepository):
@@ -20,7 +20,7 @@ class FeedParserRepository(BaseRepository):
 
     async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser | None:
         async with self._session_factory() as session, session.begin():
-            if not await _lock_feed_in_session(session, feed_id):
+            if not await lock_feed_in_session(session, feed_id):
                 return None
             return await self.upsert_in_session(session, feed_id, valid_for)
 
