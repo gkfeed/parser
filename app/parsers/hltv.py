@@ -98,9 +98,7 @@ class HltvFeed(
         # section so a missing schedule cannot select the past-results table.
         section = headline_container.find_next_sibling()
         match_table = None
-        if isinstance(section, Tag) and section.name == "table":
-            match_table = section
-        elif isinstance(section, Tag) and "profile-box" in (section.get("class") or []):
+        if isinstance(section, Tag) and "profile-box" in (section.get("class") or []):
             match_table = section.select_one("table.table-container.match-table")
             empty_state = section.select_one(".empty-state")
             team = upcoming_matches_headline_tag.get_text(" ", strip=True).removeprefix(
@@ -116,10 +114,7 @@ class HltvFeed(
             ):
                 return []
 
-        if not isinstance(match_table, Tag) or not {
-            "table-container",
-            "match-table",
-        }.issubset(match_table.get("class") or []):
+        if not isinstance(match_table, Tag):
             logger.warning(
                 "hltv_match_section_invalid",
                 **url_log_fields(self.feed.url),
@@ -127,7 +122,9 @@ class HltvFeed(
                 section_tag=section.name if isinstance(section, Tag) else None,
                 match_tables=len(soup.select("table.match-table")),
             )
-            raise ValueError("Upcoming match table not found or invalid.")
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Upcoming match table not found or invalid."
+            )
 
         rows = [
             row
