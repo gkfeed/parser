@@ -1,3 +1,4 @@
+import asyncio
 import json
 import ssl
 from collections import Counter
@@ -27,6 +28,10 @@ class InvalidRedlibPage(ValueError):
 
 class RedlibClient:
     _instances_url = "https://raw.githubusercontent.com/redlib-org/redlib-instances/main/instances.json"
+    _additional_urls = (
+        "https://red.artemislena.eu",
+        "https://redlib.reallyaweso.me",
+    )
     _default_url_ranker = URLRanker(data_file="data/reddit_url_ranks.json")
 
     def __init__(
@@ -75,6 +80,8 @@ class RedlibClient:
             if "url" not in instance:
                 continue
             all_urls.append(self._get_instance_url(instance["url"]))
+        known_urls = {url.rstrip("/") for url in all_urls}
+        all_urls.extend(url for url in self._additional_urls if url not in known_urls)
         # Cache the directory, not the cooldown/ranking snapshot.
         self._base_urls_cache = all_urls
         return self._base_urls_cache
@@ -88,6 +95,15 @@ class RedlibClient:
             raise ValueError(f"Invalid Redlib instance URL: {url}")
         return url
 
+    async def _fetch_mirror(self, base_url: str, path: str) -> bytes:
+        url = base_url.rstrip("/") + "/" + path
+        if base_url.rstrip("/") not in self._additional_urls:
+            return await self._fetch(url)
+        try:
+            return await asyncio.wait_for(self._fetch(url), timeout=15)
+        except TimeoutError as error:
+            raise HttpRequestError() from error
+
     async def get_page_html(self, page_url: str) -> bytes:
         all_urls = await self._get_base_urls()
         base_urls = self._url_ranker.get_ranked_urls(all_urls)
@@ -97,7 +113,7 @@ class RedlibClient:
 
         for base_url in base_urls:
             try:
-                html = await self._fetch(base_url.rstrip("/") + "/" + path)
+                html = await self._fetch_mirror(base_url, path)
             except (FeedUnavailable, InvalidRedlibPage, HttpRequestError) as error:
                 last_error = error
                 self._url_ranker.demote_url(base_url)
