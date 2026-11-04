@@ -32,6 +32,7 @@ class ParserId(StrEnum):
     PORNHUB = "pornhub"
     HLTV = "hltv"
     LIQUIDPEDIA = "liquidpedia"
+    LIVEBALL = "liveball"
     SASFLIX = "sasflix"
     PORNO365 = "porno365"
     AUTHOR_TODAY = "author.today"
