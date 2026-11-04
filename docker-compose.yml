@@ -63,7 +63,7 @@ services:
       dockerfile: docker/worker/Dockerfile
     command: ["worker_browser"]
     tty: True
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 120s
     volumes:
       - ~/.local/share/gkfeed/data:/data
