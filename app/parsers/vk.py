@@ -17,6 +17,7 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.services.selenium.diagnostics import BrowserDiagnostics, BrowserSnapshot
 from app.utils.datetime import constant_datetime, parse_datetime
 
 
@@ -74,13 +75,16 @@ class VkFeed(
 
     @override
     def make_actions(self, driver: WebDriver):
-        for _ in range(self._challenge_attempts):
-            if self._attempt_challenge(driver):
+        for attempt in range(1, self._challenge_attempts + 1):
+            if self._attempt_challenge(driver, attempt):
                 return
 
+        self._log_browser_failure(
+            driver, "attempts_exhausted", self._challenge_attempts, "browser_challenge"
+        )
         raise FeedUnavailable(self.feed.url, "browser_challenge")
 
-    def _attempt_challenge(self, driver: WebDriver) -> bool:
+    def _attempt_challenge(self, driver: WebDriver, attempt: int) -> bool:
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
@@ -92,32 +96,94 @@ class VkFeed(
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
         wait = WebDriverWait(driver, 30)
+        stage = "inspect_page"
         try:
             if page_ready(driver):
                 return True
 
             buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
             if not buttons:
+                stage = "wait_for_page"
                 wait.until(page_ready)
                 return True
 
+            stage = "wait_for_button"
             button = wait.until(start)
+            stage = "click_button"
             button.click()
             # Hiding the button starts the challenge; it does not finish it.
+            stage = "wait_for_challenge_start"
             wait.until(
                 ec.any_of(
                     page_ready, challenge_error, ec.invisibility_of_element(button)
                 )
             )
+            stage = "wait_for_challenge_result"
             wait.until(ec.any_of(page_ready, challenge_error, start))
+            stage = "check_challenge_result"
             if page_ready(driver):
                 return True
             if not start(driver):
                 raise FeedUnavailable(self.feed.url, "browser_challenge")
 
             return False
+        except FeedUnavailable as error:
+            self._log_browser_failure(driver, stage, attempt, error.reason)
+            raise
         except (TimeoutException, WebDriverException) as error:
+            self._log_browser_failure(
+                driver, stage, attempt, "browser_action_failed", type(error).__name__
+            )
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+
+    def _log_browser_failure(
+        self,
+        driver: WebDriver,
+        stage: str,
+        attempt: int,
+        reason: str,
+        error_type: str | None = None,
+    ) -> None:
+        diagnostics = BrowserDiagnostics(driver)
+        try:
+            snapshot = diagnostics.capture(
+                """
+            const count = selector => document.querySelectorAll(selector).length;
+            const visible = element => !!(element.getClientRects().length &&
+                getComputedStyle(element).visibility !== 'hidden' &&
+                Number(getComputedStyle(element).opacity) > 0);
+            const buttons = [...document.querySelectorAll('button.start')];
+            const errors = [...document.querySelectorAll('.error')];
+            const resources = performance.getEntriesByType('resource');
+            return {
+                page_kind: location.pathname === '/challenge.html' ? 'challenge' : 'other',
+                document_ready_state: document.readyState,
+                document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                challenge_buttons: buttons.length,
+                visible_challenge_buttons: buttons.filter(visible).length,
+                enabled_challenge_buttons: buttons.filter(button => !button.matches(':disabled')).length,
+                challenge_errors: errors.length,
+                visible_challenge_errors: errors.filter(visible).length,
+                posts: count('[data-testid="post"][data-post-id], .wall_post_cont'),
+                empty_markers: count('#page-wall [data-testid="feed-empty-result"], #page-wall [data-testid="empty_wall"]'),
+                empty_cards: count('#page_wall_posts > .no_rows, #spa_layout_content:has([data-testid="group-header"]) section:has(.vkuiIcon--newsfeed_outline_56)'),
+                iframes: count('iframe'),
+                resources_with_status: resources.filter(resource => resource.responseStatus > 0).length,
+                resource_http_errors: resources.filter(resource => resource.responseStatus >= 400).length,
+                text: document.body?.innerText || ''
+            };
+                """
+            )
+        except Exception as error:  # noqa: BLE001 - preserve the browser failure
+            snapshot = BrowserSnapshot({"diagnostic_error": type(error).__name__})
+        diagnostics.log(
+            "vk_browser_unavailable",
+            stage,
+            snapshot,
+            attempt=attempt,
+            reason=reason,
+            error_type=error_type,
+        )
 
     def _empty_wall_card(self, driver: WebDriver) -> bool:
         # A generic placeholder can also contain an access or loading error.
