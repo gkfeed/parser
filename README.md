@@ -127,8 +127,9 @@ the old workers, then `make docker-browser-start` if browser processing is neede
 
 ### Database configuration
 
-`DB_URL` must point to PostgreSQL. The parser normalizes the standard PostgreSQL
-schemes to use the asyncpg driver.
+Set `DB_URL` in the parser's local `.env` to the externally managed PostgreSQL
+database. The parser normalizes the standard PostgreSQL schemes to use the
+asyncpg driver.
 
 Accepted formats:
 
@@ -136,4 +137,15 @@ Accepted formats:
 - `postgresql://user:password@host:port/dbname`
 - `postgresql+asyncpg://user:password@host:port/dbname`
 
-SQLite URLs are rejected.
+Use an operator-provisioned LOGIN that inherits the `gkfeed_parser` role, which
+has no schema-creation privileges. See the infra
+[application role contract](https://github.com/gkfeed/infra/blob/master/docs/application-roles.md).
+Keep credentials outside Git and percent-encode special characters in the URL.
+For production Compose, the database host is `postgres` on port `5432`.
+
+Before starting or updating the parser, apply migrations in `gkfeed/infra`,
+run the schema check using the production network, then run `make docker-update`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml run --build --rm --no-deps dispatcher python -m app.run.check_schema_compatibility
+```
