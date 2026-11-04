@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urlparse
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
+from dateutil.parser import parse
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -13,24 +14,50 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
-from app.serializers.feed import Item
-from app.services.hash import HashService
-from app.utils.datetime import constant_datetime, convert_datetime
+from app.services.selenium.diagnostics import BrowserDiagnostics, BrowserSnapshot
+from app.utils.datetime import constant_datetime, parse_datetime
 
 
 class VkFeed(
     PostToItemsMixin,
-    ItemsHashExtension,
+    ItemLinkHashExtension,
     SeleniumParserExtension,
     CacheFeedExtension,
 ):
     _cache_storage_time = timedelta(hours=1)
     _selenium_wait_time = 5
     _post_selector = '[data-testid="post"][data-post-id]'
+    _empty_selector = (
+        '#page-wall [data-testid="feed-empty-result"], '
+        '#page-wall [data-testid="empty_wall"]'
+    )
+    _empty_card_selector = (
+        "#page_wall_posts > .no_rows, "
+        # The SPA group page uses an empty newsfeed card without a wall test ID.
+        '#spa_layout_content:has([data-testid="group-header"]) '
+        "section:has(.vkuiIcon--newsfeed_outline_56)"
+    )
+    _empty_card_messages = frozenset({"No results found", "The wall is empty."})
     _challenge_attempts = 3
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.select_one(f"{self._post_selector}, .wall_post_cont") is not None:
+            return
+        if soup.select_one("button.start") is not None:
+            raise FeedUnavailable(url, "browser_challenge")
+        if soup.select_one(self._empty_selector) is not None:
+            return
+        if any(
+            card.get_text(" ", strip=True) in self._empty_card_messages
+            for card in soup.select(self._empty_card_selector)
+        ):
+            return
+        raise FeedUnavailable(url, "missing_wall")
 
     @property
     @override
@@ -44,58 +71,126 @@ class VkFeed(
             for post in soup.find_all(class_="wall_post_cont")
             if isinstance(post, Tag)
         ]
-        if legacy_posts:
-            return legacy_posts
-
-        if soup.select_one("button.start"):
-            raise FeedUnavailable(self.feed.url, "browser_challenge")
-
-        return []
-
-    @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
+        return legacy_posts
 
     @override
     def make_actions(self, driver: WebDriver):
-        wait = WebDriverWait(driver, 30)
-        for _ in range(self._challenge_attempts):
-            if self._try_browser_challenge(driver, wait):
+        for attempt in range(1, self._challenge_attempts + 1):
+            if self._attempt_challenge(driver, attempt):
                 return
 
+        self._log_browser_failure(
+            driver, "attempts_exhausted", self._challenge_attempts, "browser_challenge"
+        )
         raise FeedUnavailable(self.feed.url, "browser_challenge")
 
-    def _try_browser_challenge(
-        self, driver: WebDriver, wait: WebDriverWait[WebDriver]
-    ) -> bool:
+    def _attempt_challenge(self, driver: WebDriver, attempt: int) -> bool:
         posts = ec.presence_of_all_elements_located(
             (By.CSS_SELECTOR, f"{self._post_selector}, .wall_post_cont")
         )
+        empty = ec.any_of(
+            ec.presence_of_element_located((By.CSS_SELECTOR, self._empty_selector)),
+            self._empty_wall_card,
+        )
+        page_ready = ec.any_of(posts, empty)
         start = ec.element_to_be_clickable((By.CSS_SELECTOR, "button.start"))
         challenge_error = ec.visibility_of_element_located((By.CSS_SELECTOR, ".error"))
+        wait = WebDriverWait(driver, 30)
+        stage = "inspect_page"
         try:
-            if posts(driver):
+            if page_ready(driver):
                 return True
 
             buttons = driver.find_elements(By.CSS_SELECTOR, "button.start")
             if not buttons:
+                stage = "wait_for_page"
+                wait.until(page_ready)
                 return True
 
+            stage = "wait_for_button"
             button = wait.until(start)
+            stage = "click_button"
             button.click()
             # Hiding the button starts the challenge; it does not finish it.
+            stage = "wait_for_challenge_start"
             wait.until(
-                ec.any_of(posts, challenge_error, ec.invisibility_of_element(button))
+                ec.any_of(
+                    page_ready, challenge_error, ec.invisibility_of_element(button)
+                )
             )
-            wait.until(ec.any_of(posts, challenge_error, start))
-            if posts(driver):
+            stage = "wait_for_challenge_result"
+            wait.until(ec.any_of(page_ready, challenge_error, start))
+            stage = "check_challenge_result"
+            if page_ready(driver):
                 return True
             if not start(driver):
                 raise FeedUnavailable(self.feed.url, "browser_challenge")
 
             return False
+        except FeedUnavailable as error:
+            self._log_browser_failure(driver, stage, attempt, error.reason)
+            raise
         except (TimeoutException, WebDriverException) as error:
+            self._log_browser_failure(
+                driver, stage, attempt, "browser_action_failed", type(error).__name__
+            )
             raise FeedUnavailable(self.feed.url, "browser_action_failed") from error
+
+    def _log_browser_failure(
+        self,
+        driver: WebDriver,
+        stage: str,
+        attempt: int,
+        reason: str,
+        error_type: str | None = None,
+    ) -> None:
+        diagnostics = BrowserDiagnostics(driver)
+        try:
+            snapshot = diagnostics.capture(
+                """
+            const count = selector => document.querySelectorAll(selector).length;
+            const visible = element => !!(element.getClientRects().length &&
+                getComputedStyle(element).visibility !== 'hidden' &&
+                Number(getComputedStyle(element).opacity) > 0);
+            const buttons = [...document.querySelectorAll('button.start')];
+            const errors = [...document.querySelectorAll('.error')];
+            const resources = performance.getEntriesByType('resource');
+            return {
+                page_kind: location.pathname === '/challenge.html' ? 'challenge' : 'other',
+                document_ready_state: document.readyState,
+                document_status: performance.getEntriesByType('navigation')[0]?.responseStatus || null,
+                challenge_buttons: buttons.length,
+                visible_challenge_buttons: buttons.filter(visible).length,
+                enabled_challenge_buttons: buttons.filter(button => !button.matches(':disabled')).length,
+                challenge_errors: errors.length,
+                visible_challenge_errors: errors.filter(visible).length,
+                posts: count('[data-testid="post"][data-post-id], .wall_post_cont'),
+                empty_markers: count('#page-wall [data-testid="feed-empty-result"], #page-wall [data-testid="empty_wall"]'),
+                empty_cards: count('#page_wall_posts > .no_rows, #spa_layout_content:has([data-testid="group-header"]) section:has(.vkuiIcon--newsfeed_outline_56)'),
+                iframes: count('iframe'),
+                resources_with_status: resources.filter(resource => resource.responseStatus > 0).length,
+                resource_http_errors: resources.filter(resource => resource.responseStatus >= 400).length,
+                text: document.body?.innerText || ''
+            };
+                """
+            )
+        except Exception as error:  # noqa: BLE001 - preserve the browser failure
+            snapshot = BrowserSnapshot({"diagnostic_error": type(error).__name__})
+        diagnostics.log(
+            "vk_browser_unavailable",
+            stage,
+            snapshot,
+            attempt=attempt,
+            reason=reason,
+            error_type=error_type,
+        )
+
+    def _empty_wall_card(self, driver: WebDriver) -> bool:
+        # A generic placeholder can also contain an access or loading error.
+        return any(
+            card.text.strip() in self._empty_card_messages
+            for card in driver.find_elements(By.CSS_SELECTOR, self._empty_card_selector)
+        )
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -160,31 +255,44 @@ class VkFeed(
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
-        time_tag = post.find("time")
-        if not isinstance(time_tag, Tag):
+        for time_tag in post.select('[data-testid="post_date_block_preview"], time'):
+            owner = time_tag.find_parent(attrs={"data-testid": "post"})
+            if owner is None or owner is post:
+                break
+        else:
             return constant_datetime
 
-        datetime_str = time_tag.text.strip()
+        datetime_str = time_tag.get_text(" ", strip=True)
+        if time_tag.get("data-testid") == "post_date_block_preview":
+            return self._parse_post_day(datetime_str)
         if not datetime_str:
             return constant_datetime
-
         return self._parse_datetime(datetime_str)
 
-    def _parse_datetime(self, datetime_str: str) -> datetime:
-        if datetime_str.startswith("today"):
-            today_str = datetime.now(UTC).date().strftime("%m/%d/%Y")
-            datetime_str = today_str + datetime_str.split("at")[1]
-
-        if datetime_str.startswith("yesterday"):
-            yesterday = datetime.now(UTC).date() - timedelta(days=1)
-            yesterday_str = yesterday.strftime("%m/%d/%Y")
-            datetime_str = yesterday_str + datetime_str.split("at")[1]
-
-        try:
-            return convert_datetime(datetime_str)
-        except (IndexError, ValueError) as e:
-            print(e)
+    @staticmethod
+    def _parse_post_day(value: str) -> datetime:
+        # Relative previews cannot reliably identify a calendar day. Keep the
+        # constant rather than guessing from the current time or browser state.
+        if re.fullmatch(r"just now|\d+\s+(min|h|d)\s+ago", value, re.IGNORECASE):
             return constant_datetime
+        try:
+            parsed = parse(value)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(f"Invalid VK post date: {value!r}") from error
+        return parsed.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+
+    def _parse_datetime(self, datetime_str: str) -> datetime:
+        if datetime_str.startswith(("today", "yesterday")):
+            match = re.fullmatch(r"(today|yesterday)\s+at\s+(.+)", datetime_str)
+            if match is None:
+                raise ValueError(f"Invalid VK relative date: {datetime_str!r}")
+
+            relative_date = datetime.now(UTC).date()
+            if match.group(1) == "yesterday":
+                relative_date -= timedelta(days=1)
+            datetime_str = f"{relative_date.isoformat()} {match.group(2)}"
+
+        return parse_datetime(datetime_str)
 
     @override
     async def _get_post_link(self, post: Tag) -> str:

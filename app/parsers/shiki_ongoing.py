@@ -1,45 +1,50 @@
 from datetime import datetime, timedelta
 from typing import override
 
-from bs4 import Tag
+from bs4 import BeautifulSoup, Tag
 
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.datetime import constant_datetime
+from app.utils.html import require_tag, required_attr, required_text
 
 
 class ShikiOngoingFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
     _cache_storage_time = timedelta(hours=1)
     _cache_storage_time_if_success = timedelta(days=1)
 
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        self._get_ongoings_container(BeautifulSoup(html, "html.parser"))
+
+    def _get_ongoings_container(self, soup: BeautifulSoup) -> Tag:
+        container = soup.find("div", class_="fc-ongoings")
+        if not isinstance(container, Tag):
+            raise FeedUnavailable(self.feed.url, "missing_ongoings_container")
+        return container
+
     @property
     @override
     async def _posts(self) -> list[Tag]:
         soup = await self.get_soup(self.feed.url)
 
-        container = soup.find("div", class_="fc-ongoings")
-        if not isinstance(container, Tag):
-            raise FeedUnavailable(self.feed.url, "missing_ongoings_container")
+        container = self._get_ongoings_container(soup)
 
         return [a for a in container.find_all("article") if isinstance(a, Tag)]
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
-        title_tag = post.find("span", class_="name-en")
-        if isinstance(title_tag, Tag):
-            return title_tag.text
-        raise ValueError("Title not found")
+        title_tag = require_tag(
+            post.find("span", class_="name-en"), "Shiki ongoing title"
+        )
+        return required_text(title_tag, "Shiki ongoing title")
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        link_tag = post.find("a")
-        if isinstance(link_tag, Tag):
-            href = link_tag.get("href")
-            if isinstance(href, str):
-                return href
-        raise ValueError("Link not found")
+        link_tag = require_tag(post.find("a"), "Shiki ongoing link")
+        return required_attr(link_tag, "href", "Shiki ongoing link")
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:

@@ -1,4 +1,8 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError, ClientError, InvalidURL
@@ -10,6 +14,17 @@ _headers = {
         "Chrome/106.0.0.0 Safari/537.36"
     ),
 }
+
+_connector: ContextVar[aiohttp.BaseConnector | None] = ContextVar(
+    "http_connector", default=None
+)
+
+
+def _session(**kwargs: Any) -> aiohttp.ClientSession:
+    connector = _connector.get()
+    return aiohttp.ClientSession(
+        connector=connector, connector_owner=connector is None, **kwargs
+    )
 
 
 class HttpRequestError(Exception):
@@ -25,14 +40,30 @@ class HttpResponse:
     status: int
     content: bytes
     headers: dict[str, str]
+    url: str = ""
+    redirect_statuses: tuple[int, ...] = ()
 
 
 class HttpService:
     headers = _headers
 
     @classmethod
+    @asynccontextmanager
+    async def connection_pool(cls) -> AsyncGenerator[None]:
+        async with aiohttp.TCPConnector(limit=100, limit_per_host=10) as connector:
+            token = _connector.set(connector)
+            try:
+                yield
+            finally:
+                _connector.reset(token)
+
+    @classmethod
     async def get(cls, url: str, headers: dict = headers) -> bytes:
-        _, content = await cls.get_with_status(url, headers=headers)
+        status, content = await cls.get_with_status(url, headers=headers)
+        if status >= 400:
+            raise HttpRequestError(
+                f"HTTP request failed with status {status}", status=status
+            )
         return content
 
     @classmethod
@@ -46,7 +77,7 @@ class HttpService:
     async def get_response(
         cls, url: str, headers: dict = headers, max_bytes: int | None = None
     ) -> HttpResponse:
-        async with aiohttp.ClientSession() as session:
+        async with _session() as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     if max_bytes is None:
@@ -64,13 +95,15 @@ class HttpService:
                         response.status,
                         content,
                         {key.lower(): value for key, value in response.headers.items()},
+                        url=str(response.url),
+                        redirect_statuses=tuple(hop.status for hop in response.history),
                     )
             except (ClientError, TimeoutError) as exc:
                 raise HttpRequestError(status=getattr(exc, "status", None)) from exc
 
     @classmethod
     async def post(cls, url: str, body: dict, headers: dict | None = headers) -> bytes:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with _session(conn_timeout=None) as session:
             try:
                 async with session.post(url, data=body, headers=headers) as response:
                     return await response.content.read()
@@ -79,7 +112,7 @@ class HttpService:
 
     @classmethod
     async def delete(cls, url: str, headers: dict = headers) -> bytes:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with _session(conn_timeout=None) as session:
             try:
                 async with session.delete(url, headers=headers) as response:
                     return await response.content.read()
@@ -88,7 +121,7 @@ class HttpService:
 
     @classmethod
     async def get_json(cls, url: str, headers: dict = headers) -> dict:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with _session(conn_timeout=None) as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     return await response.json()
@@ -99,7 +132,7 @@ class HttpService:
     async def post_json(
         cls, url: str, json: dict, headers: dict | None = headers
     ) -> dict:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with _session(conn_timeout=None) as session:
             try:
                 async with session.post(url, json=json, headers=headers) as response:
                     response.raise_for_status()
@@ -109,7 +142,7 @@ class HttpService:
 
     @classmethod
     async def get_status(cls, url: str, headers: dict | None = headers) -> int:
-        async with aiohttp.ClientSession(conn_timeout=None) as session:
+        async with _session(conn_timeout=None) as session:
             try:
                 async with session.get(url, headers=headers) as response:
                     return response.status

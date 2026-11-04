@@ -46,13 +46,19 @@ class PostToItemsMixin(ABC):
             link=await self._get_post_link(post),
         )
 
+    async def _post_to_item_or_skip(self, post: Tag) -> Item | None:
+        try:
+            return await self._post_to_item(post)
+        except self.skip_post_exceptions as exc:
+            if not self.skip_invalid_posts:
+                raise
+            logger.warning("malformed_post_skipped", error_type=type(exc).__name__)
+            return None
+
     async def _parse_items(self) -> list[Item]:
         items: list[Item] = []
         for post in await self._posts:
-            try:
-                items.append(await self._post_to_item(post))
-            except self.skip_post_exceptions as exc:
-                if not self.skip_invalid_posts:
-                    raise
-                logger.warning("malformed_post_skipped", error_type=type(exc).__name__)
+            item = await self._post_to_item_or_skip(post)
+            if item is not None:
+                items.append(item)
         return items

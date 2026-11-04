@@ -1,0 +1,6 @@
+interface:
+  display_name: "Parser verification"
+  short_description: "Run after any code change, before completing the task"
+  default_prompt: "Use $parser-verification to check and finish the code change before marking the task done."
+policy:
+  allow_implicit_invocation: true

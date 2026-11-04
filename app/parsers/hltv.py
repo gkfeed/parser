@@ -1,10 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import override
 from urllib.parse import urljoin
 
 import structlog
 from bs4 import BeautifulSoup, Tag
-from bs4.element import NavigableString
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -16,6 +15,8 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.extensions.parsers.selenium import SeleniumParserExtension
+from app.utils.html import require_tag, required_attr, required_text
+from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
 
@@ -33,22 +34,15 @@ class HltvFeed(
         )
 
     @override
-    async def get_html(self, url: str) -> bytes:
-        if self.cache.has_valid_cache(url):
-            html = self.cache.get(url)
-            if not self._is_challenge(html):
-                return html
-            # Discard challenges cached by older versions and try a fresh page.
-            self.cache.set_with_expiry(url, html, timedelta(0))
-
-        return await super().get_html(url)
-
-    @override
-    async def _fetch_html(self, url: str) -> bytes:
-        html = await super()._fetch_html(url)
+    def _validate_html(self, url: str, html: bytes) -> None:
         if self._is_challenge(html):
             raise FeedUnavailable(url, "cloudflare_challenge")
-        return html
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.select_one("body.neterror, #main-frame-error") is not None:
+            raise FeedUnavailable(url, "browser_load_error")
+        title = soup.title.get_text(strip=True).lower() if soup.title else ""
+        if title.startswith(("access denied", "attention required")):
+            raise FeedUnavailable(url, "source_blocked")
 
     @override
     def make_actions(self, driver: WebDriver) -> None:
@@ -65,12 +59,14 @@ class HltvFeed(
                 )
             )
         except TimeoutException as exc:
-            reason = (
-                "cloudflare_challenge"
-                if self._is_challenge(driver.page_source.encode())
-                else "upcoming_headline_timeout"
+            try:
+                self._validate_html(self.feed.url, driver.page_source.encode())
+            except FeedUnavailable as unavailable:
+                raise unavailable from exc
+            reason = "upcoming_headline_timeout"
+            logger.warning(
+                "hltv_page_unavailable", **url_log_fields(self.feed.url), reason=reason
             )
-            logger.warning("hltv_page_unavailable", url=self.feed.url, reason=reason)
             raise FeedUnavailable(self.feed.url, reason) from exc
 
     @property
@@ -82,8 +78,7 @@ class HltvFeed(
             return (
                 tag.name == "h2"
                 and "standard-headline" in (tag.get("class") or [])
-                and isinstance(tag.string, NavigableString)
-                and tag.string.strip().startswith("Upcoming matches for")
+                and tag.get_text(" ", strip=True).startswith("Upcoming matches for")
             )
 
         upcoming_matches_headline_tag = soup.find(is_upcoming_matches_headline)
@@ -92,27 +87,53 @@ class HltvFeed(
             raise ValueError("Upcoming matches headline not found.")
 
         headline_container = upcoming_matches_headline_tag
-        if (
-            isinstance(upcoming_matches_headline_tag.parent, Tag)
-            and "headline-with-action"
-            in (upcoming_matches_headline_tag.parent.get("class") or [])
+        if isinstance(
+            upcoming_matches_headline_tag.parent, Tag
+        ) and "headline-with-action" in (
+            upcoming_matches_headline_tag.parent.get("class") or []
         ):
             headline_container = upcoming_matches_headline_tag.parent
 
-        match_table = headline_container.find_next_sibling(
-            "table", class_="table-container match-table"
-        )
+        # HLTV now wraps the table in a profile box. Stay in the adjacent
+        # section so a missing schedule cannot select the past-results table.
+        section = headline_container.find_next_sibling()
+        match_table = None
+        if isinstance(section, Tag) and "profile-box" in (section.get("class") or []):
+            match_table = section.select_one("table.table-container.match-table")
+            empty_state = section.select_one(".empty-state")
+            team = upcoming_matches_headline_tag.get_text(" ", strip=True).removeprefix(
+                "Upcoming matches for "
+            )
+            if (
+                match_table is None
+                and empty_state is not None
+                and (
+                    empty_state.get_text(" ", strip=True)
+                    == f"No upcoming matches for {team}, check back later."
+                )
+            ):
+                return []
 
         if not isinstance(match_table, Tag):
+            logger.warning(
+                "hltv_match_section_invalid",
+                **url_log_fields(self.feed.url),
+                reason="missing_match_table",
+                section_tag=section.name if isinstance(section, Tag) else None,
+                match_tables=len(soup.select("table.match-table")),
+            )
             raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Match table not found or invalid."
+                "Upcoming match table not found or invalid."
             )
 
-        return [
+        rows = [
             row
             for row in match_table.find_all("tr", class_="team-row")
             if isinstance(row, Tag)
         ]
+        if not rows:
+            raise ValueError("Upcoming match table has no match rows.")
+        return rows
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -129,15 +150,14 @@ class HltvFeed(
 
     @override
     async def _get_post_link(self, post: Tag) -> str:
-        match_link_tag = post.select_one(
-            "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
+        match_link_tag = require_tag(
+            post.select_one(
+                "td.matchpage-button-cell a[href], td.stats-button-cell a[href]"
+            ),
+            "HLTV match link",
         )
-        if not isinstance(match_link_tag, Tag):
-            raise ValueError(  # noqa: TRY004 - missing page data is a value error
-                "Link tag not found"
-            )
-
-        return urljoin("https://www.hltv.org", str(match_link_tag["href"]))
+        href = required_attr(match_link_tag, "href", "HLTV match link")
+        return urljoin("https://www.hltv.org", href)
 
     @override
     async def _get_post_datetime(self, post: Tag) -> datetime:
@@ -175,4 +195,7 @@ class HltvFeed(
         if not isinstance(team1_name_tag, Tag) or not isinstance(team2_name_tag, Tag):
             return None
 
-        return team1_name_tag.get_text(strip=True), team2_name_tag.get_text(strip=True)
+        return (
+            required_text(team1_name_tag, "HLTV first team name"),
+            required_text(team2_name_tag, "HLTV second team name"),
+        )

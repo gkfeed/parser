@@ -1,12 +1,16 @@
+from app.core.parser_id import ParserId
 from app.core.worker_kind import WorkerKind
 from app.parsers import Parser
 
 ignored_parser_types: set[Parser] = {
     Parser.X,
+    Parser.MATRESHKA,  # The site has closed.
 }
 
 
-def _filter_by_worker_type(worker_kind: WorkerKind, ignore: set[Parser]) -> list[str]:
+def _filter_by_worker_type(
+    worker_kind: WorkerKind, ignore: set[Parser]
+) -> list[ParserId]:
     return [
         parser.value.id
         for parser in Parser
@@ -15,4 +19,5 @@ def _filter_by_worker_type(worker_kind: WorkerKind, ignore: set[Parser]) -> list
 
 
 light_parsers = _filter_by_worker_type(WorkerKind.LIGHT, ignored_parser_types)
-heavy_parsers = _filter_by_worker_type(WorkerKind.HEAVY, ignored_parser_types)
+http_parsers = _filter_by_worker_type(WorkerKind.HTTP, ignored_parser_types)
+browser_parsers = _filter_by_worker_type(WorkerKind.BROWSER, ignored_parser_types)

@@ -1,14 +1,10 @@
-import json
 from datetime import UTC, datetime
 from typing import ClassVar, override
 from urllib.parse import (
-    SplitResult,
     parse_qs,
     unquote,
-    urlencode,
     urljoin,
     urlsplit,
-    urlunsplit,
 )
 
 from bs4 import BeautifulSoup, Tag
@@ -17,21 +13,31 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
+from app.services.liquidpedia import LiquidpediaClient, get_page_title
 
 
 class LiquidpediaFeed(
     PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
 ):
-    _headers: ClassVar[dict[str, str]] = {
-        **HttpParserExtension._headers,
-        "User-Agent": "gkfeed-parser/0.1 (https://github.com/gkfeed/parser)",
-    }
+    _headers: ClassVar[dict[str, str]] = LiquidpediaClient.headers
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        page_html = LiquidpediaClient.parse_page_html(html)
+        self._get_matches(BeautifulSoup(page_html, "html.parser"))
 
     @property
     @override
     async def _posts(self) -> list[Tag]:
-        soup = await self._get_page_soup()
-        matches = self._get_upcoming_matches(soup)
+        html = await LiquidpediaClient(self.get_html).get_page_html(self.feed.url)
+        return self._get_matches(BeautifulSoup(html, "html.parser"))
+
+    @classmethod
+    def _get_matches(cls, soup: BeautifulSoup) -> list[Tag]:
+        if soup.select_one(".mw-message-box-error, .scribunto-error, .errorbox"):
+            raise ValueError("Liquipedia page contains a rendering error")
+
+        matches = cls._get_upcoming_matches(soup)
         if matches:
             return matches
 
@@ -39,7 +45,24 @@ class LiquidpediaFeed(
         # heading. Their recent matches are rendered using table2 markup. The
         # rows are not guaranteed to be ``tr`` elements, so select the row
         # class independently of the element name.
-        return list(soup.select(".match-table-wrapper .table2__row--body"))
+        matches = list(soup.select(".match-table-wrapper .table2__row--body"))
+        if matches:
+            return matches
+
+        if soup.select_one(".match-info") is not None:
+            raise ValueError("Liquipedia upcoming matches structure is invalid")
+
+        for table in soup.select(".match-table-wrapper"):
+            if table.select_one(".table2__row--head") is None:
+                raise ValueError("Liquipedia recent matches table is invalid")
+
+        # A missing match section is normal for teams with no matches, but
+        # missing selectors alone cannot distinguish them from error pages.
+        team_header = soup.select_one('[data-infobox-type="Team"] .infobox-header')
+        if team_header is None or not team_header.get_text(strip=True):
+            raise ValueError("Liquipedia team page structure not found")
+
+        return []
 
     @staticmethod
     def _get_upcoming_matches(soup: BeautifulSoup) -> list[Tag]:
@@ -49,9 +72,18 @@ class LiquidpediaFeed(
 
         container = heading.parent.find_next_sibling()
         if not isinstance(container, Tag):
-            return []
+            raise ValueError(  # noqa: TRY004 - missing page data is a value error
+                "Liquipedia upcoming matches container not found"
+            )
 
-        return list(container.select(".match-info"))
+        matches = list(container.select(".match-info, .table2__row--body"))
+        if matches:
+            return matches
+
+        if container.select_one(".table2__row--head") is None:
+            raise ValueError("Liquipedia upcoming matches structure is invalid")
+
+        return []
 
     @override
     async def _get_post_title(self, post: Tag) -> str:
@@ -156,62 +188,11 @@ class LiquidpediaFeed(
             return parsed.replace(tzinfo=UTC)
         return parsed.astimezone(UTC)
 
-    async def _get_page_soup(self) -> BeautifulSoup:
-        try:
-            response = json.loads(await self.get_html(self._get_api_url()))
-        except (json.JSONDecodeError, TypeError) as error:
-            raise ValueError("Invalid Liquipedia API response") from error
-
-        try:
-            html = response["parse"]["text"]
-        except (KeyError, TypeError) as error:
-            raise ValueError("Unexpected Liquipedia API response") from error
-
-        # MediaWiki's legacy response wraps the rendered HTML in a ``*`` key.
-        # Keep accepting that shape for cached responses and older wikis.
-        if isinstance(html, dict):
-            html = html.get("*")
-
-        if not isinstance(html, str):
-            raise ValueError(  # noqa: TRY004 - malformed parser data is a value error
-                "Liquipedia API response does not contain HTML"
-            )
-
-        return BeautifulSoup(html, "html.parser")
-
-    def _get_api_url(self) -> str:
-        url = urlsplit(self.feed.url)
-        path_parts = url.path.strip("/").split("/", maxsplit=1)
-        if len(path_parts) != 2 or not all(path_parts):
-            raise ValueError("Invalid Liquipedia page URL")
-
-        wiki, page = path_parts
-        page = self._get_page_title(url, page)
-        if not page:
-            raise ValueError("Invalid Liquipedia page URL")
-
-        query = urlencode(
-            {
-                "action": "parse",
-                "page": unquote(page),
-                "prop": "text",
-                "format": "json",
-                "formatversion": 2,
-            }
-        )
-        return urlunsplit((url.scheme, url.netloc, f"/{wiki}/api.php", query, ""))
-
     def _get_team_name_from_url(self) -> str:
         url = urlsplit(self.feed.url)
         page = url.path.rstrip("/").rsplit("/", 1)[-1]
-        page = self._get_page_title(url, page)
+        page = get_page_title(url, page)
         team_name = page.replace("_", " ").strip()
         if not team_name:
             raise ValueError("Could not extract team name from Liquipedia URL")
         return team_name
-
-    @staticmethod
-    def _get_page_title(url: SplitResult, path_page: str) -> str:
-        if path_page.casefold() == "index.php":
-            path_page = parse_qs(url.query).get("title", [""])[0]
-        return unquote(path_page)

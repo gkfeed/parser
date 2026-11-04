@@ -5,6 +5,7 @@ from typing import Any
 import structlog
 
 from app.core.worker_kind import WorkerKind
+from app.extensions.parsers.exceptions import FeedUnavailable
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
 from app.services.ytdlp.modes import (
     TikTokProfileExtractionMode,
@@ -19,6 +20,7 @@ logger = structlog.get_logger(__name__)
 class TikTokFeed(BaseTikTokFeed):
     worker_kind = WorkerKind.LIGHT
     _max_videos = 10
+    _empty_confirmed_cache_time = timedelta(days=3)
     _entries_by_url: dict[str, dict[str, Any]]
 
     @property
@@ -28,47 +30,37 @@ class TikTokFeed(BaseTikTokFeed):
         info = await YtdlpInfoExtractor.extract_channel_videos_info(
             self.feed.url, TikTokProfileExtractionMode(), self._max_videos
         )
-        if info.get("tiktok_outcome") == "partial":
-            self.data["retry_at"] = datetime.now(UTC) + timedelta(minutes=15)
+        if info.get("tiktok_outcome") == "partial" or info.get("extraction_incomplete"):
+            raise FeedUnavailable(self.feed.url, "tiktok_profile_extraction_failed")
 
         entries = info["entries"]
+        if not isinstance(entries, list):
+            raise TypeError("TikTok discovery did not return an entries list")
+        if not entries and info.get("tiktok_outcome") != "empty_confirmed":
+            raise FeedUnavailable(self.feed.url, "tiktok_profile_empty_unverified")
+        if entries and info.get("tiktok_outcome") == "empty_confirmed":
+            raise ValueError("Confirmed empty TikTok profile contains video entries")
+        if info.get("tiktok_outcome") == "empty_confirmed":
+            self.data["retry_at"] = datetime.now(UTC) + self._empty_confirmed_cache_time
+
         videos: list[str] = []
         for index, entry in enumerate(entries, start=1):
             if not isinstance(entry, dict):
-                logger.warning(
-                    "tiktok_entry_skipped",
-                    entry_index=index,
-                    reason="invalid_entry_type",
-                    entry_type=type(entry).__name__,
-                )
-                continue
+                raise TypeError(f"TikTok entry {index} is not a video object")
             url = entry.get("url") or entry.get("webpage_url")
             if not isinstance(url, str) or not url.strip():
-                logger.warning(
-                    "tiktok_entry_skipped", entry_index=index, reason="invalid_url"
-                )
-                continue
+                raise ValueError(f"TikTok entry {index} has no valid video URL")
             videos.append(url)
             self._entries_by_url[url] = entry
 
-        skipped = len(entries) - len(videos)
-        if skipped:
-            self.data["retry_at"] = datetime.now(UTC) + timedelta(minutes=15)
-        outcome = "links_found"
-        if not videos:
-            outcome = "no_valid_entries" if entries else "no_entries"
-        log = logger.warning if skipped or not videos else logger.info
-        log(
+        logger.info(
             "tiktok_discovery_completed",
-            outcome=outcome,
+            outcome="links_found" if videos else "empty_confirmed",
             requested_limit=self._max_videos,
             entries=len(entries),
             links=len(videos),
-            skipped=skipped,
             below_limit=len(videos) < self._max_videos,
         )
-        if entries and not videos:
-            raise ValueError("TikTok discovery returned no valid video links")
         return videos
 
     async def _get_video_info(self, link: str) -> dict[str, Any]:

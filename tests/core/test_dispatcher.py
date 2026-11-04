@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.dispatcher import Dispatcher
+from app.core.parser_id import ParserId
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import BrokerError
 
@@ -17,13 +18,15 @@ def dispatcher():
     return Dispatcher(
         broker=AsyncMock(),
         feed_parser_repository=FakeFeedParserRepository,
+        feed_repository=AsyncMock(),
+        items_repository=AsyncMock(),
         parsers={},
     )
 
 
 @pytest.mark.asyncio
 async def test_request_items_from_broker_success(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
     items = [
         Item(
             title="Item 1",
@@ -46,7 +49,7 @@ async def test_request_items_from_broker_success(dispatcher):
 
 @pytest.mark.asyncio
 async def test_request_items_from_broker_error(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
 
     dispatcher.broker.put_and_wait_for_result.side_effect = BrokerError("Error")
 
@@ -55,8 +58,8 @@ async def test_request_items_from_broker_error(dispatcher):
 
 
 @pytest.mark.asyncio
-async def test_fetch_feed_items_no_parser(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="unknown")
+async def test_fetch_feed_items_without_configured_parser(dispatcher):
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.TWITCH)
 
     with patch.object(
         dispatcher, "_request_items_from_broker", new_callable=AsyncMock
@@ -67,7 +70,7 @@ async def test_fetch_feed_items_no_parser(dispatcher):
 
 @pytest.mark.asyncio
 async def test_fetch_feed_items_success(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
     items = [
         Item(
             title="Item 1",
@@ -80,13 +83,15 @@ async def test_fetch_feed_items_success(dispatcher):
     class MockParser:
         _cache_storage_time_if_success = timedelta(hours=2)
 
-    dispatcher.parsers = {"test": MockParser}
+    dispatcher.parsers = {ParserId.WEB: MockParser}
 
     with (
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = FeedResult(items=items)
         mock_save.return_value = items
@@ -110,18 +115,20 @@ async def test_fetch_feed_items_success(dispatcher):
 
 @pytest.mark.asyncio
 async def test_fetch_feed_items_no_items(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
 
     class MockParser:
         _cache_storage_time = timedelta(minutes=30)
 
-    dispatcher.parsers = {"test": MockParser}
+    dispatcher.parsers = {ParserId.WEB: MockParser}
 
     with (
         patch.object(
             dispatcher, "_request_items_from_broker", new_callable=AsyncMock
         ) as mock_request,
-        patch.object(dispatcher, "_save_items", new_callable=AsyncMock) as mock_save,
+        patch.object(
+            dispatcher.items_repository, "add_items_to_feed", new_callable=AsyncMock
+        ) as mock_save,
     ):
         mock_request.return_value = FeedResult(items=[])
 
@@ -144,8 +151,8 @@ async def test_fetch_feed_items_no_items(dispatcher):
 
 @pytest.mark.asyncio
 async def test_fetch_feed_items_backs_off_after_failures(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    dispatcher.parsers = {"test": object}
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
+    dispatcher.parsers = {ParserId.WEB: object}
     dispatcher.broker.put_and_wait_for_result.side_effect = BrokerError("Error")
 
     with patch("app.core.dispatcher.random.uniform", return_value=1):
@@ -168,8 +175,8 @@ async def test_fetch_feed_items_backs_off_after_failures(dispatcher):
 
 @pytest.mark.asyncio
 async def test_success_resets_failure_backoff(dispatcher):
-    feed = Feed(id=1, title="Test", url="http://test.com", type="test")
-    dispatcher.parsers = {"test": object}
+    feed = Feed(id=1, title="Test", url="http://test.com", type=ParserId.WEB)
+    dispatcher.parsers = {ParserId.WEB: object}
 
     with (
         patch.object(

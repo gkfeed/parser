@@ -26,11 +26,22 @@ class HttpParserExtension(_BaseFeed, UseTemporaryCacheServiceExtension[bytes], A
 
     async def get_html(self, url: str) -> bytes:
         if self.cache.has_valid_cache(url):
-            return self.cache.get(url)
+            html = self.cache.get(url)
+            try:
+                self._validate_html(url, html)
+            except (FeedUnavailable, ValueError):
+                # Refresh invalid pages cached before validation was added.
+                self.cache.set_with_expiry(url, html, timedelta(0))
+            else:
+                return html
 
         html = await self._fetch_html(url)
+        self._validate_html(url, html)
         self.cache.set_with_expiry(url, html, self._http_response_storage_time)
         return html
+
+    def _validate_html(self, url: str, html: bytes) -> None:
+        """Raise FeedUnavailable or ValueError for an unusable page."""
 
     async def _fetch_html(self, url: str) -> bytes:
         try:
