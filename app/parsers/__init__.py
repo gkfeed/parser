@@ -12,6 +12,7 @@ from .insolarance import InsolaranceFeed
 from .instagram import InstagramFeed
 from .kinogo import KinogoFeed
 from .liquidpedia import LiquidpediaFeed
+from .liveball import LiveballFeed
 from .mangalib import MangaLibFeed
 from .matreshka import MatreshkaFeed
 from .onefootball import OneFootballFeed
@@ -75,6 +76,7 @@ class Parser(Enum):
     PORNHUB = ParserConfig(ParserId.PORNHUB, PornHubFeed)
     HLTV = ParserConfig(ParserId.HLTV, HltvFeed)
     LIQUIDPEDIA = ParserConfig(ParserId.LIQUIDPEDIA, LiquidpediaFeed)
+    LIVEBALL = ParserConfig(ParserId.LIVEBALL, LiveballFeed)
     SASFLIX = ParserConfig(ParserId.SASFLIX, SasflixFeed)
     PORNO365 = ParserConfig(ParserId.PORNO365, Porno365Feed)
     AUTHOR_TODAY = ParserConfig(ParserId.AUTHOR_TODAY, AuthorTodayFeed)
