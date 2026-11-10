@@ -13,7 +13,6 @@ from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
-from app.services.http import HttpRequestError, HttpService
 
 
 class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension):
@@ -39,17 +38,15 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
     @override
     async def _parse_items(self) -> list[Item]:
         username = self._username()
-        try:
-            response = await HttpService.get_response(f"https://t.me/s/{username}")
-        except HttpRequestError as exc:
-            raise FeedUnavailable(self.feed.url, "http_request_failed") from exc
-        if response.status != 200:
-            raise FeedUnavailable(self.feed.url, f"http_status_{response.status}")
-        soup = BeautifulSoup(response.content, "html.parser")
+        soup = await self.get_soup(f"https://t.me/s/{username}")
         posts = soup.select(".tgme_widget_message[data-post]")
-        if not posts:
-            raise FeedUnavailable(self.feed.url, "telegram_preview_unavailable")
         return [self._post_to_item(post, username) for post in posts]
+
+    @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        soup = BeautifulSoup(html, "html.parser")
+        if not soup.select_one(".tgme_widget_message[data-post]"):
+            raise FeedUnavailable(self.feed.url, "telegram_preview_unavailable")
 
     def _post_to_item(self, post: Tag, username: str) -> Item:
         post_id = str(post.get("data-post", ""))
