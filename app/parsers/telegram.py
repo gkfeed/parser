@@ -12,10 +12,13 @@ from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
+from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 
 
-class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension):
+class TelegramFeed(
+    PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension
+):
     worker_kind = WorkerKind.LIGHT
     _cache_storage_time = timedelta(hours=1)
 
@@ -35,12 +38,11 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
             raise FeedUnavailable(self.feed.url, "invalid_telegram_url")
         return parts[0].lower()
 
+    @property
     @override
-    async def _parse_items(self) -> list[Item]:
-        username = self._username()
-        soup = await self.get_soup(f"https://t.me/s/{username}")
-        posts = soup.select(".tgme_widget_message[data-post]")
-        return [self._post_to_item(post, username) for post in posts]
+    async def _posts(self) -> list[Tag]:
+        soup = await self.get_soup(f"https://t.me/s/{self._username()}")
+        return soup.select(".tgme_widget_message[data-post]")
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
@@ -48,10 +50,22 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
         if not soup.select_one(".tgme_widget_message[data-post]"):
             raise FeedUnavailable(self.feed.url, "telegram_preview_unavailable")
 
-    def _post_to_item(self, post: Tag, username: str) -> Item:
+    @override
+    async def _post_to_item(self, post: Tag) -> Item:
+        item = await super()._post_to_item(post)
+        item.guid = item.link
+        return item
+
+    @override
+    async def _get_post_link(self, post: Tag) -> str:
+        username = self._username()
         post_id = str(post.get("data-post", ""))
         if not re.fullmatch(rf"{re.escape(username)}/[0-9]+", post_id, re.IGNORECASE):
             raise FeedUnavailable(self.feed.url, "invalid_telegram_post")
+        return f"https://t.me/{username}/{post_id.split('/')[1]}"
+
+    @override
+    async def _get_post_datetime(self, post: Tag) -> datetime:
         date_tag = post.select_one("time[datetime]")
         if date_tag is None:
             raise FeedUnavailable(self.feed.url, "missing_telegram_date")
@@ -61,7 +75,10 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
                 raise ValueError("missing timezone")
         except ValueError as exc:
             raise FeedUnavailable(self.feed.url, "invalid_telegram_date") from exc
-        link = f"https://t.me/{username}/{post_id.split('/')[1]}"
+        return date
+
+    @override
+    async def _get_post_title(self, post: Tag) -> str:
         text_tag = post.select_one(".tgme_widget_message_text")
         title_soup = BeautifulSoup(str(text_tag), "html.parser") if text_tag else None
         if title_soup:
@@ -69,7 +86,11 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
                 br.replace_with(NavigableString("\n"))
         plain = title_soup.get_text().strip() if title_soup else ""
         title = next((line for line in plain.splitlines() if line.strip()), "")[:200]
-        title = title or f"Telegram: {username}"
+        return title or f"Telegram: {self._username()}"
+
+    @override
+    async def _get_post_text(self, post: Tag) -> str:
+        text_tag = post.select_one(".tgme_widget_message_text")
         body = self._safe_text(text_tag) if text_tag else ""
         images = []
         for photo in post.select(".tgme_widget_message_photo_wrap[style]"):
@@ -83,9 +104,10 @@ class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtensio
             body = "<br/>".join([part for part in [body, *images] if part])
         if post.select_one(
             ".tgme_widget_message_video_player, .tgme_widget_message_video_wrap, .tgme_widget_message_document_wrap"
-        ) or "roundvideo_media" in (post.get_attribute_list("class")):
+        ) or "roundvideo_media" in post.get_attribute_list("class"):
+            link = await self._get_post_link(post)
             body += f'<br/><a href="{link}">Открыть медиа в Telegram</a>'
-        return Item(title=title, text=body, date=date, link=link, guid=link)
+        return body
 
     @staticmethod
     def _safe_text(text_tag: Tag) -> str:
