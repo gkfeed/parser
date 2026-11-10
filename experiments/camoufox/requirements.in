@@ -1,0 +1,5 @@
+# Standalone research environment. Do not add these to the worker image.
+-r ../../requirements.txt
+camoufox==0.5.8
+playwright==1.62.0
+psutil==7.1.3
