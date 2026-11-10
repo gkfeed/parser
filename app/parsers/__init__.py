@@ -27,6 +27,7 @@ from .shiki import ShikiFeed
 from .shiki_ongoing import ShikiOngoingFeed
 from .spoti import SpotifyFeed, SpotifyPlaylistFeed
 from .stories import InstagramStoriesFeed
+from .telegram import TelegramFeed
 from .tiktok import TikTokFeed
 from .twitch import TwitchFeed
 from .vk import VkFeed
@@ -49,6 +50,7 @@ class ParserConfig:
 
 class Parser(Enum):
     WEB = ParserConfig(ParserId.WEB, WebFeed)
+    TELEGRAM = ParserConfig(ParserId.TELEGRAM, TelegramFeed)
     TIKTOK = ParserConfig(ParserId.TIKTOK, TikTokFeed)
     KINOGO = ParserConfig(ParserId.KINOGO, KinogoFeed)
     TWITCH = ParserConfig(ParserId.TWITCH, TwitchFeed)
