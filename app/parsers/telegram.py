@@ -10,17 +10,15 @@ from bs4.element import NavigableString
 from app.core.worker_kind import WorkerKind
 from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
-from app.extensions.parsers.hash import ItemsHashExtension
+from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
-from app.services.hash import HashService
 from app.services.http import HttpRequestError, HttpService
 
 
-class TelegramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class TelegramFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension):
     worker_kind = WorkerKind.LIGHT
     _cache_storage_time = timedelta(hours=1)
-    _cache_storage_time_if_success = timedelta(hours=1)
 
     def _username(self) -> str:
         url = urlsplit(self.feed.url)
@@ -39,10 +37,6 @@ class TelegramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
         return parts[0].lower()
 
     @override
-    async def _generate_hash(self, item: Item) -> str:
-        return HashService.hash_str(item.link)
-
-    @override
     async def _parse_items(self) -> list[Item]:
         username = self._username()
         try:
@@ -55,10 +49,7 @@ class TelegramFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
         posts = soup.select(".tgme_widget_message[data-post]")
         if not posts:
             raise FeedUnavailable(self.feed.url, "telegram_preview_unavailable")
-        items = []
-        for post in posts:
-            items.append(self._post_to_item(post, username))
-        return items
+        return [self._post_to_item(post, username) for post in posts]
 
     def _post_to_item(self, post: Tag, username: str) -> Item:
         post_id = str(post.get("data-post", ""))
