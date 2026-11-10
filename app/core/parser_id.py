@@ -5,6 +5,7 @@ class ParserId(StrEnum):
     """Parser identifiers shared by storage, feed payloads, and task routing."""
 
     WEB = "web"
+    TELEGRAM = "telegram"
     TIKTOK = "tiktok"
     KINOGO = "kinogo"
     TWITCH = "twitch"
