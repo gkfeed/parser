@@ -2,6 +2,7 @@ import json
 from base64 import b64decode
 from datetime import timedelta
 from typing import override
+from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
@@ -18,10 +19,25 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
 
+    @staticmethod
+    def _artist_id(url: str) -> str | None:
+        path = urlsplit(url).path.rstrip("/")
+        prefix = "/artist/"
+        if not path.startswith(prefix):
+            return None
+        return path[len(prefix) :].split("/", maxsplit=1)[0] or None
+
+    def _artist_base_url(self) -> str:
+        artist_id = self._artist_id(self.feed.url)
+        if artist_id is None:
+            return self.feed.url.removesuffix("/")
+        parts = urlsplit(self.feed.url)
+        return f"{parts.scheme}://{parts.netloc}/artist/{artist_id}"
+
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
         soup = BeautifulSoup(html, "html.parser")
-        discography_url = self.feed.url.removesuffix("/") + "/discography"
+        discography_url = self._artist_base_url() + "/discography"
         if (
             url == discography_url
             and soup.title
@@ -36,15 +52,18 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
             raise ValueError("Spotify artist page not found")
         page_url = soup.find("meta", property="og:url")
         canonical = soup.find("link", rel="canonical")
-        expected_url = self.feed.url.removesuffix("/")
-        meta_matches = (
-            isinstance(page_url, Tag) and page_url.get("content") == expected_url
-        )
-        canonical_matches = isinstance(canonical, Tag) and canonical.get("href") in (
-            expected_url,
-            expected_url + "/discography",
-        )
-        if not meta_matches and not canonical_matches:
+        candidates: list[object] = []
+        if isinstance(page_url, Tag):
+            candidates.append(page_url.get("content"))
+        if isinstance(canonical, Tag):
+            candidates.append(canonical.get("href"))
+        # Share URLs carry tracking params and the discography route adds a
+        # suffix, so compare the artist id instead of the literal URL.
+        expected_id = self._artist_id(self.feed.url)
+        if expected_id is None or not any(
+            isinstance(value, str) and self._artist_id(value) == expected_id
+            for value in candidates
+        ):
             raise ValueError("Spotify page does not identify the requested artist")
         links = list(soup.select('a[href^="/album"]'))
         if links:
@@ -61,7 +80,9 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
             return False
         # Spotify's artist state lists each release category. Metadata and a
         # missing album selector alone do not prove that the artist is empty.
-        artist_id = self.feed.url.removesuffix("/").rsplit("/", maxsplit=1)[-1]
+        artist_id = self._artist_id(self.feed.url)
+        if artist_id is None:
+            return False
         try:
             state = json.loads(b64decode(state_tag.get_text(strip=True), validate=True))
             artist = state["entities"]["items"][f"spotify:artist:{artist_id}"]
@@ -96,7 +117,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
         ]
 
     async def _get_discography_soup(self):
-        url = self.feed.url.removesuffix("/")
+        url = self._artist_base_url()
 
         soup = await self.get_soup(url + "/discography")
         if soup.title and "Page not found" in soup.title.text:
