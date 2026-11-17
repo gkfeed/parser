@@ -10,6 +10,11 @@ from app.utils.logging import url_log_fields
 
 logger = structlog.get_logger(__name__)
 
+# Denied profiles stay denied for weeks, and the dispatcher honours retry_at verbatim.
+_RETRY_PROFILE_NOT_RETURNED = timedelta(days=7)
+_RETRY_RESTRICTED_PROFILE = timedelta(days=1)
+_RETRY_PROFILE_IDENTITY_UNCLEAR = timedelta(days=1)
+
 
 class TikTokUserIE(UpstreamTikTokUserIE):
     """Keep the upstream extractor key and handle explicit profile denials."""
@@ -85,7 +90,7 @@ def classify_profile(
 
     restriction = _profile_restriction(message)
     if restriction:
-        retry_at = datetime.now(UTC) + timedelta(days=1)
+        retry_at = datetime.now(UTC) + _RETRY_RESTRICTED_PROFILE
         status = 209002 if "status code 209002" in message else None
         log.warning(
             "tiktok_profile_classified",
@@ -97,7 +102,7 @@ def classify_profile(
         raise FeedUnavailable(url, "tiktok_profile_restricted", retry_at)
 
     if "status code 10221" in message:
-        retry_at = datetime.now(UTC) + timedelta(hours=1)
+        retry_at = datetime.now(UTC) + _RETRY_PROFILE_NOT_RETURNED
         log.warning(
             "tiktok_profile_classified",
             outcome="unavailable",
@@ -108,7 +113,7 @@ def classify_profile(
         raise FeedUnavailable(url, "tiktok_profile_unavailable", retry_at)
 
     if "Unable to extract secondary user ID" in message:
-        retry_at = datetime.now(UTC) + timedelta(hours=1)
+        retry_at = datetime.now(UTC) + _RETRY_PROFILE_IDENTITY_UNCLEAR
         # This warning means the embed fallback returned no page. yt-dlp's
         # access hint does not prove privacy or rule out a request failure.
         embed_unavailable = any(
