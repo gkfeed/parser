@@ -15,28 +15,24 @@ from app.utils.datetime import constant_datetime
 from app.utils.html import required_attr, required_text
 
 
-def _artist_id(url: str) -> str | None:
-    path = urlsplit(url).path.rstrip("/")
-    prefix = "/artist/"
-    if not path.startswith(prefix):
-        return None
-    return path[len(prefix) :].split("/", maxsplit=1)[0] or None
-
-
-def _artist_url(url: str) -> str | None:
-    artist_id = _artist_id(url)
-    if artist_id is None:
-        return None
-    parts = urlsplit(url)
-    return f"{parts.scheme}://{parts.netloc}/artist/{artist_id}"
-
-
 class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
     _cache_storage_time = timedelta(days=1)
     _selenium_wait_time = 20
 
+    @staticmethod
+    def _artist_id(url: str) -> str | None:
+        path = urlsplit(url).path.rstrip("/")
+        prefix = "/artist/"
+        if not path.startswith(prefix):
+            return None
+        return path[len(prefix) :].split("/", maxsplit=1)[0] or None
+
     def _artist_base_url(self) -> str:
-        return _artist_url(self.feed.url) or self.feed.url.removesuffix("/")
+        artist_id = self._artist_id(self.feed.url)
+        if artist_id is None:
+            return self.feed.url.removesuffix("/")
+        parts = urlsplit(self.feed.url)
+        return f"{parts.scheme}://{parts.netloc}/artist/{artist_id}"
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:
@@ -63,9 +59,9 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
             candidates.append(canonical.get("href"))
         # Share URLs carry tracking params and the discography route adds a
         # suffix, so compare the artist id instead of the literal URL.
-        expected_id = _artist_id(self.feed.url)
+        expected_id = self._artist_id(self.feed.url)
         if expected_id is None or not any(
-            isinstance(value, str) and _artist_id(value) == expected_id
+            isinstance(value, str) and self._artist_id(value) == expected_id
             for value in candidates
         ):
             raise ValueError("Spotify page does not identify the requested artist")
@@ -84,7 +80,7 @@ class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtensio
             return False
         # Spotify's artist state lists each release category. Metadata and a
         # missing album selector alone do not prove that the artist is empty.
-        artist_id = _artist_id(self.feed.url)
+        artist_id = self._artist_id(self.feed.url)
         if artist_id is None:
             return False
         try:
