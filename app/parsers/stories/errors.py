@@ -70,10 +70,28 @@ def failure_reason(
     return fallback or error_kind or "upstream_error"
 
 
+_TERMINAL_REASONS = frozenset({"private", "not_found"})
+_TRANSIENT_REASONS = frozenset(
+    {
+        "media_hash_error",
+        "media_loading_timeout",
+        "media_loading_unverified",
+        "media_upload_error",
+        "search_result_timeout",
+        "stories_media_timeout",
+        "subscription_landing_timeout",
+    }
+)
+
+
 def unavailable(feed_url: str, reason: str) -> FeedUnavailable:
-    delay = (
-        timedelta(days=1)
-        if reason in ("private", "not_found")
-        else timedelta(minutes=1)
-    )
-    return FeedUnavailable(feed_url, reason, datetime.now(UTC) + delay)
+    # Deterministic source failures ("no stories", disabled Stories tab,
+    # challenges, layout changes) must not be polled every minute. Leaving
+    # retry_at unset hands them to the dispatcher's escalating failure backoff.
+    if reason in _TERMINAL_REASONS:
+        retry_at = datetime.now(UTC) + timedelta(days=1)
+    elif reason in _TRANSIENT_REASONS:
+        retry_at = datetime.now(UTC) + timedelta(minutes=1)
+    else:
+        retry_at = None
+    return FeedUnavailable(feed_url, reason, retry_at)
