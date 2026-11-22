@@ -36,6 +36,8 @@ class RedditFeed(
         self._extract_posts(BeautifulSoup(html, "html.parser"))
 
     def _extract_posts(self, soup: BeautifulSoup) -> list[Tag]:
+        if soup.select_one(".stale_banner"):
+            raise FeedUnavailable(self.feed.url, "reddit_mirror_stale_page")
         title = soup.title.get_text(strip=True).lower() if soup.title else ""
         if soup.select_one(
             "#challenge-form, #cf-challenge-running, .cf-turnstile, #anubis_challenge"

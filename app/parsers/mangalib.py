@@ -15,6 +15,10 @@ class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExte
     _max_posts = 5
 
     @override
+    def _validate_html(self, url: str, html: bytes) -> None:
+        MangaLibClient.parse_chapters(html, self._max_posts)
+
+    @override
     async def _parse_items(self) -> list[Item]:
         chapters = await MangaLibClient(self.get_html).get_chapters(
             self._get_slug(), self._max_posts

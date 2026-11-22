@@ -1,6 +1,7 @@
 import structlog
 
 from app.services.catbox import CatboxUploader
+from app.services.litterbox import LitterboxUploader
 from app.services.tempfile import TempFileUploader
 from app.utils.logging import url_log_fields
 
@@ -8,7 +9,7 @@ logger = structlog.get_logger(__name__)
 
 
 class FallbackUploader:
-    uploaders = (CatboxUploader, TempFileUploader)
+    uploaders = (CatboxUploader, TempFileUploader, LitterboxUploader)
 
     @classmethod
     async def upload_with_url(cls, url: str) -> str | None:

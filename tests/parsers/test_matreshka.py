@@ -11,6 +11,7 @@ MATRESHKA_FEED_DATA = {
 }
 
 
+@pytest.mark.skip(reason="Matreshka has closed and its parser is disabled")
 @pytest.mark.parametrize("fetch_items", [MATRESHKA_FEED_DATA], indirect=True)
 async def test_matreshka_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0

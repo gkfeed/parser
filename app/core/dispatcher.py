@@ -7,12 +7,12 @@ from typing import Protocol
 import structlog
 from structlog.contextvars import bound_contextvars
 
+from app.core.parser_id import ParserId
 from app.extensions.parsers.base import BaseFeed
 from app.models.feed_parser import FeedParser
 from app.parsers import PARSERS, ParserConfig
 from app.serializers.feed import Feed, FeedResult, Item
 from app.services.broker import (
-    BrokerError,
     BrokerFeedUnavailable,
     BrokerNoWorker,
     BrokerService,
@@ -26,7 +26,7 @@ class FeedParserRepositoryProtocol(Protocol):
 
 
 class FeedRepositoryProtocol(Protocol):
-    async def get_eligible(self, parser_types: Collection[str]) -> list[Feed]: ...
+    async def get_eligible(self, parser_types: Collection[ParserId]) -> list[Feed]: ...
 
 
 class ItemsRepositoryProtocol(Protocol):
@@ -47,14 +47,17 @@ class Dispatcher:
         feed_parser_repository: FeedParserRepositoryProtocol,
         feed_repository: FeedRepositoryProtocol,
         items_repository: ItemsRepositoryProtocol,
-        parsers: Mapping[str, type[BaseFeed]] = PARSERS,
+        parsers: Mapping[ParserId, type[BaseFeed]]
+        | Mapping[str, type[BaseFeed]] = PARSERS,
         broker_wait_timeout: int = 300,
     ):
         self.broker = broker
         self.feed_parser_repository = feed_parser_repository
         self.feed_repository = feed_repository
         self.items_repository = items_repository
-        self.parsers = parsers
+        self.parsers = {
+            ParserId(parser_id): parser for parser_id, parser in parsers.items()
+        }
         self.broker_wait_timeout = broker_wait_timeout
         self._failure_counts: dict[int, int] = {}
 
@@ -101,12 +104,13 @@ class Dispatcher:
                 next_retry=next_retry.isoformat(),
             )
             return
-        except BrokerError:
+        except Exception:
+            # This boundary only covers broker I/O and result validation.
+            # Database writes, including failure scheduling, must still raise.
             logger.exception("feed_dispatch_failed")
             await self._schedule_failure(feed.id)
             return
 
-        self._failure_counts.pop(feed.id, None)
         items = result.items
         received = len(items)
         policy = ParserConfig(feed.type, parser_cls).scheduling_policy
@@ -126,17 +130,18 @@ class Dispatcher:
                 next_retry=next_run_at.isoformat(),
             )
         await self.feed_parser_repository.upsert(feed.id, next_run_at)
+        self._failure_counts.pop(feed.id, None)
         logger.info("feed_items_received", received=received, returned=len(items))
 
     async def _schedule_failure(self, feed_id: int) -> None:
         failure_count = self._failure_counts.get(feed_id, 0) + 1
-        self._failure_counts[feed_id] = failure_count
         backoff = self._failure_backoffs[
             min(failure_count, len(self._failure_backoffs)) - 1
         ]
         jittered_backoff = backoff * random.uniform(0.9, 1.1)
         next_retry = datetime.now(UTC) + jittered_backoff
         await self.feed_parser_repository.upsert(feed_id, next_retry)
+        self._failure_counts[feed_id] = failure_count
         logger.warning(
             "feed_retry_scheduled",
             failure_count=failure_count,
@@ -145,7 +150,7 @@ class Dispatcher:
 
     async def _request_items_from_broker(self, feed: Feed) -> FeedResult:
         items_json = await self.broker.put_and_wait_for_result(
-            f"gkfeed.process_feed_{feed.type}",
+            feed.type.task_name,
             (feed.model_dump_json(),),
             timeout=self.broker_wait_timeout,
             task_key=f"feed:{feed.id}",

@@ -1,3 +1,4 @@
+from app.core.parser_id import ParserId
 from app.core.worker_kind import WorkerKind
 from app.parsers import Parser
 
@@ -7,7 +8,9 @@ ignored_parser_types: set[Parser] = {
 }
 
 
-def _filter_by_worker_type(worker_kind: WorkerKind, ignore: set[Parser]) -> list[str]:
+def _filter_by_worker_type(
+    worker_kind: WorkerKind, ignore: set[Parser]
+) -> list[ParserId]:
     return [
         parser.value.id
         for parser in Parser

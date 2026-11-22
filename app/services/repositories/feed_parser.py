@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.models.feed_parser import FeedParser
 
@@ -16,17 +17,15 @@ class FeedParserRepository(BaseRepository):
             return result.scalar_one_or_none()
 
     async def upsert(self, feed_id: int, next_run_at: datetime) -> FeedParser:
-        async with self._session_factory() as session, session.begin():
-            result = await session.execute(
-                select(FeedParser).where(FeedParser.feed_id == feed_id)
+        statement = (
+            insert(FeedParser)
+            .values(feed_id=feed_id, next_run_at=next_run_at)
+            .on_conflict_do_update(
+                index_elements=[FeedParser.feed_id],
+                set_={FeedParser.next_run_at: next_run_at},
             )
-            feed_parser = result.scalar_one_or_none()
-
-            if feed_parser:
-                feed_parser.next_run_at = next_run_at
-            else:
-                feed_parser = FeedParser(feed_id=feed_id, next_run_at=next_run_at)
-                session.add(feed_parser)
-
-            await session.flush()
-            return feed_parser
+            .returning(FeedParser)
+        )
+        async with self._session_factory() as session, session.begin():
+            result = await session.execute(statement)
+            return result.scalar_one()
