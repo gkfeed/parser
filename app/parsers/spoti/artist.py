@@ -6,7 +6,6 @@ from typing import override
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
 from app.serializers.feed import Item
@@ -14,8 +13,9 @@ from app.utils.datetime import constant_datetime
 from app.utils.html import required_attr, required_text
 
 
-class SpotifyFeed(SeleniumParserExtension, CacheFeedExtension, ItemsHashExtension):
+class SpotifyFeed(SeleniumParserExtension, ItemsHashExtension):
     empty_result_delay = timedelta(days=1)
+    success_result_delay = timedelta(hours=1)
     _selenium_wait_time = 20
 
     @override

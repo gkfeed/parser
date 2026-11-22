@@ -2,7 +2,6 @@ from datetime import timedelta
 from typing import override
 from urllib.parse import urljoin, urlsplit
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
@@ -10,9 +9,9 @@ from app.services.anilibria import AnilibriaClient, AnilibriaEpisode
 from app.utils.datetime import constant_datetime
 
 
-class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
-    success_result_delay = timedelta(days=1)
+class AnilibriaFeed(ItemIdentityHashExtension, HttpParserExtension):
     empty_result_delay = timedelta(seconds=5)
+    success_result_delay = timedelta(days=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

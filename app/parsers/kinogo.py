@@ -2,7 +2,6 @@ from datetime import timedelta
 from typing import override
 
 from app.core.worker_kind import WorkerKind
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
@@ -10,9 +9,10 @@ from app.utils.datetime import constant_datetime
 from app.utils.html import require_tag, required_text
 
 
-class KinogoFeed(ItemsHashExtension, HttpParserExtension, CacheFeedExtension):
+class KinogoFeed(ItemsHashExtension, HttpParserExtension):
     worker_kind = WorkerKind.LIGHT
     empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
 
     @override
     async def _parse_items(self) -> list[Item]:

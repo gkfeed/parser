@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 import structlog
 
 from app.core.worker_kind import WorkerKind
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
@@ -22,10 +21,9 @@ logger = structlog.get_logger(__name__)
 _IMAGE_SOURCE = re.compile(r'src="data:(?P<mime_type>[^;]+);base64,(?P<encoded>[^"]+)"')
 
 
-class InstagramFeed(
-    ItemsHashExtension, HttpParserExtension, CacheFeedExtension, ResultSizeExtension
-):
+class InstagramFeed(ItemsHashExtension, HttpParserExtension, ResultSizeExtension):
     worker_kind = WorkerKind.HTTP
+    empty_result_delay = timedelta(minutes=5)
     success_result_delay = timedelta(weeks=1)
     # At most 30 images are embedded, so base64 stays near 40 MiB before JSON.
     _max_image_bytes = 1024 * 1024

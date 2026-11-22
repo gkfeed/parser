@@ -12,7 +12,6 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
@@ -25,9 +24,9 @@ class VkFeed(
     PostToItemsMixin,
     ItemLinkHashExtension,
     SeleniumParserExtension,
-    CacheFeedExtension,
 ):
     empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
     _selenium_wait_time = 5
     _post_selector = '[data-testid="post"][data-post-id]'
     _empty_selector = (

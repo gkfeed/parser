@@ -2,16 +2,17 @@ from datetime import timedelta
 from typing import ClassVar, override
 from urllib.parse import urlsplit
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
 from app.services.mangalib import MangaLibChapter, MangaLibClient
 
 
-class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension):
-    _headers: ClassVar[dict[str, str]] = MangaLibClient.headers
+class MangaLibFeed(ItemIdentityHashExtension, HttpParserExtension):
     empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
+
+    _headers: ClassVar[dict[str, str]] = MangaLibClient.headers
     _max_posts = 5
 
     @override

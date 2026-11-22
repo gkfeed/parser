@@ -3,18 +3,16 @@ from typing import override
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.html import require_tag, required_attr, required_text
 
 
-class RanobeMeFeed(
-    PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
-):
-    _base_url = "https://ranobe.me"
+class RanobeMeFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
     empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
+    _base_url = "https://ranobe.me"
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

@@ -271,7 +271,7 @@ async def test_next_run_at_reads_and_updates_legacy_column(
 
     future = datetime.now(UTC) + timedelta(days=1)
     updated = await feed_parser_repository.upsert(feed.id, next_run_at=future)
-    assert updated.next_run_at == future
+    assert updated.next_run_at.replace(tzinfo=UTC) == future
     assert await feed_repository.get_eligible({feed.type}) == []
     async with session_factory() as session:
         stored = await session.execute(

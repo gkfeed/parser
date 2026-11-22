@@ -4,7 +4,6 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemIdentityHashExtension
 from app.extensions.parsers.http import HttpParserExtension
@@ -12,10 +11,9 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.utils.html import require_tag, required_attr, required_text
 
 
-class LiveballFeed(
-    PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension, CacheFeedExtension
-):
+class LiveballFeed(PostToItemsMixin, ItemIdentityHashExtension, HttpParserExtension):
     empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
     _base_url = "https://liveball.sx"
     _source_url = "https://liveball.sx/"
 

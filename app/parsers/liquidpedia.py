@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar, override
 from urllib.parse import (
     parse_qs,
@@ -9,16 +9,16 @@ from urllib.parse import (
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.services.liquidpedia import LiquidpediaClient, get_page_title
 
 
-class LiquidpediaFeed(
-    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
-):
+class LiquidpediaFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+    empty_result_delay = timedelta(minutes=5)
+    success_result_delay = timedelta(hours=1)
+
     _headers: ClassVar[dict[str, str]] = LiquidpediaClient.headers
 
     @override
