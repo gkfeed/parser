@@ -1,8 +1,7 @@
 import json
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryDirectory
 
 import structlog
 
@@ -28,20 +27,14 @@ class URLRanker:
             self.last_failed = {}
 
     def save_ranks(self):
-        # Ranking is a best-effort cache: failing to persist it must never turn
-        # a mirror error into a hard feed failure. Create the directory when
-        # running in a fresh image and write atomically to avoid partial files.
         path = Path(self.data_file)
+        data = {"ranks": self.ranks, "last_failed": self.last_failed}
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            with NamedTemporaryFile("w", dir=path.parent, delete=False) as tmp:
-                tmp_path = tmp.name
-                json.dump(
-                    {"ranks": self.ranks, "last_failed": self.last_failed},
-                    tmp,
-                    indent=4,
-                )
-            os.replace(tmp_path, path)
+            with TemporaryDirectory(dir=path.parent) as directory:
+                temporary_file = Path(directory) / path.name
+                temporary_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
+                temporary_file.replace(path)
         except OSError as error:
             logger.warning(
                 "url_ranks_save_failed", data_file=self.data_file, error=str(error)

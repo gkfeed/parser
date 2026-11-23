@@ -16,8 +16,6 @@ COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache /wheels/*
 
 COPY ./app ./app
-# The URL ranker persists reddit_url_ranks.json relative to the container CWD (/).
-COPY ./data ./data
 COPY ./docker/worker/run-worker /usr/local/bin/run-worker
 
 RUN chmod +x /usr/local/bin/run-worker
