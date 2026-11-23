@@ -1,7 +1,6 @@
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import structlog
 
@@ -33,16 +32,9 @@ class URLRanker:
             self.last_failed = {}
 
     def save_ranks(self):
-        path = Path(self.data_file)
-        data = {"ranks": self.ranks, "last_failed": self.last_failed}
-        try:
-            with TemporaryDirectory(dir=path.parent) as directory:
-                temporary_file = Path(directory) / path.name
-                temporary_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
-                temporary_file.replace(path)
-        except OSError as error:
-            logger.warning(
-                "url_ranks_save_failed", data_file=self.data_file, error=str(error)
+        with open(self.data_file, "w") as f:
+            json.dump(
+                {"ranks": self.ranks, "last_failed": self.last_failed}, f, indent=4
             )
 
     def get_ranked_urls(self, all_urls: list[str]) -> list[str]:
