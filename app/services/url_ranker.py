@@ -14,7 +14,13 @@ class URLRanker:
         self.cooldown_minutes = cooldown_minutes
         self.ranks: dict[str, int] = {}
         self.last_failed: dict[str, float] = {}  # timestamp of last failure
-        self._load_ranks()
+        try:
+            Path(data_file).parent.mkdir(parents=True, exist_ok=True)
+            self._load_ranks()
+        except OSError as error:
+            logger.warning(
+                "url_ranks_init_failed", data_file=data_file, error=str(error)
+            )
 
     def _load_ranks(self):
         try:
@@ -30,7 +36,6 @@ class URLRanker:
         path = Path(self.data_file)
         data = {"ranks": self.ranks, "last_failed": self.last_failed}
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(dir=path.parent) as directory:
                 temporary_file = Path(directory) / path.name
                 temporary_file.write_text(json.dumps(data, indent=4), encoding="utf-8")
