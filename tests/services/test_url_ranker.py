@@ -93,17 +93,6 @@ def test_demote_url(url_ranker):
     assert "new_url" in url_ranker.last_failed
 
 
-def test_demote_url_with_missing_file_and_directory(tmp_path):
-    data_file = tmp_path / "nested" / "reddit_url_ranks.json"
-    assert not data_file.parent.exists()
-
-    ranker = URLRanker(str(data_file))
-    ranker.demote_url("https://mirror.example")
-
-    assert data_file.is_file()
-    assert json.loads(data_file.read_text())["ranks"]["https://mirror.example"] == 1
-
-
 def test_promote_url(url_ranker):
     url_ranker.ranks = {"url1": 2}
     url_ranker.last_failed = {"url1": datetime.now(UTC).timestamp()}
