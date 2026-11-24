@@ -5,7 +5,6 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.http import HttpParserExtension
@@ -16,9 +15,9 @@ from app.utils.datetime import constant_datetime, parse_datetime
 from app.utils.html import require_tag, required_text
 
 
-class OneFootballFeed(
-    PostToItemsMixin, ItemsHashExtension, HttpParserExtension, CacheFeedExtension
-):
+class OneFootballFeed(PostToItemsMixin, ItemsHashExtension, HttpParserExtension):
+    empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
     __base_url = "https://onefootball.com"
     __match_path = re.compile(r"^/[^/]+/match/\d+/?\Z")
     __entity_title_selector = (
@@ -26,7 +25,6 @@ class OneFootballFeed(
         '.xpaLayoutContainerComponentResolver--entityTitle p[class*="_title"]'
     )
     __match_lists_selector = 'ul:is([class*="MatchCardsList"], [class*="_matches"])'
-    _cache_storage_time = timedelta(hours=1)
 
     @override
     def _validate_html(self, url: str, html: bytes) -> None:

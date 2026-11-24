@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import override
 from urllib.parse import urljoin
 
@@ -10,7 +10,6 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.post_to_items import PostToItemsMixin
@@ -21,9 +20,10 @@ from app.utils.logging import url_log_fields
 logger = structlog.get_logger(__name__)
 
 
-class HltvFeed(
-    PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
-):
+class HltvFeed(PostToItemsMixin, ItemsHashExtension, SeleniumParserExtension):
+    empty_result_delay = timedelta(minutes=5)
+    success_result_delay = timedelta(hours=1)
+
     @staticmethod
     def _is_challenge(html: bytes) -> bool:
         soup = BeautifulSoup(html, "html.parser")

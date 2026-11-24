@@ -15,7 +15,6 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -28,15 +27,17 @@ from app.utils.datetime import constant_datetime
 logger = structlog.get_logger(__name__)
 
 
-class InstagramFeed(ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension):
+class InstagramFeed(ItemsHashExtension, SeleniumParserExtension):
     """Embed still images and deduplicate by their content.
 
     Video URL lifetimes are unverified and no durable video store is configured.
     Explicitly marked videos are unsupported, even when a thumbnail is available.
     """
 
+    empty_result_delay = timedelta(minutes=5)
+    success_result_delay = timedelta(weeks=1)
+
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
-    _cache_storage_time_if_success = timedelta(weeks=1)
     _selenium_wait_time = 0
     _results_wait_time = 30
     _load_more_wait_time = 5

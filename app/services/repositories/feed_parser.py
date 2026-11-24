@@ -16,12 +16,13 @@ class FeedParserRepository(BaseRepository):
             )
             return result.scalar_one_or_none()
 
-    async def upsert(self, feed_id: int, valid_for: datetime) -> FeedParser:
+    async def upsert(self, feed_id: int, next_run_at: datetime) -> FeedParser:
         statement = (
             insert(FeedParser)
-            .values(feed_id=feed_id, valid_for=valid_for)
+            .values(feed_id=feed_id, next_run_at=next_run_at)
             .on_conflict_do_update(
-                index_elements=[FeedParser.feed_id], set_={"valid_for": valid_for}
+                index_elements=[FeedParser.feed_id],
+                set_={FeedParser.next_run_at: next_run_at},
             )
             .returning(FeedParser)
         )

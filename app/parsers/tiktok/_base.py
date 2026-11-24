@@ -6,7 +6,6 @@ from typing import Any
 import structlog
 
 from app.extensions.parsers.base import BaseFeed as _BaseFeed
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.serializers.feed import Item
 from app.services.ytdlp.extractor import YtdlpInfoExtractor
@@ -17,8 +16,9 @@ from app.utils.logging import url_log_fields
 logger = structlog.get_logger(__name__)
 
 
-class BaseTikTokFeed(ItemLinkHashExtension, CacheFeedExtension, _BaseFeed, ABC):
-    _cache_storage_time_if_success = timedelta(days=1)
+class BaseTikTokFeed(ItemLinkHashExtension, _BaseFeed, ABC):
+    empty_result_delay = timedelta(minutes=5)
+    success_result_delay = timedelta(days=1)
 
     async def _parse_items(self) -> list[Item]:
         links = await self._video_links

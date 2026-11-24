@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 
 from app.core.worker_kind import WorkerKind
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
@@ -16,11 +15,10 @@ from app.extensions.parsers.post_to_items import PostToItemsMixin
 from app.serializers.feed import Item
 
 
-class TelegramFeed(
-    PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension
-):
+class TelegramFeed(PostToItemsMixin, ItemLinkHashExtension, HttpParserExtension):
     worker_kind = WorkerKind.LIGHT
-    _cache_storage_time = timedelta(hours=1)
+    empty_result_delay = timedelta(hours=1)
+    success_result_delay = timedelta(hours=1)
 
     def _username(self) -> str:
         url = urlsplit(self.feed.url)

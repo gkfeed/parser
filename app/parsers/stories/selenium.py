@@ -8,7 +8,6 @@ from bs4 import Tag
 from requests.exceptions import RequestException
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.exceptions import FeedUnavailable
 from app.extensions.parsers.hash import ItemsHashExtension
 from app.extensions.parsers.selenium import SeleniumParserExtension
@@ -24,11 +23,10 @@ from .page import StoriesPage
 logger = structlog.get_logger(__name__)
 
 
-class InstagramStoriesFeed(
-    ItemsHashExtension, SeleniumParserExtension, CacheFeedExtension
-):
+class InstagramStoriesFeed(ItemsHashExtension, SeleniumParserExtension):
+    empty_result_delay = timedelta(minutes=5)
+    success_result_delay = timedelta(days=1)
     _http_response_storage_time = timedelta(seconds=0)  # url is similar
-    _cache_storage_time_if_success = timedelta(days=1)
     _selenium_wait_time = 10
     _page_load_timeout_seconds = 30
     _should_delete_cookies = True

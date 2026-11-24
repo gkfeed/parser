@@ -4,7 +4,6 @@ from urllib.parse import urljoin
 
 from bs4 import Tag
 
-from app.extensions.parsers.cache import CacheFeedExtension
 from app.extensions.parsers.hash import ItemLinkHashExtension
 from app.extensions.parsers.http import HttpParserExtension
 from app.serializers.feed import Item
@@ -12,8 +11,9 @@ from app.services.matreshka import MatreshkaClient
 from app.utils.datetime import constant_datetime
 
 
-class MatreshkaFeed(ItemLinkHashExtension, HttpParserExtension, CacheFeedExtension):
-    _cache_storage_time = timedelta(days=1)
+class MatreshkaFeed(ItemLinkHashExtension, HttpParserExtension):
+    empty_result_delay = timedelta(days=1)
+    success_result_delay = timedelta(hours=1)
     _page_size = 12
 
     @override
