@@ -1,5 +1,10 @@
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class URLRanker:
@@ -8,7 +13,13 @@ class URLRanker:
         self.cooldown_minutes = cooldown_minutes
         self.ranks: dict[str, int] = {}
         self.last_failed: dict[str, float] = {}  # timestamp of last failure
-        self._load_ranks()
+        try:
+            Path(data_file).parent.mkdir(parents=True, exist_ok=True)
+            self._load_ranks()
+        except OSError as error:
+            logger.warning(
+                "url_ranks_init_failed", data_file=data_file, error=str(error)
+            )
 
     def _load_ranks(self):
         try:
