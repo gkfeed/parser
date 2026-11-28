@@ -25,6 +25,7 @@ from .rtl import RTLSeriesFeed
 from .sasflix import SasflixFeed
 from .shiki import ShikiFeed
 from .shiki_ongoing import ShikiOngoingFeed
+from .soundcloud import SoundCloudFeed
 from .spoti import SpotifyFeed, SpotifyPlaylistFeed
 from .stories import InstagramStoriesFeed
 from .tiktok import TikTokFeed
@@ -80,6 +81,7 @@ class Parser(Enum):
     SASFLIX = ParserConfig(ParserId.SASFLIX, SasflixFeed)
     PORNO365 = ParserConfig(ParserId.PORNO365, Porno365Feed)
     AUTHOR_TODAY = ParserConfig(ParserId.AUTHOR_TODAY, AuthorTodayFeed)
+    SOUNDCLOUD = ParserConfig(ParserId.SOUNDCLOUD, SoundCloudFeed)
 
 
 # NOTE: inconsistent api

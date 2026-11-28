@@ -36,6 +36,7 @@ class ParserId(StrEnum):
     SASFLIX = "sasflix"
     PORNO365 = "porno365"
     AUTHOR_TODAY = "author.today"
+    SOUNDCLOUD = "soundcloud"
 
     @property
     def task_name(self) -> str:
