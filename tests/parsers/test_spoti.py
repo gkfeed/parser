@@ -38,6 +38,24 @@ async def test_spoti_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0
 
 
+@pytest.mark.parametrize(
+    "fetch_items",
+    [
+        {
+            "type": "spoti",
+            "parser": SpotifyFeed,
+            "url": (
+                "https://open.spotify.com/artist/0ChMIwzbYxHbebgoPeETfV"
+                "?si=parser_share_link"
+            ),
+        }
+    ],
+    indirect=True,
+)
+async def test_spoti_feed_with_share_url(fetch_items):  # noqa: F811
+    assert len(fetch_items) != 0
+
+
 @pytest.mark.parametrize("fetch_items", SPOTIFY_PLAYLIST_FEED_DATA, indirect=True)
 async def test_spoti_playlist_feed(fetch_items):  # noqa: F811
     assert len(fetch_items) != 0
